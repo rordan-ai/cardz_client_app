@@ -1,4 +1,4 @@
--- בדיקת הסכמה האמיתית של טבלת products
+-- בדיקת הסכמה האמיתית של טבלת businesses
 SELECT 
     column_name,
     data_type,
@@ -6,15 +6,20 @@ SELECT
     is_nullable,
     column_default
 FROM information_schema.columns 
-WHERE table_name = 'products' 
+WHERE table_name = 'businesses' 
 AND table_schema = 'public'
+AND column_name LIKE '%icon%'
 ORDER BY ordinal_position;
 
--- בדיקת המוצרים הקיימים
+-- בדיקת נתוני העסק 0001
 SELECT 
     business_code,
-    product_code,
-    product_name,
-    LENGTH(product_code) as code_length
-FROM products 
-ORDER BY business_code, product_code; 
+    name,
+    max_punches,
+    punched_icon,
+    unpunched_icon,
+    punched_icon,
+    unpunched_icon,
+    logo
+FROM businesses 
+WHERE business_code = '0001'; 

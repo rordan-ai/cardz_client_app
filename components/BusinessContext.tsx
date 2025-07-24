@@ -9,13 +9,13 @@ interface Business {
   logo?: string;
   address?: string;
   phone?: string;
-  logine_barand_color?: string;
+  login_brand_color?: string;
   login_background_image?: string;
   business_whatsapp?: string;
   business_phone?: string;
   max_punches?: number;
-  Punched_Iicon?: string;
-  Unpunched_Iicon?: string;
+  punched_icon?: string;
+  unpunched_icon?: string;
   card_text_color?: string;
   logo_size?: number;
   expiration_date?: string;

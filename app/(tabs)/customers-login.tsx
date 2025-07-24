@@ -24,7 +24,7 @@ export default function CustomersLogin() {
   const [menuVisible, setMenuVisible] = useState(false);
   const slideAnim = useState(new Animated.Value(-200))[0];
 
-  const brandColor = business?.logine_barand_color || '#9747FF';
+  const brandColor = business?.login_brand_color || '#9747FF';
 
   // טעינת מספר טלפון שמור מהכניסה הקודמת
   useEffect(() => {

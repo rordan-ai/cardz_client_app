@@ -69,12 +69,12 @@ export default function PunchCard() {
         if (businessInfo.logo) {
           Image.prefetch(businessInfo.logo).catch(() => {});
         }
-        if (businessInfo.Punched_Iicon) {
-          Image.prefetch(businessInfo.Punched_Iicon).catch(() => {});
-        }
-        if (businessInfo.Unpunched_Iicon) {
-          Image.prefetch(businessInfo.Unpunched_Iicon).catch(() => {});
-        }
+            if (businessInfo.punched_icon) {
+      Image.prefetch(businessInfo.punched_icon).catch(() => {});
+    }
+    if (businessInfo.unpunched_icon) {
+      Image.prefetch(businessInfo.unpunched_icon).catch(() => {});
+    }
       }
       
       // שליפת כרטיסייה לפי card_number
@@ -191,10 +191,20 @@ export default function PunchCard() {
   const totalPunches = business?.max_punches || 0;
   const usedPunches = punchCard.used_punches || 0;
   const unpunched = totalPunches - usedPunches;
-  const punchedIcon = business?.Punched_Iicon;
-  const unpunchedIcon = business?.Unpunched_Iicon;
+  const punchedIcon = business?.punched_icon;
+  const unpunchedIcon = business?.unpunched_icon;
   const benefit = punchCard.benefit || '';
   const prepaid = punchCard.prepaid === 'כן' ? 'כן' : 'לא';
+
+  // 🔍 DEBUG: לוגים מפורטים לאייקונים
+  console.log('🔍 DEBUG - נתוני האייקונים:');
+  console.log('📊 totalPunches:', totalPunches);
+  console.log('📊 usedPunches:', usedPunches);
+  console.log('📊 unpunched:', unpunched);
+  console.log('🖼️ punchedIcon:', punchedIcon);
+  console.log('🖼️ unpunchedIcon:', unpunchedIcon);
+  console.log('🏢 business data:', business);
+  console.log('💳 punchCard data:', punchCard);
 
   // בניית מערך אייקונים
   const iconsArr = [
@@ -202,12 +212,17 @@ export default function PunchCard() {
     ...Array(unpunched).fill(unpunchedIcon),
   ];
 
+  console.log('📋 iconsArr length:', iconsArr.length);
+  console.log('📋 iconsArr content:', iconsArr);
+
   // עיצוב גריד סימטרי (למשל 3x4, 2x5 וכו')
   const iconsPerRow = Math.ceil(Math.sqrt(totalPunches));
   const rows = [];
   for (let i = 0; i < iconsArr.length; i += iconsPerRow) {
     rows.push(iconsArr.slice(i, i + iconsPerRow));
   }
+
+  console.log('📊 rows:', rows);
 
   // צבע הטקסט מהעסק או ברירת מחדל
   const cardTextColor = business?.card_text_color || '#6B3F1D';

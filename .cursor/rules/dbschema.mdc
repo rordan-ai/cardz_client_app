@@ -46,15 +46,15 @@ CREATE TABLE public.businesses (
   prepaid_discount_percent numeric,
   prepaid_bonus_value numeric,
   login_background_image text,
-  logine_barand_color text,
+  login_brand_color text,
   business_phone text NOT NULL,
   business_website text,
   completion_bonus_value numeric,
   completion_bonus_type text,
   business_whatsapp text,
   business_code character varying NOT NULL UNIQUE,
-  Punched_Iicon text,
-  Unpunched_Iicon text,
+  punched_icon text,
+  unpunched_icon text,
   CONSTRAINT businesses_pkey PRIMARY KEY (business_code)
 );
 CREATE TABLE public.customers (
