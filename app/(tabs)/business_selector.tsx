@@ -34,11 +34,11 @@ export default function BusinessSelector() {
         .from('businesses')
         .select('business_code, name, logo')
         .order('name', { ascending: true });
-      if (data) setBusinesses(data.map((b: any) => ({ name: b.name, id: b.business_code, logo: b.logo })));
+      if (data) setBusinesses(data.map((b: { name: string; business_code: string; logo?: string }) => ({ name: b.name, id: b.business_code, logo: b.logo })));
     })();
   }, []);
 
-  const selectBusiness = async (businessItem: any) => {
+  const selectBusiness = async (businessItem: { id: string; name: string; logo?: string }) => {
     await setBusinessCode(businessItem.id);
     setModalVisible(false);
     setSearchBusiness('');
@@ -47,7 +47,7 @@ export default function BusinessSelector() {
 
   const handleMenuOption = (option: string) => {
     setMenuVisible(false);
-    console.log('Selected menu option:', option);
+
   };
 
   return (

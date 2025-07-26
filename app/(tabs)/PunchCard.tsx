@@ -7,15 +7,24 @@ import { useBusiness } from '../../components/BusinessContext';
 import { getCurrentLogoScale } from '../../components/LogoUtils';
 import { supabase } from '../../components/supabaseClient';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export default function PunchCard() {
   const router = useRouter();
   const { business, refresh: refreshBusiness } = useBusiness();
   const { phone } = useLocalSearchParams();
   const phoneStr = typeof phone === 'string' ? phone.trim() : Array.isArray(phone) ? phone[0].trim() : '';
-  const [customer, setCustomer] = useState<any>(null);
-  const [punchCard, setPunchCard] = useState<any>(null);
+  const [customer, setCustomer] = useState<{ 
+    business_code: string; 
+    name: string; 
+    customer_phone: string; 
+  } | null>(null);
+  const [punchCard, setPunchCard] = useState<{ 
+    card_number: string; 
+    used_punches: number; 
+    benefit: string; 
+    prepaid: string; 
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [logoLoading, setLogoLoading] = useState(true);
@@ -24,7 +33,16 @@ export default function PunchCard() {
   const [mailVisible, setMailVisible] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(2);
   const [referralVisible, setReferralVisible] = useState(false);
-  const [localBusiness, setLocalBusiness] = useState<any>(null);
+  const [localBusiness, setLocalBusiness] = useState<{
+    business_code: string;
+    name: string;
+    logo?: string;
+    max_punches: number;
+    punched_icon?: string;
+    unpunched_icon?: string;
+    card_text_color?: string;
+    expiration_date?: string;
+  } | null>(null);
 
 
   useEffect(() => {
@@ -107,9 +125,11 @@ export default function PunchCard() {
   useEffect(() => {
     if (!phoneStr) return;
 
-    const businessCode = customer?.business_code || '0001';
-    const productCode = '12';
-    const cardNumber = `${businessCode}${phoneStr}${productCode}`;
+    const businessCode = customer?.business_code;
+    const productCode = punchCard?.product_code;
+    const cardNumber = punchCard?.card_number;
+    
+    if (!businessCode || !productCode || !cardNumber) return;
 
     // חיבור ל-Realtime לטבלת PunchCards
     const punchCardChannel = supabase
@@ -122,9 +142,8 @@ export default function PunchCard() {
           table: 'PunchCards',
           filter: `card_number=eq.${cardNumber}`
         },
-        (payload: any) => {
-          console.log('🔄 עדכון Realtime לכרטיסייה:', payload);
-          if (payload.new) {
+                 (payload: { new?: Record<string, any>; old?: Record<string, any> }) => {
+           if (payload.new) {
             setPunchCard(payload.new);
           }
         }
@@ -142,9 +161,8 @@ export default function PunchCard() {
           table: 'businesses',
           filter: `business_code=eq.${businessCode}`
         },
-        async (payload: any) => {
-          console.log('🏢 עדכון Realtime לעסק:', payload);
-          if (payload.new) {
+                 async (payload: { new?: Record<string, any>; old?: Record<string, any> }) => {
+           if (payload.new) {
             await refreshBusiness();
           }
         }
@@ -185,26 +203,18 @@ export default function PunchCard() {
   }
 
   // לוגיקת קוד כרטיסייה
-  const cardCode = punchCard.card_number;
+  const cardCode = punchCard?.card_number || '';
 
   // לוגיקת ניקובים - שימוש ב-max_punches מהעסק במקום total_punches מהכרטיסייה
   const totalPunches = business?.max_punches || 0;
-  const usedPunches = punchCard.used_punches || 0;
+  const usedPunches = punchCard?.used_punches || 0;
   const unpunched = totalPunches - usedPunches;
   const punchedIcon = business?.punched_icon;
   const unpunchedIcon = business?.unpunched_icon;
-  const benefit = punchCard.benefit || '';
-  const prepaid = punchCard.prepaid === 'כן' ? 'כן' : 'לא';
+  const benefit = punchCard?.benefit || '';
+  const prepaid = punchCard?.prepaid === 'כן' ? 'כן' : 'לא';
 
-  // 🔍 DEBUG: לוגים מפורטים לאייקונים
-  console.log('🔍 DEBUG - נתוני האייקונים:');
-  console.log('📊 totalPunches:', totalPunches);
-  console.log('📊 usedPunches:', usedPunches);
-  console.log('📊 unpunched:', unpunched);
-  console.log('🖼️ punchedIcon:', punchedIcon);
-  console.log('🖼️ unpunchedIcon:', unpunchedIcon);
-  console.log('🏢 business data:', business);
-  console.log('💳 punchCard data:', punchCard);
+  
 
   // בניית מערך אייקונים
   const iconsArr = [
@@ -212,8 +222,7 @@ export default function PunchCard() {
     ...Array(unpunched).fill(unpunchedIcon),
   ];
 
-  console.log('📋 iconsArr length:', iconsArr.length);
-  console.log('📋 iconsArr content:', iconsArr);
+  
 
   // עיצוב גריד סימטרי (למשל 3x4, 2x5 וכו')
   const iconsPerRow = Math.ceil(Math.sqrt(totalPunches));
@@ -222,7 +231,7 @@ export default function PunchCard() {
     rows.push(iconsArr.slice(i, i + iconsPerRow));
   }
 
-  console.log('📊 rows:', rows);
+  
 
   // צבע הטקסט מהעסק או ברירת מחדל
   const cardTextColor = business?.card_text_color || '#6B3F1D';
@@ -247,7 +256,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={styles.container}>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
-        style={styles.hamburgerContainer}
+        style={[styles.hamburgerContainer, styles.topIconOffsetClean]}
         onPress={() => setMenuVisible(true)}
       >
         <View style={styles.hamburgerButton}>
@@ -259,7 +268,7 @@ export default function PunchCard() {
 
       {/* אייקון הודעות דואר */}
       <TouchableOpacity 
-        style={styles.mailIconContainer}
+        style={[styles.mailIconContainer, styles.topIconOffsetClean]}
         onPress={() => setMailVisible(true)}
       >
         <Image 
@@ -276,7 +285,7 @@ export default function PunchCard() {
 
       {/* אייקון קבוצה באמצע */}
       <TouchableOpacity 
-        style={styles.communityIconContainer}
+        style={[styles.communityIconContainer, styles.topIconOffsetClean]}
         onPress={() => setReferralVisible(true)}
       >
         <Image 
@@ -288,49 +297,55 @@ export default function PunchCard() {
       
       {/* מקשה אחת - לוגו, שם עסק ושם לקוח */}
       <View style={styles.topElementsGroup}>
-        {/* לוגו העסק */}
-        <View style={styles.logoContainer}>
-          {business?.logo && (
-            <View style={{ position: 'relative' }}>
-              {logoLoading && (
-                <View style={{ 
-                  position: 'absolute',
-                  width: 170, 
-                  height: 170,
-                  backgroundColor: '#f0f0f0',
-                  borderRadius: 85,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  transform: [{ scale: getCurrentLogoScale() }]
-                }}>
-                  <Text style={{ color: '#999', fontSize: 12, fontFamily: 'Rubik' }}>טוען לוגו...</Text>
-                </View>
-              )}
-              <Image 
-                key={`logo-${business.business_code}-${business.logo}`}
-                source={{ uri: business.logo }} 
-                style={{ 
-                  width: 170, 
-                  height: 170,
-                  transform: [{ scale: getCurrentLogoScale() }],
-                  opacity: logoLoading ? 0 : 1
-                }} 
-                resizeMode="contain"
-                onLoad={() => setLogoLoading(false)}
-                onError={() => setLogoLoading(false)}
-              />
-            </View>
-          )}
-          {/* שם העסק מתחת ללוגו */}
-          {business?.name && (
-            <Text style={[styles.businessName, { color: cardTextColor }]}>{business.name}</Text>
-          )}
+        {/* לוגו ושם עסק - מוזחים ב-5% */}
+        <View style={styles.logoBusinessOffset}>
+          {/* לוגו העסק */}
+          <View style={styles.logoContainer}>
+            {business?.logo && (
+              <View style={{ position: 'relative' }}>
+                {logoLoading && (
+                  <View style={{ 
+                    position: 'absolute',
+                    width: 170, 
+                    height: 170,
+                    backgroundColor: '#f0f0f0',
+                    borderRadius: 85,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    transform: [{ scale: getCurrentLogoScale() }]
+                  }}>
+                    <Text style={{ color: '#999', fontSize: 12, fontFamily: 'Rubik' }}>טוען לוגו...</Text>
+                  </View>
+                )}
+                <Image 
+                  key={`logo-${business.business_code}-${business.logo}`}
+                  source={{ uri: business.logo }} 
+                  style={{ 
+                    width: 170, 
+                    height: 170,
+                    transform: [{ scale: getCurrentLogoScale() }],
+                    opacity: logoLoading ? 0 : 1
+                  }} 
+                  resizeMode="contain"
+                  onLoad={() => setLogoLoading(false)}
+                  onError={() => setLogoLoading(false)}
+                />
+              </View>
+            )}
+            {/* שם העסק מתחת ללוגו */}
+            {business?.name && (
+              <Text style={[styles.businessName, { color: cardTextColor }]}>{business.name}</Text>
+            )}
+          </View>
         </View>
-        {/* שם הלקוח */}
-        <Text style={[styles.customerName, { color: cardTextColor }]}>{customer.name}</Text>
+                 {/* שם הלקוח */}
+         <Text style={[styles.customerName, { color: cardTextColor }]}>{customer?.name || ''}</Text>
       </View>
-      {/* אייקונים */}
-      <View style={styles.iconsBoxTight}>
+      {/* כל התוכן מתחת לשם הלקוח - מוזח 10% למטה */}
+      <View style={styles.bottomContentOffset}>
+        {/* אייקונים - מוזחים 5% למעלה */}
+        <View style={styles.iconsUpOffset}>
+        <View style={styles.iconsBoxTight}>
         {rows.map((row, idx) => (
           <View key={idx} style={styles.iconsRow}>
             {row.map((icon, j) => {
@@ -365,22 +380,26 @@ export default function PunchCard() {
             })}
           </View>
         ))}
+        </View>
       </View>
-      {/* ניקובים */}
-      <Text style={[styles.punchCount, { color: cardTextColor }]}>ניקובים: {usedPunches}/{totalPunches}</Text>
-      {/* טקסט מתחת לאייקונים */}
-      <Text style={[styles.benefitText, { color: cardTextColor }]}>
-        נותרו {unpunched} ניקובים לקבלת {benefit}
-      </Text>
-      {/* סטטוס תשלום מראש */}
-      <Text style={[styles.prepaidText, { color: cardTextColor }]}>תשלום מראש: {prepaid}</Text>
-      
-      {/* תאריך תפוגה */}
-      <Text style={[styles.expirationText, { color: cardTextColor }]}>
-        בתוקף עד: {business?.expiration_date 
-          ? new Date(business.expiration_date).toLocaleDateString('he-IL') 
-          : 'ללא זמן תפוגה'}
-      </Text>
+      {/* 4 הטקסטים התחתונים - מוזחים 7% למעלה */}
+      <View style={styles.bottomTextsUpOffset}>
+        {/* ניקובים */}
+        <Text style={[styles.punchCount, { color: cardTextColor }]}>ניקובים: {usedPunches}/{totalPunches}</Text>
+        {/* טקסט מתחת לאייקונים */}
+        <Text style={[styles.benefitText, { color: cardTextColor }]}>
+          נותרו {unpunched} ניקובים לקבלת {benefit}
+        </Text>
+        {/* סטטוס תשלום מראש */}
+        <Text style={[styles.prepaidText, { color: cardTextColor }]}>תשלום מראש: {prepaid}</Text>
+        
+        {/* תאריך תפוגה */}
+        <Text style={[styles.expirationText, { color: cardTextColor }]}>
+          בתוקף עד: {business?.expiration_date 
+            ? new Date(business.expiration_date).toLocaleDateString('he-IL') 
+            : 'ללא זמן תפוגה'}
+        </Text>
+      </View>
       
       {/* ברקוד */}
       <View style={styles.barcodeBox}>
@@ -388,13 +407,26 @@ export default function PunchCard() {
       </View>
       {/* מספר סידורי */}
       <Text style={styles.cardCode}>#{cardCode}</Text>
+      </View>
       
-      {/* מודאל תפריט המבורגר */}
-      <Modal visible={menuVisible} transparent animationType="slide">
+             {/* מודאל תפריט המבורגר */}
+       <Modal 
+         visible={menuVisible} 
+         transparent 
+         animationType="slide"
+         onRequestClose={() => setMenuVisible(false)}
+       >
         <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.menuContent}>
-              <Text style={[styles.menuTitle, { color: cardTextColor }]}>תפריט</Text>
+                     <View style={styles.modalOverlay}>
+             <View style={styles.menuContent}>
+               <TouchableOpacity 
+                 style={styles.menuCloseButton}
+                 onPress={() => setMenuVisible(false)}
+               >
+                 <Text style={styles.menuCloseText}>×</Text>
+               </TouchableOpacity>
+               
+               <Text style={[styles.menuTitle, { color: cardTextColor }]}>תפריט</Text>
               
               <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
                 <Text style={styles.menuItemText}>הוראות שימוש</Text>
@@ -424,12 +456,7 @@ export default function PunchCard() {
                 <Text style={styles.menuItemText}>צור קשר</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={() => setMenuVisible(false)}
-              >
-                <Text style={styles.closeButtonText}>×</Text>
-              </TouchableOpacity>
+
             </View>
           </View>
                  </TouchableWithoutFeedback>
@@ -475,25 +502,30 @@ export default function PunchCard() {
            </View>
          </Modal>
 
-      {/* חלונית חבר מביא חבר */}
-      <Modal visible={referralVisible} transparent animationType="slide">
+             {/* חלונית חבר מביא חבר */}
+       <Modal 
+         visible={referralVisible} 
+         transparent 
+         animationType="slide"
+         onRequestClose={() => setReferralVisible(false)}
+       >
         <TouchableWithoutFeedback onPress={() => setReferralVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={[styles.referralModal, { backgroundColor: 'white' }]}>
                 
-                {/* כפתור סגירה */}
-                <TouchableOpacity 
-                  style={styles.closeButton}
-                  onPress={() => setReferralVisible(false)}
-                >
-                  <Text style={styles.closeButtonText}>×</Text>
-                </TouchableOpacity>
-
-                {/* כותרת */}
-                <Text style={[styles.referralTitle, { color: cardTextColor }]}>
-                  חבר מביא חבר
-                </Text>
+                                 {/* בר עליון עם כותרת וכפתור סגירה */}
+                 <View style={[styles.referralHeader, { backgroundColor: cardTextColor }]}>
+                  <Text style={styles.referralHeaderTitle}>
+                    חבר מביא חבר
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.referralCloseButton}
+                    onPress={() => setReferralVisible(false)}
+                  >
+                    <Text style={styles.referralCloseButtonText}>×</Text>
+                  </TouchableOpacity>
+                </View>
 
                 {/* קוד ההפניה */}
                 <View style={styles.referralCodeContainer}>
@@ -501,15 +533,13 @@ export default function PunchCard() {
                   <TouchableOpacity 
                     style={styles.referralCodeBox}
                     onPress={async () => {
-                      try {
-                        const textToCopy = punchCard?.card_number || '';
-                        console.log('מנסה להעתיק מספר קופון:', textToCopy);
-                        await Clipboard.setStringAsync(textToCopy);
-                        console.log('מספר הקופון הועתק בהצלחה');
-                        Alert.alert('הקופון הועתק!', `קופון ההזמנה ${textToCopy} הועתק ללוח`);
-                      } catch (error) {
+                                             try {
+                         const textToCopy = punchCard?.card_number || '';
+                         await Clipboard.setStringAsync(textToCopy);
+                         Alert.alert('הקופון הועתק!', `קופון ההזמנה ${textToCopy} הועתק ללוח`);
+                      } catch (error: unknown) {
                         console.error('שגיאה בהעתקת מספר הקופון:', error);
-                        Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${error.message || error}`);
+                        Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${(error as Error).message || error}`);
                       }
                     }}
                   >
@@ -520,15 +550,13 @@ export default function PunchCard() {
                   <TouchableOpacity 
                     style={[styles.copyButton, { backgroundColor: cardTextColor }]}
                     onPress={async () => {
-                      try {
-                        const textToCopy = punchCard?.card_number || '';
-                        console.log('מנסה להעתיק מכפתור:', textToCopy);
-                        await Clipboard.setStringAsync(textToCopy);
-                        console.log('הכפתור העתיק בהצלחה');
-                        Alert.alert('הקופון הועתק!', `קופון ההזמנה ${textToCopy} הועתק ללוח`);
-                      } catch (error) {
+                                             try {
+                         const textToCopy = punchCard?.card_number || '';
+                         await Clipboard.setStringAsync(textToCopy);
+                         Alert.alert('הקופון הועתק!', `קופון ההזמנה ${textToCopy} הועתק ללוח`);
+                      } catch (error: unknown) {
                         console.error('שגיאה בהעתקה מכפתור:', error);
-                        Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${error.message || error}`);
+                        Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${(error as Error).message || error}`);
                       }
                     }}
                   >
@@ -655,6 +683,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 8,
   },
+  topIconOffsetClean: {
+    transform: [{ translateY: height * 0.05 }],
+  },
+  logoBusinessOffset: {
+    transform: [{ translateY: height * 0.10 }],
+  },
+  iconsUpOffset: {
+    transform: [{ translateY: height * -0.10 }],
+  },
+  bottomContentOffset: {
+    transform: [{ translateY: height * 0.095 }],
+  },
+  bottomTextsUpOffset: {
+    transform: [{ translateY: height * -0.07 }],
+    alignItems: 'center',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -662,7 +706,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FBF8F8',
   },
   topElementsGroup: {
-    transform: [{ translateY: 40 }],
+    // transform: [{ translateY: 40 }], // NEUTRALIZED - conflicts with logoBusinessOffset
   },
   logoContainer: {
     alignItems: 'center',
@@ -687,13 +731,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 60,
     textAlign: 'center',
-    transform: [{ translateY: -40 }],
+    // transform: [{ translateY: -40 }], // NEUTRALIZED - conflicts with spacing adjustments
     fontFamily: 'Rubik',
   },
   iconsBoxTight: {
     marginTop: 0,
     marginBottom: 12,
-    transform: [{ translateY: -50 }],
+    transform: [{ translateY: -50 }], // RESTORED - helps with fine-tuning when adding/removing elements
   },
   iconsRow: {
     flexDirection: 'row',
@@ -951,22 +995,36 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
+  referralHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    zIndex: 10,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    marginTop: -24,
+    marginHorizontal: -24,
+    marginBottom: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
-  closeButtonText: {
+  referralHeaderTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#666',
+    color: 'white',
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: 'Rubik',
+  },
+  referralCloseButton: {
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  referralCloseButtonText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
   },
   referralTitle: {
     fontSize: 20,
@@ -1062,11 +1120,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 6,
   },
-  copyButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-    fontFamily: 'Rubik',
-    textAlign: 'center',
-  },
-}); 
+     copyButtonText: {
+     color: 'white',
+     fontSize: 12,
+     fontWeight: '600',
+     fontFamily: 'Rubik',
+     textAlign: 'center',
+   },
+       menuCloseButton: {
+      width: 30,
+      height: 30,
+      justifyContent: 'center',
+      alignItems: 'center',
+      alignSelf: 'flex-end',
+      marginBottom: 10,
+    },
+   menuCloseText: {
+     fontSize: 24,
+     fontWeight: 'bold',
+     color: '#666',
+   },
+ }); 

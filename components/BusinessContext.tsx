@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 
-const BUSINESS_CODE = '0001';
-
 interface Business {
   business_code: string;
   name: string;
@@ -43,12 +41,11 @@ export const useBusiness = () => useContext(BusinessContext);
 export const BusinessProvider = ({ children }: { children: React.ReactNode }) => {
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentBusinessCode, setCurrentBusinessCode] = useState(BUSINESS_CODE);
+  const [currentBusinessCode, setCurrentBusinessCode] = useState<string | null>('0001');
 
   const fetchBusiness = async (businessCode?: string) => {
     setLoading(true);
     const codeToFetch = businessCode || currentBusinessCode;
-    console.log('🔄 טוען נתוני עסק:', codeToFetch);
     const { data, error } = await supabase
       .from('businesses')
       .select('*')
@@ -57,9 +54,6 @@ export const BusinessProvider = ({ children }: { children: React.ReactNode }) =>
     
     if (error) {
       console.error('❌ שגיאה בטעינת נתוני עסק:', error);
-    } else {
-      console.log('✅ נתוני עסק נטענו בהצלחה:', data?.name);
-      console.log('🖼️ תמונת רקע:', data?.login_background_image);
     }
     
     setBusiness(data);
@@ -68,18 +62,11 @@ export const BusinessProvider = ({ children }: { children: React.ReactNode }) =>
   };
 
   const refreshBusiness = async () => {
-    console.log('🔄 מרענן נתוני עסק עבור קוד:', currentBusinessCode);
     const oldData = business;
     const newData = await fetchBusiness(currentBusinessCode);
-    console.log('📊 השוואת נתונים:', {
-      oldImage: oldData?.login_background_image,
-      newImage: newData?.login_background_image,
-      changed: oldData?.login_background_image !== newData?.login_background_image
-    });
   };
 
   const setBusinessCode = async (code: string) => {
-    console.log('🏢 מחליף קוד עסק ל:', code);
     setCurrentBusinessCode(code);
     await fetchBusiness(code);
   };

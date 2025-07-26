@@ -47,7 +47,7 @@ export default function NewClientForm() {
         .from('businesses')
         .select('business_code, name')
         .order('name', { ascending: true });
-      if (data) setBusinesses(data.map((b: any) => ({ name: b.name, id: b.business_code })));
+      if (data) setBusinesses(data.map((b: { name: string; business_code: string }) => ({ name: b.name, id: b.business_code })));
     })();
   }, []);
 
@@ -60,7 +60,7 @@ export default function NewClientForm() {
           setPhone(savedPhone);
         }
       } catch (error) {
-        console.log('שגיאה בטעינת מספר טלפון שמור:', error);
+        console.error('שגיאה בטעינת מספר טלפון שמור:', error);
       }
     };
     loadSavedPhone();

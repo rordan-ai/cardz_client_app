@@ -34,9 +34,9 @@ export default function CustomersLogin() {
         if (savedPhone) {
           setPhone(savedPhone);
         }
-      } catch (error) {
-        console.log('שגיאה בטעינת מספר טלפון שמור:', error);
-      }
+          } catch (error) {
+      console.error('שגיאה בטעינת מספר טלפון שמור:', error);
+    }
     };
     loadSavedPhone();
   }, []);
@@ -76,7 +76,7 @@ export default function CustomersLogin() {
     try {
       await AsyncStorage.setItem('saved_phone', phone);
     } catch (error) {
-      console.log('שגיאה בשמירת מספר טלפון:', error);
+      console.error('שגיאה בשמירת מספר טלפון:', error);
     }
     
     router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}`);
@@ -281,12 +281,7 @@ export default function CustomersLogin() {
                 );
               }
               
-              console.log('🖼️ בודק תמונת רקע:', {
-                original: business?.login_background_image,
-                cleaned: originalUrl,
-                hasError: backgroundImageError,
-                businessName: business?.name
-              });
+
               
               return !backgroundImageError ? (
                                   <View style={styles(brandColor).backgroundImageContainer}>
@@ -297,10 +292,8 @@ export default function CustomersLogin() {
                       resizeMode="contain"
                       onError={() => {
                         setBackgroundImageError(true);
-                        console.log('❌ שגיאת טעינת תמונה:', originalUrl);
                       }}
                       onLoad={() => {
-                        console.log('✅ תמונה נטענה בהצלחה:', originalUrl);
                       }}
                     />
                   </View>
