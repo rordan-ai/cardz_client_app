@@ -209,12 +209,14 @@ const styles = StyleSheet.create({
   // New touchable areas
   hamburgerArea: {
     position: 'absolute',
-    top: 153,
+    top: 162,
     right: 155,
-    width: 35,
-    height: 35,
-    backgroundColor: 'transparent',
+    width: 47,
+    height: 47,
+    backgroundColor: 'red',
     borderRadius: 5,
+    borderWidth: 2,
+    borderColor: 'black',
   },
   selectBusinessArea: {
     position: 'absolute',
@@ -239,10 +241,13 @@ const styles = StyleSheet.create({
 
   // Tablet-specific styles
   tabletHamburgerArea: {
-    top: 100,
+    top: 106,
     right: 100,
-    width: 50,
-    height: 50,
+    width: 66,
+    height: 66,
+    backgroundColor: 'red',
+    borderWidth: 2,
+    borderColor: 'black',
   },
   tabletSelectBusinessArea: {
     bottom: 120,

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useBusiness } from '../../components/BusinessContext';
 const LotteryIcon = require('../../assets/images/LOTTARY.png');
@@ -22,9 +22,21 @@ export default function CustomersLogin() {
   const [imageKey, setImageKey] = useState(0);
   const { business, loading, refresh: refreshBusiness } = useBusiness();
   const [menuVisible, setMenuVisible] = useState(false);
-  const slideAnim = useState(new Animated.Value(-200))[0];
+  const slideAnim = useRef(new Animated.Value(-200)).current;
 
   const brandColor = business?.login_brand_color || '#9747FF';
+
+  // Debug נתוני עסק
+  useEffect(() => {
+    if (business) {
+      console.log('🏢 נתוני עסק נטענו:', {
+        name: business.name,
+        business_phone: business.business_phone,
+        business_whatsapp: business.business_whatsapp,
+        phone: business.phone
+      });
+    }
+  }, [business]);
 
   // טעינת מספר טלפון שמור מהכניסה הקודמת
   useEffect(() => {
@@ -38,30 +50,17 @@ export default function CustomersLogin() {
       console.error('שגיאה בטעינת מספר טלפון שמור:', error);
     }
     };
-    loadSavedPhone();
+    // אסינכרוני ללא חסימה
+    setTimeout(() => loadSavedPhone(), 0);
   }, []);
 
-  // הסרת כל הקוד המסובך - חזרה לפשטות
+  // איפוס שגיאות תמונה כשהעסק משתנה - ללא חסימה
   useEffect(() => {
-    // איפוס שגיאות תמונה כשהעסק משתנה
     if (business) {
       setBackgroundImageError(false);
-      
-      // Preload תמונות לשיפור הביצועים
-      if (business.login_background_image) {
-        const cleanUrl = business.login_background_image.trim().replace(/[\r\n\t]/g, '');
-        if (cleanUrl) {
-          Image.prefetch(cleanUrl).catch(() => {});
-        }
-      }
+      setImageKey(prev => prev + 1);
     }
-  }, [business?.business_code, business?.login_background_image]);
-
-  // איפוס שגיאת תמונה כשהכתובת משתנה
-  useEffect(() => {
-    setBackgroundImageError(false);
-    setImageKey(prev => prev + 1); // כפיית רענון התמונה
-  }, [business?.login_background_image]);
+  }, [business?.business_code]);
 
 
 
@@ -83,6 +82,7 @@ export default function CustomersLogin() {
   };
 
   const openMenu = () => {
+    console.log('🍔 פותח תפריט המבורגר');
     setMenuVisible(true);
     Animated.timing(slideAnim, {
       toValue: 0,
@@ -107,32 +107,50 @@ export default function CustomersLogin() {
   };
 
   const handleWhatsappChat = () => {
+    console.log('🔍 בדיקת וואטסאפ:', business?.business_whatsapp);
     if (business?.business_whatsapp) {
       const phone = getInternationalPhone(business.business_whatsapp);
+      console.log('📞 מספר וואטסאפ מעובד:', phone);
       const url = `https://wa.me/${phone}`;
+      console.log('🔗 URL:', url);
       Linking.openURL(url);
+    } else {
+      console.log('❌ אין מספר וואטסאפ');
     }
   };
 
   const handlePhoneCall = () => {
+    console.log('🔍 בדיקת טלפון:', business?.business_phone);
     if (business?.business_phone) {
       const phone = business.business_phone.replace(/[^0-9]/g, '');
+      console.log('📞 מספר טלפון מעובד:', phone);
       const url = `tel:${phone}`;
+      console.log('🔗 URL:', url);
       Linking.openURL(url);
+    } else {
+      console.log('❌ אין מספר טלפון');
     }
   };
 
   const handleShareWhatsapp = () => {
+    console.log('🔍 בדיקת שיתוף:', business?.name);
     if (business?.name) {
       const message = `היי, שמעת על הכרטיסייה האלקטרונית של ${business.name}? מעבר להטבה על מספר ניקובים יש שם הגרלות והפתעות, משקיעים בנו 😉.`;
       const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      console.log('🔗 שיתוף URL:', url);
       Linking.openURL(url);
+    } else {
+      console.log('❌ אין שם עסק');
     }
   };
 
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FBF8F8' }}>
+        {/* כפתור המבורגר גם במצב טעינה */}
+                 <TouchableOpacity onPress={openMenu} style={{ position: 'absolute', top: Platform.OS === 'ios' ? 70 : 30, alignSelf: 'center' }}>
+           <Image source={HamburgerIcon} style={{ width: 36, height: 36, tintColor: '#9747FF' }} />
+         </TouchableOpacity>
         <LottieView
           source={{ uri: 'https://cdn.lottielab.com/l/CeHEQyB7hKAF1h.json' }}
           autoPlay
@@ -140,6 +158,38 @@ export default function CustomersLogin() {
           style={{ width: 120, height: 120 }}
         />
         <Text style={{ color: '#A39393', fontSize: 16, marginTop: 16, fontFamily: 'Rubik' }}>טוען נתוני עסק...</Text>
+        
+        {/* תפריט פופאובר גם במצב טעינה */}
+        <Modal
+          visible={menuVisible}
+          transparent
+          animationType="none"
+          onRequestClose={closeMenu}
+        >
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.15)' }} onPress={closeMenu}>
+            <Animated.View
+              style={{
+                position: 'absolute',
+                top: 60,
+                left: 0,
+                right: 0,
+                marginHorizontal: 0,
+                backgroundColor: '#fff',
+                borderRadius: 16,
+                padding: 20,
+                margin: 16,
+                elevation: 6,
+                transform: [{ translateY: slideAnim }],
+                shadowColor: '#000',
+                shadowOpacity: 0.12,
+                shadowRadius: 12,
+                shadowOffset: { width: 0, height: 4 },
+              }}
+            >
+              <Text style={{ fontSize: 16, color: '#9747FF', fontWeight: 'bold', fontFamily: 'Rubik', textAlign: 'center' }}>טוען נתוני עסק...</Text>
+            </Animated.View>
+          </Pressable>
+        </Modal>
       </View>
     );
   }
@@ -178,31 +228,60 @@ export default function CustomersLogin() {
             }}
           >
             {/* אייקון וואטסאפ */}
-            <TouchableOpacity onPress={handleWhatsappChat}>
+            <TouchableOpacity 
+              onPress={() => {
+                console.log('👆 לחיצה על וואטסאפ');
+                closeMenu();
+                handleWhatsappChat();
+              }}
+              style={{ paddingVertical: 8, paddingHorizontal: 4 }}
+            >
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 18 }}>
                 <Image source={WhatsappIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
                 <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>צ'וטט איתנו</Text>
               </View>
             </TouchableOpacity>
             {/* אייקון טלפון */}
-            <TouchableOpacity onPress={handlePhoneCall}>
+            <TouchableOpacity 
+              onPress={() => {
+                console.log('👆 לחיצה על טלפון');
+                closeMenu();
+                handlePhoneCall();
+              }}
+              style={{ paddingVertical: 8, paddingHorizontal: 4 }}
+            >
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 18 }}>
                 <Image source={PhoneIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
                 <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>צלצל אלינו</Text>
               </View>
             </TouchableOpacity>
             {/* אייקון חץ */}
-            <TouchableOpacity onPress={handleShareWhatsapp}>
+            <TouchableOpacity 
+              onPress={() => {
+                console.log('👆 לחיצה על שיתוף');
+                closeMenu();
+                handleShareWhatsapp();
+              }}
+              style={{ paddingVertical: 8, paddingHorizontal: 4 }}
+            >
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 18 }}>
                 <Image source={ShareIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
                 <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>שתפ/י חבר/ה</Text>
               </View>
             </TouchableOpacity>
             {/* אייקון הגרלות */}
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
-              <Image source={LotteryIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
-              <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>הגרלות והפתעות</Text>
-            </View>
+            <TouchableOpacity 
+              onPress={() => {
+                console.log('👆 לחיצה על הגרלות (עדיין לא מוטמע)');
+                closeMenu();
+              }}
+              style={{ paddingVertical: 8, paddingHorizontal: 4 }}
+            >
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
+                <Image source={LotteryIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
+                <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>הגרלות והפתעות</Text>
+              </View>
+            </TouchableOpacity>
           </Animated.View>
         </Pressable>
       </Modal>
@@ -214,8 +293,12 @@ export default function CustomersLogin() {
           width: 170, 
           height: 170, 
           resizeMode: 'contain',
-          transform: [{ scale: 0.68 }]
+          transform: [{ scale: 0.68 }],
+          zIndex: 1
         }}
+        onLoadStart={() => {}}
+        onLoadEnd={() => {}}
+        onError={() => {}}
       />
               {/* שאר התוכן יורד למטה */}
       <View style={{ width: '100%', marginTop: 4, alignItems: 'center' }}>
