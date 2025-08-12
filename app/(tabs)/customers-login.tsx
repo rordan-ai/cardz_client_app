@@ -346,12 +346,6 @@ export default function CustomersLogin() {
           </View>
           {/* תמונת נושא + קרדיט */}
           <View style={{ alignItems: 'center', marginTop: -28, width: '100%' }}>
-            {/* שטח מגע נסתר לבדיקה - ממורכז על פולי הקפה */}
-            <TouchableOpacity
-              style={{ position: 'absolute', top: '50%', left: '50%', width: 60, height: 60, marginLeft: -30, marginTop: -30, opacity: 0, zIndex: 1 }}
-              onPress={() => router.push('/(tabs)/thank_you')}
-              accessible={false}
-            />
             {(() => {
               // הסרת הלוגיקה הקבועה - שימוש בנתונים דינמיים
               const originalUrl = business?.login_background_image?.trim().replace(/[\r\n\t]/g, '');
