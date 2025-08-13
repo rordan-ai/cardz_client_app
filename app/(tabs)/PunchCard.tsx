@@ -44,6 +44,15 @@ export default function PunchCard() {
     expiration_date?: string;
   } | null>(null);
 
+  // פונקציה ליצירת קוד הזמנה מספרי חדש
+  const generateReferralCode = (businessCode: string, customerPhone: string): string => {
+    // מספר עסק (4 ספרות) + 4 ספרות אחרונות של טלפון + 4 ספרות רנדומליות
+    const businessNumber = businessCode.padStart(4, '0').slice(-4);
+    const phoneLast4 = customerPhone.slice(-4);
+    const randomDigits = Math.floor(1000 + Math.random() * 9000).toString();
+    return businessNumber + phoneLast4 + randomDigits;
+  };
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -534,9 +543,11 @@ export default function PunchCard() {
                     style={styles.referralCodeBox}
                     onPress={async () => {
                                              try {
-                         const textToCopy = punchCard?.card_number || '';
-                         await Clipboard.setStringAsync(textToCopy);
-                         Alert.alert('הקופון הועתק!', `קופון ההזמנה ${textToCopy} הועתק ללוח`);
+                         const referralCode = customer && localBusiness 
+                           ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
+                           : punchCard?.card_number || '';
+                         await Clipboard.setStringAsync(referralCode);
+                         Alert.alert('הקופון הועתק!', `קופון ההזמנה ${referralCode} הועתק ללוח`);
                       } catch (error: unknown) {
                         console.error('שגיאה בהעתקת מספר הקופון:', error);
                         Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${(error as Error).message || error}`);
@@ -544,16 +555,20 @@ export default function PunchCard() {
                     }}
                   >
                     <Text style={[styles.referralCodeText, { color: cardTextColor }]}>
-                      {punchCard?.card_number}
+                      {customer && localBusiness 
+                        ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
+                        : punchCard?.card_number || ''}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[styles.copyButton, { backgroundColor: cardTextColor }]}
                     onPress={async () => {
                                              try {
-                         const textToCopy = punchCard?.card_number || '';
-                         await Clipboard.setStringAsync(textToCopy);
-                         Alert.alert('הקופון הועתק!', `קופון ההזמנה ${textToCopy} הועתק ללוח`);
+                         const referralCode = customer && localBusiness 
+                           ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
+                           : punchCard?.card_number || '';
+                         await Clipboard.setStringAsync(referralCode);
+                         Alert.alert('הקופון הועתק!', `קופון ההזמנה ${referralCode} הועתק ללוח`);
                       } catch (error: unknown) {
                         console.error('שגיאה בהעתקה מכפתור:', error);
                         Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${(error as Error).message || error}`);
@@ -577,7 +592,10 @@ export default function PunchCard() {
                     <TouchableOpacity 
                       style={styles.inviteMethodItem}
                       onPress={() => {
-                        const message = `היי, חשבתי לפנק אותך בכרטיסיית ${business?.name}.\nמדובר בכרטיסיית הטבות מדליקה הכוללת הטבות, הגרלות ומתנות. הרבה יותר טוב ממועדון.\nברגע שתוריד את האפליקציה CARDS מהחנות ותירשם יסומן לך אוטומטית ניקוב ראשון חינם כבר (וגם לי).\nקישור להורדת האפליקציה באייפון ובאנדרואיד.\nקופון ההזמנה: ${punchCard?.card_number}`;
+                        const referralCode = customer && localBusiness 
+                          ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
+                          : punchCard?.card_number || '';
+                        const message = `היי, חשבתי לפנק אותך בכרטיסיית ${business?.name}.\nמדובר בכרטיסיית הטבות מדליקה הכוללת הטבות, הגרלות ומתנות. הרבה יותר טוב ממועדון.\nברגע שתוריד את האפליקציה CARDS מהחנות ותירשם יסומן לך אוטומטית ניקוב ראשון חינם כבר (וגם לי).\nקישור להורדת האפליקציה באייפון ובאנדרואיד.\nקופון ההזמנה: ${referralCode}`;
                         const url = `whatsapp://send?text=${encodeURIComponent(message)}`;
                         Linking.openURL(url).catch(() => {
                           Alert.alert('שגיאה', 'לא ניתן לפתוח את WhatsApp. ודא שהאפליקציה מותקנת.');
@@ -597,8 +615,11 @@ export default function PunchCard() {
                     <TouchableOpacity 
                       style={styles.inviteMethodItem}
                       onPress={() => {
+                        const referralCode = customer && localBusiness 
+                          ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
+                          : punchCard?.card_number || '';
                         const subject = `הזמנה לכרטיסיית ${business?.name}`;
-                        const body = `היי, חשבתי לפנק אותך בכרטיסיית ${business?.name}.\nמדובר בכרטיסיית הטבות מדליקה הכוללת הטבות, הגרלות ומתנות. הרבה יותר טוב ממועדון.\nברגע שתוריד את האפליקציה CARDS מהחנות ותירשם יסומן לך אוטומטית ניקוב ראשון חינם כבר (וגם לי).\nקישור להורדת האפליקציה באייפון ובאנדרואיד.\nקופון ההזמנה: ${punchCard?.card_number}`;
+                        const body = `היי, חשבתי לפנק אותך בכרטיסיית ${business?.name}.\nמדובר בכרטיסיית הטבות מדליקה הכוללת הטבות, הגרלות ומתנות. הרבה יותר טוב ממועדון.\nברגע שתוריד את האפליקציה CARDS מהחנות ותירשם יסומן לך אוטומטית ניקוב ראשון חינם כבר (וגם לי).\nקישור להורדת האפליקציה באייפון ובאנדרואיד.\nקופון ההזמנה: ${referralCode}`;
                         const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
                         Linking.openURL(url).catch(() => {
                           Alert.alert('שגיאה', 'לא ניתן לפתוח את אפליקציית המייל.');
@@ -621,7 +642,10 @@ export default function PunchCard() {
                     <TouchableOpacity 
                       style={styles.inviteMethodItem}
                       onPress={() => {
-                        const text = `היי חברים, חשבתי לשתף אתכם בכרטיסיית ${business?.name} המדהימה!\nמדובר בכרטיסיית הטבות מדליקה הכוללת הטבות, הגרלות ומתנות. הרבה יותר טוב ממועדון.\nתורידו את האפליקציה CARDS והירשמו עם קופון ההזמנה שלי: ${punchCard?.card_number}\nכך נקבל שנינו ניקוב חינם!`;
+                        const referralCode = customer && localBusiness 
+                          ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
+                          : punchCard?.card_number || '';
+                        const text = `היי חברים, חשבתי לשתף אתכם בכרטיסיית ${business?.name} המדהימה!\nמדובר בכרטיסיית הטבות מדליקה הכוללת הטבות, הגרלות ומתנות. הרבה יותר טוב ממועדון.\nתורידו את האפליקציה CARDS והירשמו עם קופון ההזמנה שלי: ${referralCode}\nכך נקבל שנינו ניקוב חינם!`;
                         const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://cards-app.com')}&quote=${encodeURIComponent(text)}`;
                         Linking.openURL(url).catch(() => {
                           Alert.alert('שגיאה', 'לא ניתן לפתוח את Facebook.');

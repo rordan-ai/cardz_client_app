@@ -1,0 +1,326 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.PunchCards (
+  business_code character varying NOT NULL,
+  customer_phone character varying NOT NULL,
+  product_code character varying NOT NULL,
+  card_number character varying NOT NULL,
+  total_punches integer NOT NULL DEFAULT 0,
+  used_punches integer NOT NULL DEFAULT 0,
+  status character varying,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  benefit text,
+  prepaid text,
+  last_action_date timestamp with time zone,
+  renewal_count integer DEFAULT 0,
+  cancel_reason text,
+  card_expiration_date timestamp with time zone,
+  CONSTRAINT PunchCards_pkey PRIMARY KEY (card_number),
+  CONSTRAINT PunchCards_product_code_fkey FOREIGN KEY (product_code) REFERENCES public.products(product_code),
+  CONSTRAINT PunchCards_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code),
+  CONSTRAINT PunchCards_customer_phone_fkey FOREIGN KEY (customer_phone) REFERENCES public.customers(customer_phone)
+);
+CREATE TABLE public.activity_logs (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  business_code text NOT NULL,
+  user_id text,
+  user_type text NOT NULL CHECK (user_type = ANY (ARRAY['customer'::text, 'business_user'::text, 'system'::text])),
+  action_type text NOT NULL,
+  action_details jsonb DEFAULT '{}'::jsonb,
+  target_entity text,
+  source text CHECK (source = ANY (ARRAY['manual'::text, 'barcode'::text, 'nfc'::text, 'auto'::text, 'api'::text, 'web'::text, 'mobile'::text])),
+  ip_address inet,
+  user_agent text,
+  timestamp timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT activity_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT activity_logs_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.backups (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  business_code text NOT NULL,
+  backup_type text NOT NULL CHECK (backup_type = ANY (ARRAY['manual'::text, 'auto'::text])),
+  backup_status text DEFAULT 'pending'::text CHECK (backup_status = ANY (ARRAY['pending'::text, 'in_progress'::text, 'completed'::text, 'failed'::text])),
+  backup_size bigint,
+  backup_path text,
+  started_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  error_message text,
+  created_by text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT backups_pkey PRIMARY KEY (id),
+  CONSTRAINT backups_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.benefits (
+  id bigint NOT NULL DEFAULT nextval('benefits_id_seq'::regclass),
+  business_code text,
+  customer_phone text,
+  type text NOT NULL CHECK (type = ANY (ARRAY['birthday'::text, 'lottery'::text, 'referral'::text, 'promotion'::text, 'compensation'::text, 'completion'::text])),
+  value numeric,
+  status text DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'used'::text, 'expired'::text, 'cancelled'::text])),
+  code text UNIQUE,
+  expiration_date timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone,
+  CONSTRAINT benefits_pkey PRIMARY KEY (id),
+  CONSTRAINT benefits_customer_phone_fkey FOREIGN KEY (customer_phone) REFERENCES public.customers(customer_phone),
+  CONSTRAINT benefits_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.business_users (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  business_code character varying NOT NULL,
+  user_name text NOT NULL,
+  user_phone text,
+  user_email text,
+  role text NOT NULL DEFAULT 'employee'::text CHECK (role = ANY (ARRAY['employee'::text, 'manager'::text, 'shift_manager'::text])),
+  employee_number text,
+  admin_password_hash text,
+  is_active boolean DEFAULT true,
+  permissions jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT business_users_pkey PRIMARY KEY (id),
+  CONSTRAINT business_users_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.businesses (
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  name text NOT NULL UNIQUE,
+  logo text,
+  background_login_page_color text,
+  default_product text,
+  max_punches smallint NOT NULL,
+  pricing_otp numeric NOT NULL,
+  pricing_push numeric NOT NULL,
+  free_stamp_count smallint NOT NULL,
+  prepaid_discount_percent numeric,
+  prepaid_bonus_value numeric,
+  login_background_image text,
+  login_brand_color text,
+  business_phone text NOT NULL,
+  business_website text,
+  completion_bonus_value numeric,
+  completion_bonus_type text,
+  business_whatsapp text,
+  business_code character varying NOT NULL UNIQUE,
+  punched_icon text,
+  unpunched_icon text,
+  card_text_color text,
+  expiration_date timestamp without time zone,
+  company_registration_no numeric,
+  branch text,
+  allowed_languages ARRAY,
+  referral_active boolean DEFAULT false,
+  legal_name text,
+  business_type text CHECK (business_type IS NULL OR (business_type = ANY (ARRAY['מסעדה'::text, 'בית קפה'::text, 'טיפול ציפורניים'::text, 'קוסמטיקה ויופי'::text, 'כושר'::text, 'עיסויים'::text, 'שטיפת רכבים'::text, 'פרחים'::text, 'מתנות'::text, 'מזון מהיר'::text, 'מיצים ושייקים'::text, 'גלידות'::text, 'מאפים'::text, 'פיצריה'::text, 'חיות'::text, 'מספרה'::text, 'הסרת שיער'::text, 'מוסך'::text, 'בגדים'::text, 'נעליים'::text, 'תכשיטים ואקססוריס'::text, 'אופטיקה ומשקפיים'::text, 'סטודיו חוגים'::text, 'משחקים וצעצועים'::text, 'מורה פרטי'::text, 'נהיגה'::text, 'צילום ופיתוח'::text, 'אחר'::text]))),
+  business_address text,
+  business_city text,
+  business_zipcode text,
+  business_email text,
+  menu_url text,
+  brand_colors text,
+  contact_person_name text,
+  contact_person_phone text,
+  contact_person_role text,
+  internal_notes text,
+  auto_punch boolean DEFAULT false,
+  semi_auto_punch boolean DEFAULT false,
+  completion_punches integer,
+  expiration_months integer,
+  theme_image_url text,
+  CONSTRAINT businesses_pkey PRIMARY KEY (business_code)
+);
+CREATE TABLE public.campaigns (
+  id bigint NOT NULL DEFAULT nextval('campaigns_id_seq'::regclass),
+  business_code text,
+  type text NOT NULL CHECK (type = ANY (ARRAY['immediate'::text, 'scheduled'::text, 'birthday'::text, 'inactive_reminder'::text, 'completion_reminder'::text])),
+  target_group text,
+  message text NOT NULL,
+  scheduled_time timestamp with time zone,
+  status text DEFAULT 'pending'::text,
+  sent_count integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone,
+  title text,
+  auto_trigger text CHECK (auto_trigger IS NULL OR (auto_trigger = ANY (ARRAY['birthday'::text, 'inactive_days'::text, 'completion'::text]))),
+  trigger_value integer,
+  include_voucher boolean DEFAULT false,
+  voucher_id bigint,
+  language text DEFAULT 'he'::text CHECK (language = ANY (ARRAY['he'::text, 'en'::text, 'fr'::text, 'es'::text, 'ar'::text])),
+  image_url text,
+  is_active boolean DEFAULT true,
+  CONSTRAINT campaigns_pkey PRIMARY KEY (id),
+  CONSTRAINT campaigns_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES public.benefits(id),
+  CONSTRAINT campaigns_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.customers (
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  name text NOT NULL,
+  language text,
+  role text NOT NULL DEFAULT 'customer'::text,
+  business_code character varying NOT NULL,
+  customer_phone character varying NOT NULL,
+  birthday date,
+  notes text,
+  CONSTRAINT customers_pkey PRIMARY KEY (customer_phone),
+  CONSTRAINT customers_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.inbox (
+  id bigint NOT NULL DEFAULT nextval('inbox_id_seq'::regclass),
+  business_code text,
+  customer_phone text,
+  message text NOT NULL,
+  status text DEFAULT 'unread'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone,
+  CONSTRAINT inbox_pkey PRIMARY KEY (id),
+  CONSTRAINT inbox_customer_phone_fkey FOREIGN KEY (customer_phone) REFERENCES public.customers(customer_phone),
+  CONSTRAINT inbox_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.invoices (
+  month_year text NOT NULL,
+  total_stamps integer NOT NULL DEFAULT 0,
+  total_push_notifications integer NOT NULL DEFAULT 0,
+  total_otp_verifications integer NOT NULL DEFAULT 0,
+  total_amount numeric NOT NULL DEFAULT 0,
+  payment_status text NOT NULL DEFAULT 'unpaid'::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  business_code character varying NOT NULL,
+  CONSTRAINT invoices_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.lotteries (
+  id bigint NOT NULL DEFAULT nextval('lotteries_id_seq'::regclass),
+  business_code text,
+  type text NOT NULL CHECK (type = ANY (ARRAY['weekly'::text, 'monthly'::text, 'quarterly'::text, 'special'::text])),
+  benefit_id bigint,
+  winner_phone text,
+  draw_date timestamp with time zone,
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'cancelled'::text])),
+  expiration_date timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone,
+  CONSTRAINT lotteries_pkey PRIMARY KEY (id),
+  CONSTRAINT lotteries_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code),
+  CONSTRAINT lotteries_winner_phone_fkey FOREIGN KEY (winner_phone) REFERENCES public.customers(customer_phone),
+  CONSTRAINT lotteries_benefit_id_fkey FOREIGN KEY (benefit_id) REFERENCES public.benefits(id)
+);
+CREATE TABLE public.otp_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  customer_phone text NOT NULL,
+  timestamp timestamp with time zone,
+  status text,
+  price numeric,
+  business_id character varying,
+  CONSTRAINT otp_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT otp_logs_business_id_fkey FOREIGN KEY (business_id) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.popups (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  business_code text NOT NULL,
+  title text,
+  content text NOT NULL,
+  image_url text,
+  display_duration integer DEFAULT 5,
+  trigger_location text DEFAULT 'entry'::text CHECK (trigger_location = ANY (ARRAY['entry'::text, 'after_punch'::text, 'after_phone'::text])),
+  target_audience text DEFAULT 'all'::text CHECK (target_audience = ANY (ARRAY['all'::text, 'specific'::text, 'segment'::text])),
+  target_criteria jsonb DEFAULT '{}'::jsonb,
+  is_active boolean DEFAULT true,
+  show_count_per_user integer DEFAULT '-1'::integer,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT popups_pkey PRIMARY KEY (id),
+  CONSTRAINT popups_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.products (
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  product_name text NOT NULL,
+  sub_product_name text,
+  price numeric NOT NULL DEFAULT 0,
+  product_type text NOT NULL,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  product_code character varying NOT NULL UNIQUE,
+  business_code character varying NOT NULL,
+  internal_product_number text,
+  CONSTRAINT products_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.push_logs (
+  id uuid NOT NULL UNIQUE,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  customer_id uuid NOT NULL,
+  template text,
+  status text,
+  price numeric NOT NULL DEFAULT 0,
+  business_id character varying,
+  CONSTRAINT push_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT pushlog_business_id_fkey FOREIGN KEY (business_id) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.referrals (
+  id bigint NOT NULL DEFAULT nextval('referrals_id_seq'::regclass),
+  inviter_phone text,
+  invited_phone text,
+  business_code text,
+  referral_date timestamp with time zone DEFAULT now(),
+  reward_given boolean DEFAULT false,
+  status text DEFAULT 'pending'::text,
+  updated_at timestamp with time zone,
+  CONSTRAINT referrals_pkey PRIMARY KEY (id),
+  CONSTRAINT referrals_inviter_phone_fkey FOREIGN KEY (inviter_phone) REFERENCES public.customers(customer_phone),
+  CONSTRAINT referrals_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.roles (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT roles_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.system_settings (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  business_code text NOT NULL,
+  setting_key text NOT NULL,
+  setting_value text,
+  setting_type text DEFAULT 'string'::text CHECK (setting_type = ANY (ARRAY['string'::text, 'integer'::text, 'boolean'::text, 'json'::text])),
+  description text,
+  is_system boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT system_settings_pkey PRIMARY KEY (id),
+  CONSTRAINT system_settings_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.usage_summaries (
+  id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  period_start timestamp with time zone NOT NULL,
+  period_end timestamp with time zone NOT NULL,
+  total_push_count integer NOT NULL,
+  total_otp_count integer NOT NULL,
+  total_cost numeric NOT NULL,
+  payment_status text NOT NULL DEFAULT 'pending'::text,
+  business_id character varying,
+  CONSTRAINT usage_summaries_pkey PRIMARY KEY (id),
+  CONSTRAINT usage_summries_business_id_fkey FOREIGN KEY (business_id) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.user_activities (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  customer_id character varying NOT NULL,
+  action_type text NOT NULL,
+  action_time timestamp with time zone NOT NULL DEFAULT now(),
+  duration_seconds integer,
+  source text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_activities_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.users_roles (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  role_id uuid,
+  user_id uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT users_roles_pkey PRIMARY KEY (id),
+  CONSTRAINT users_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT users_roles_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id)
+);

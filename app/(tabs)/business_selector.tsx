@@ -1,3 +1,4 @@
+
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -62,7 +63,10 @@ export default function BusinessSelector() {
         <TouchableOpacity 
           style={[styles.hamburgerArea, isTablet && styles.tabletHamburgerArea]} 
           onPress={() => setMenuVisible(true)}
-        />
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="פתח תפריט"
+        >
+        </TouchableOpacity>
 
         {/* שטח מגע כפתור "בחר עסק" - הכפתור הוורוד במרכז */}
         <TouchableOpacity 
@@ -213,10 +217,17 @@ const styles = StyleSheet.create({
     right: 155,
     width: 47,
     height: 47,
-    backgroundColor: 'red',
+    backgroundColor: 'transparent',
     borderRadius: 5,
-    borderWidth: 2,
-    borderColor: 'black',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hamburgerIcon: {
+    width: 28,
+    height: 28,
+    alignSelf: 'center',
+    marginTop: 8,
+    tintColor: '#ffffff',
   },
   selectBusinessArea: {
     position: 'absolute',
@@ -245,9 +256,7 @@ const styles = StyleSheet.create({
     right: 100,
     width: 66,
     height: 66,
-    backgroundColor: 'red',
-    borderWidth: 2,
-    borderColor: 'black',
+    backgroundColor: 'transparent',
   },
   tabletSelectBusinessArea: {
     bottom: 120,
@@ -296,8 +305,6 @@ const styles = StyleSheet.create({
   },
   menuItem: {
     paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   menuItemText: {
     fontSize: 16,

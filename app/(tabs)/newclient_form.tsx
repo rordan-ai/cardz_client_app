@@ -287,6 +287,46 @@ export default function NewClientForm() {
 
       // אם הלקוח קיים באותו עסק, צור כרטיסיה עם המוצר שנבחר
       if (existingCustomer) {
+        // אם יש קוד הזמנה - שליחה לטבלת referrals גם עבור לקוח קיים
+        if (referralCode && referralCode.trim()) {
+          try {
+            // פענוח קוד ההזמנה: מספר עסק (4) + טלפון (4) + רנדום (4)
+            const businessCode4 = referralCode.slice(0, 4);
+            const phoneLast4 = referralCode.slice(4, 8);
+            
+            // חיפוש המזמין לפי 4 ספרות אחרונות של טלפון ועסק
+            const { data: potentialInviters, error: inviterError } = await supabase
+              .from('customers')
+              .select('customer_phone, business_code')
+              .eq('business_code', businessCode4.replace(/^0+/, '') || businessCode4) // ללא אפסים מובילים
+              .like('customer_phone', `%${phoneLast4}`);
+
+            if (!inviterError && potentialInviters && potentialInviters.length > 0) {
+              // בחירת המזמין הראשון שנמצא (אם יש כמה)
+              const inviter = potentialInviters[0];
+              
+              // יצירת רשומת הזמנה
+              const { error: referralError } = await supabase
+                .from('referrals')
+                .insert({
+                  inviter_phone: inviter.customer_phone,
+                  invited_phone: phone,
+                  business_code: selectedBusiness.id,
+                  status: 'pending',
+                  referral_date: new Date().toISOString()
+                });
+
+              if (referralError) {
+                console.error('שגיאה בשליחת קוד הזמנה:', referralError);
+                // לא נעצור את התהליך בגלל שגיאה בהזמנה
+              }
+            }
+          } catch (error) {
+            console.error('שגיאה בפענוח קוד הזמנה:', error);
+            // לא נעצור את התהליך בגלל שגיאה בהזמנה
+          }
+        }
+
         const result = await createCardWithProduct(selectedProduct.product_code);
         
         if (result.success) {
@@ -307,6 +347,46 @@ export default function NewClientForm() {
       if (customerError) {
         setErrorModal({ visible: true, message: 'שגיאה בהוספת לקוח. נסה שוב מאוחר יותר.' });
         return;
+      }
+
+      // אם יש קוד הזמנה - שליחה לטבלת referrals
+      if (referralCode && referralCode.trim()) {
+        try {
+          // פענוח קוד ההזמנה: מספר עסק (4) + טלפון (4) + רנדום (4)
+          const businessCode4 = referralCode.slice(0, 4);
+          const phoneLast4 = referralCode.slice(4, 8);
+          
+          // חיפוש המזמין לפי 4 ספרות אחרונות של טלפון ועסק
+          const { data: potentialInviters, error: inviterError } = await supabase
+            .from('customers')
+            .select('customer_phone, business_code')
+            .eq('business_code', businessCode4.replace(/^0+/, '') || businessCode4) // ללא אפסים מובילים
+            .like('customer_phone', `%${phoneLast4}`);
+
+          if (!inviterError && potentialInviters && potentialInviters.length > 0) {
+            // בחירת המזמין הראשון שנמצא (אם יש כמה)
+            const inviter = potentialInviters[0];
+            
+            // יצירת רשומת הזמנה
+            const { error: referralError } = await supabase
+              .from('referrals')
+              .insert({
+                inviter_phone: inviter.customer_phone,
+                invited_phone: phone,
+                business_code: selectedBusiness.id,
+                status: 'pending',
+                referral_date: new Date().toISOString()
+              });
+
+            if (referralError) {
+              console.error('שגיאה בשליחת קוד הזמנה:', referralError);
+              // לא נעצור את התהליך בגלל שגיאה בהזמנה
+            }
+          }
+        } catch (error) {
+          console.error('שגיאה בפענוח קוד הזמנה:', error);
+          // לא נעצור את התהליך בגלל שגיאה בהזמנה
+        }
       }
 
       // צור כרטיסיה חדשה ללקוח החדש
