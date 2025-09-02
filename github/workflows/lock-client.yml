@@ -1,0 +1,14 @@
+name: lock-client
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+jobs:
+  enforce-readonly:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail to enforce read-only
+        run: |
+          echo "Repository is locked. Enable branch protection to require this check."
+          exit 1
