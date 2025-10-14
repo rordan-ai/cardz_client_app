@@ -291,3 +291,8 @@ const generateReferralCode = (businessCode: string, customerPhone: string): stri
 ---
 *מסמך זה עודכן בדצמבר 2024 עם מערכת חבר מביא חבר מלאה ופעילה.*
 
+
+
+
+
+
