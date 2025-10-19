@@ -310,3 +310,56 @@ Workflow שגוי: זוהה ונמחק ✅
 ---
 
 **עדכון אחרון:** 19/10/2025
+
+---
+
+## 🔐 שימוש ב-GitHub Token לשליטה ב-Workflows
+
+### **טוקן GitHub שמור ב:**
+`secure-tokens.env` → `GITHUB_TOKEN=ghp_...`
+
+### **שימושים:**
+
+**1. בדיקת סטטוס Workflows:**
+```bash
+# טעינת משתנים
+$env:GITHUB_TOKEN = (Get-Content secure-tokens.env | Select-String "GITHUB_TOKEN").ToString().Split("=")[1]
+
+# בדיקת runs אחרונים
+curl -H "Authorization: token $env:GITHUB_TOKEN" `
+  https://api.github.com/repos/rordan-ai/cardz_client_app/actions/runs
+```
+
+**2. ביטול workflow שגוי:**
+```bash
+# קבלת run ID
+$runId = <RUN_ID>
+
+# ביטול
+curl -X POST -H "Authorization: token $env:GITHUB_TOKEN" `
+  https://api.github.com/repos/rordan-ai/cardz_client_app/actions/runs/$runId/cancel
+```
+
+**3. הרצה מחדש של workflow:**
+```bash
+curl -X POST -H "Authorization: token $env:GITHUB_TOKEN" `
+  https://api.github.com/repos/rordan-ai/cardz_client_app/actions/runs/$runId/rerun
+```
+
+**4. קבלת מידע על workflow ספציפי:**
+```bash
+curl -H "Authorization: token $env:GITHUB_TOKEN" `
+  https://api.github.com/repos/rordan-ai/cardz_client_app/actions/workflows/lock-client.yml
+```
+
+---
+
+### **⚠️ חשוב:**
+- **לא להעלות** `secure-tokens.env` ל-Git!
+- להוסיף ל-`.gitignore`:
+  ```
+  secure-tokens.env
+  *.env
+  ```
+
+---
