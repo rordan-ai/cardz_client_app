@@ -301,7 +301,7 @@ export default function CustomersLogin() {
         onError={() => {}}
       />
               {/* שאר התוכן יורד למטה */}
-      <View style={{ width: '100%', marginTop: -30, alignItems: 'center' }}>
+      <View style={{ width: '100%', marginTop: 4, alignItems: 'center' }}>
         {/* שם העסק */}
         <Text style={styles(brandColor).businessName}>{business?.name || ''}</Text>
         {/* טקסט כותרת */}
@@ -397,10 +397,10 @@ export default function CustomersLogin() {
 const styles = (brandColor: string) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFE0E0',
+    backgroundColor: '#FBF8F8',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: Platform.OS === 'ios' ? 10 : 0,
+    paddingTop: Platform.OS === 'ios' ? 60 : 20,
   },
   logoContainer: {
     width: 120,

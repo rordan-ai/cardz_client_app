@@ -183,6 +183,7 @@ export default function BusinessSelector() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    transform: [{ translateY: -5 }],
   },
   backgroundImage: {
     flex: 1,
