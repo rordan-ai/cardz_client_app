@@ -568,7 +568,7 @@ const styles = (brandColor: string) => StyleSheet.create({
   },
   credit: {
     position: 'absolute',
-    bottom: 10,
+    bottom: 25,
     left: 0,
     right: 0,
     backgroundColor: 'transparent',

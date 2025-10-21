@@ -233,8 +233,8 @@ export default function PunchCard() {
 
   
 
-  // עיצוב גריד 4 אייקונים בשורה
-  const iconsPerRow = 4;
+  // עיצוב גריד סימטרי (למשל 3x4, 2x5 וכו')
+  const iconsPerRow = Math.ceil(Math.sqrt(totalPunches));
   const rows = [];
   for (let i = 0; i < iconsArr.length; i += iconsPerRow) {
     rows.push(iconsArr.slice(i, i + iconsPerRow));
@@ -360,57 +360,30 @@ export default function PunchCard() {
             {row.map((icon, j) => {
               const iconIndex = idx * iconsPerRow + j;
               const isIconLoading = iconsLoading[iconIndex] !== false;
-              const isPunched = iconIndex < usedPunches;
               
               return (
                 <View key={j} style={{ position: 'relative' }}>
                   {isIconLoading && (
                     <View style={{
                       position: 'absolute',
-                      width: 55,
-                      height: 55,
+                      width: 146,
+                      height: 146,
                       backgroundColor: '#f0f0f0',
-                      borderRadius: 27.5,
+                      borderRadius: 73,
                       justifyContent: 'center',
                       alignItems: 'center',
                       zIndex: 1
                     }}>
-                      <Text style={{ color: '#999', fontSize: 7, fontFamily: 'Rubik' }}>טוען...</Text>
+                      <Text style={{ color: '#999', fontSize: 10, fontFamily: 'Rubik' }}>טוען...</Text>
                     </View>
                   )}
-                  {isPunched ? (
-                    <>
-                      {/* כוס קפה בתור בסיס */}
-                      <Image
-                        source={{ uri: unpunchedIcon }}
-                        style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
-                        resizeMode="contain"
-                        onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                        onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                      />
-                      {/* חור ניקוב מעל הכוס - גדול ב-50% */}
-                      <Image
-                        source={{ uri: 'https://noqfwkxzmvpkorcaymcb.supabase.co/storage/v1/object/public/icons/punched_icones/punch_overlay.png' }}
-                        style={[styles.icon, { 
-                          position: 'absolute', 
-                          top: -13.75, 
-                          left: -13.75, 
-                          width: 82.5, 
-                          height: 82.5, 
-                          opacity: isIconLoading ? 0 : 1 
-                        }]}
-                        resizeMode="contain"
-                      />
-                    </>
-                  ) : (
-                    <Image
-                      source={{ uri: icon }}
-                      style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
-                      resizeMode="contain"
-                      onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                      onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                    />
-                  )}
+                  <Image
+                    source={{ uri: icon }}
+                    style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
+                    resizeMode="contain"
+                    onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                    onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                  />
                 </View>
               );
             })}
@@ -731,8 +704,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     backgroundColor: '#FBF8F8',
-    paddingTop: 8,
-    paddingBottom: 117,
+    paddingVertical: 8,
     paddingHorizontal: 8,
   },
   topIconOffsetClean: {
@@ -745,7 +717,7 @@ const styles = StyleSheet.create({
     transform: [{ translateY: height * -0.10 }],
   },
   bottomContentOffset: {
-    transform: [{ translateY: height * 0.095 + 67 }],
+    transform: [{ translateY: height * 0.095 }],
   },
   bottomTextsUpOffset: {
     transform: [{ translateY: height * -0.07 }],
@@ -794,12 +766,12 @@ const styles = StyleSheet.create({
   iconsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: -64,
   },
   icon: {
-    width: 55,
-    height: 55,
-    marginHorizontal: 2,
+    width: 146,
+    height: 146,
+    marginHorizontal: -40,
   },
   punchCount: {
     fontSize: 18,
