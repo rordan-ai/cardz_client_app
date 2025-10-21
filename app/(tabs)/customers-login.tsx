@@ -301,7 +301,7 @@ export default function CustomersLogin() {
         onError={() => {}}
       />
               {/* שאר התוכן יורד למטה */}
-      <View style={{ width: '100%', marginTop: 4, alignItems: 'center', transform: [{ translateY: -5 }] }}>
+      <View style={{ width: '100%', marginTop: -30, alignItems: 'center' }}>
         {/* שם העסק */}
         <Text style={styles(brandColor).businessName}>{business?.name || ''}</Text>
         {/* טקסט כותרת */}
