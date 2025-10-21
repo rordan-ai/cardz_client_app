@@ -397,10 +397,10 @@ export default function CustomersLogin() {
 const styles = (brandColor: string) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FBF8F8',
+    backgroundColor: '#FFE0E0',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: Platform.OS === 'ios' ? 60 : 20,
+    paddingTop: Platform.OS === 'ios' ? 10 : 0,
   },
   logoContainer: {
     width: 120,
