@@ -183,7 +183,6 @@ export default function BusinessSelector() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    transform: [{ translateY: -5 }],
   },
   backgroundImage: {
     flex: 1,
@@ -242,7 +241,7 @@ const styles = StyleSheet.create({
   },
   creditsArea: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 27,
     left: '50%',
     marginLeft: -120,
     width: 240,
@@ -267,7 +266,7 @@ const styles = StyleSheet.create({
     height: 60,
   },
   tabletCreditsArea: {
-    bottom: 40,
+    bottom: 47,
     left: '50%',
     marginLeft: -150,
     width: 300,
