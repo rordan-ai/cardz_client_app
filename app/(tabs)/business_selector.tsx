@@ -56,7 +56,7 @@ export default function BusinessSelector() {
       {/* התמונה הסופית שלך עם שטחי מגע */}
       <ImageBackground
         source={require('../../assets/images/cardz_home_bg.jpg.png')}
-        style={[styles.backgroundImage, isTablet && styles.tabletBackgroundImage]}
+        style={[styles.backgroundImage, isTablet && styles.tabletBackgroundImage, { transform: [{ translateY: -7 }] }]}
         resizeMode="cover"
       >
         {/* שטח מגע תפריט המבורגר - למעלה ימין */}
@@ -78,15 +78,13 @@ export default function BusinessSelector() {
         <TouchableOpacity 
           style={[styles.creditsArea, isTablet && styles.tabletCreditsArea]} 
           onPress={() => Linking.openURL('https://yula-digital.com/')}
-        >
-          <Text style={styles.creditsText}>כל הזכויות שמורות ליולה דיגיטל@</Text>
-        </TouchableOpacity>
+        />
       </ImageBackground>
 
       {/* דיאלוג תפריט המבורגר */}
       <Modal visible={menuVisible} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
-          <View style={styles.modalOverlay}>
+          <View style={[styles.modalOverlay, { transform: [{ translateY: -7 }] }]}>
             <View style={[styles.menuContent, isTablet && styles.tabletMenuContent]}>
               <TouchableOpacity 
                 style={styles.menuItem}
@@ -130,7 +128,7 @@ export default function BusinessSelector() {
       {/* דיאלוג בחירת עסק */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-          <View style={styles.modalOverlay}>
+          <View style={[styles.modalOverlay, { transform: [{ translateY: -7 }] }]}>
             <View style={[styles.modalContent, isTablet && styles.tabletModalContent]}>
               <Text style={styles.modalTitle}>בחר עסק</Text>
               
