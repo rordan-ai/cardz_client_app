@@ -78,7 +78,9 @@ export default function BusinessSelector() {
         <TouchableOpacity 
           style={[styles.creditsArea, isTablet && styles.tabletCreditsArea]} 
           onPress={() => Linking.openURL('https://yula-digital.com/')}
-        />
+        >
+          <Text style={styles.creditsText}>כל הזכויות שמורות ליולה דיגיטל@</Text>
+        </TouchableOpacity>
       </ImageBackground>
 
       {/* דיאלוג תפריט המבורגר */}
@@ -361,5 +363,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  creditsText: {
+    color: '#000',
+    fontSize: 8,
+    textAlign: 'center',
+    fontWeight: 'bold',
+    position: 'absolute',
+    bottom: -7,
+    left: 0,
+    right: 0,
   },
 }); 
