@@ -1,0 +1,30 @@
+7297c90|2025-10-19|Remove .github workflows + update backup_rules with lessons
+05e942d|2025-10-19|Update backup_rules with GitHub workflow issues lessons
+8fa719a|2025-10-19|Remove invalid workflow file
+70b9528|2025-10-19|Complete FCM integration + MCP agents-communication + Expo SDK 54 upgrade
+6f9e21a|2025-10-19|safety backup before professional commit - expo sdk 54 + fcm + mcp
+51826f0|2025-10-14|Clean up temporary merge helper files
+efce3f3|2025-10-14|Merge restore_checkpoints to main - Fix Expo compatibility
+8fb17a7|2025-10-14|Fix Expo compatibility issues - updated worklets to 0.5.1 and fixed babel config
+cb88089|2025-10-14|restore checkpoint before new build
+93eeebe|2025-09-02|Create lock-client.yml
+6de05a7|2025-08-13|Backup full code to main V2
+5f4ad13|2025-08-12| checkpoint before web-only hamburger tabIndex fix
+79feb08|2025-08-12|נקודת שחזור לפני תיקון בעיית business_selector - גיבוי מלא
+8fc6c1d|2025-07-27|[Cursor] Checkpoint at 2025-07-27T11:16:14.314Z
+4bfab11|2025-07-27|[Cursor] Checkpoint at 2025-07-27T11:16:04.574Z
+38d7fd3|2025-07-27|Merge remote changes
+6ae8e54|2025-07-27|v1.0 - Final production backup
+3e2f881|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:54:44.358Z
+bf2ff13|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:51:16.273Z
+79dac46|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:51:06.940Z
+7f47e48|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:50:57.142Z
+a093cce|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:50:48.235Z
+9811071|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:49:41.418Z
+d79c3eb|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:49:24.008Z
+5414725|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:49:11.038Z
+a44abad|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:46:49.596Z
+1d49bbe|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:46:40.938Z
+8f9c82f|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:46:26.869Z
+0f8d58d|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:46:17.038Z
+320db87|2025-07-27|[Cursor] Checkpoint at 2025-07-27T10:46:08.399Z

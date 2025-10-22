@@ -1,0 +1,156 @@
+---
+alwaysApply: false
+---
+superbase data schama:
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.PunchCards (
+  business_code character varying NOT NULL,
+  customer_phone character varying NOT NULL,
+  product_code character varying NOT NULL,
+  card_number character varying NOT NULL,
+  total_punches integer NOT NULL DEFAULT 0,
+  used_punches integer NOT NULL DEFAULT 0,
+  status character varying,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  benefit text,
+  prepaid text,
+  CONSTRAINT PunchCards_pkey PRIMARY KEY (card_number),
+  CONSTRAINT PunchCards_product_code_fkey FOREIGN KEY (product_code) REFERENCES public.products(product_code),
+  CONSTRAINT PunchCards_customer_phone_fkey FOREIGN KEY (customer_phone) REFERENCES public.customers(customer_phone),
+  CONSTRAINT PunchCards_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code),
+  CONSTRAINT punchcards_product_code_fkey FOREIGN KEY (product_code) REFERENCES public.products(product_code),
+  CONSTRAINT punchcards_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.add_on (
+  addon_name text NOT NULL,
+  addon_price numeric NOT NULL DEFAULT 0,
+  is_free boolean NOT NULL DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  business_code character varying NOT NULL,
+  CONSTRAINT add_on_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.businesses (
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  name text NOT NULL UNIQUE,
+  logo text,
+  backgrownd_login_page_color text,
+  default_product text,
+  max_punches smallint NOT NULL,
+  pricing_otp numeric NOT NULL,
+  pricing_push numeric NOT NULL,
+  free_stamp_count smallint NOT NULL,
+  prepaid_discount_percent numeric,
+  prepaid_bonus_value numeric,
+  login_background_image text,
+  login_brand_color text,
+  business_phone text NOT NULL,
+  business_website text,
+  completion_bonus_value numeric,
+  completion_bonus_type text,
+  business_whatsapp text,
+  business_code character varying NOT NULL UNIQUE,
+  punched_icon text,
+  unpunched_icon text,
+  CONSTRAINT businesses_pkey PRIMARY KEY (business_code)
+);
+CREATE TABLE public.customers (
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  name text NOT NULL,
+  language text,
+  role text NOT NULL DEFAULT 'customer'::text,
+  business_code character varying NOT NULL,
+  customer_phone character varying NOT NULL,
+  CONSTRAINT customers_pkey PRIMARY KEY (customer_phone),
+  CONSTRAINT customers_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.invoices (
+  month_year text NOT NULL,
+  total_stamps integer NOT NULL DEFAULT 0,
+  total_push_notifications integer NOT NULL DEFAULT 0,
+  total_otp_verifications integer NOT NULL DEFAULT 0,
+  total_amount numeric NOT NULL DEFAULT 0,
+  payment_status text NOT NULL DEFAULT 'unpaid'::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  business_code character varying NOT NULL,
+  CONSTRAINT invoices_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.otp_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  customer_phone text NOT NULL,
+  timestamp timestamp with time zone,
+  status text,
+  price numeric,
+  business_id character varying,
+  CONSTRAINT otp_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT otp_logs_business_id_fkey FOREIGN KEY (business_id) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.products (
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  product_name text NOT NULL,
+  sub_product_name text,
+  price numeric NOT NULL DEFAULT 0,
+  product_type text NOT NULL,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  product_code character varying NOT NULL UNIQUE,
+  business_code character varying NOT NULL,
+  CONSTRAINT products_business_code_fkey FOREIGN KEY (business_code) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.push_logs (
+  id uuid NOT NULL UNIQUE,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  customer_id uuid NOT NULL,
+  template text,
+  status text,
+  price numeric NOT NULL DEFAULT 0,
+  business_id character varying,
+  CONSTRAINT push_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT pushlog_business_id_fkey FOREIGN KEY (business_id) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.roles (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT roles_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.usage_summaries (
+  id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  period_start timestamp with time zone NOT NULL,
+  period_end timestamp with time zone NOT NULL,
+  total_push_count integer NOT NULL,
+  total_otp_count integer NOT NULL,
+  total_cost numeric NOT NULL,
+  payment_status text NOT NULL DEFAULT 'pending'::text,
+  business_id character varying,
+  CONSTRAINT usage_summaries_pkey PRIMARY KEY (id),
+  CONSTRAINT usage_summries_business_id_fkey FOREIGN KEY (business_id) REFERENCES public.businesses(business_code)
+);
+CREATE TABLE public.user_activities (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  customer_id character varying NOT NULL,
+  action_type text NOT NULL,
+  action_time timestamp with time zone NOT NULL DEFAULT now(),
+  duration_seconds integer,
+  source text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_activities_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.users_roles (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  role_id uuid,
+  user_id uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT users_roles_pkey PRIMARY KEY (id),
+  CONSTRAINT users_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT users_roles_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id)
+);
+

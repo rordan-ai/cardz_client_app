@@ -1,0 +1,4 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+  <item android:drawable="@color/splashscreen_background"/>
+  <!-- Removed missing splashscreen_logo reference to avoid aapt2 link errors -->
+</layer-list>
