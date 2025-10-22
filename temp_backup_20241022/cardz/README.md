@@ -1,2 +1,0 @@
-# cardz
-curser app
