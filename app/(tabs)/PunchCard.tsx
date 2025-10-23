@@ -105,16 +105,38 @@ export default function PunchCard() {
       // בדיקה כמה כרטיסיות יש ללקוח בעסק זה (כולל שם מוצר)
       const { data: customerCards, error: cardsError } = await supabase
         .from('PunchCards')
-        .select(`
-          product_code, 
-          card_number, 
-          used_punches, 
-          total_punches,
-          products!inner(product_name)
-        `)
+        .select('product_code, card_number, used_punches, total_punches')
         .eq('customer_phone', phoneStr)
         .eq('business_code', businessCode)
         .eq('status', 'active');
+      
+      // שליפת שמות המוצרים
+      if (customerCards && customerCards.length > 0) {
+        const productCodes = customerCards.map(c => c.product_code);
+        console.log('🔍 Product codes:', productCodes);
+        console.log('🔍 Business code:', businessCode);
+        
+        const { data: products, error: productsError } = await supabase
+          .from('products')
+          .select('product_code, product_name')
+          .in('product_code', productCodes)
+          .eq('business_code', businessCode);
+        
+        console.log('📦 Products from DB:', products);
+        console.log('❌ Products error:', productsError);
+        
+        // חיבור שמות המוצרים לכרטיסיות
+        if (products) {
+          customerCards.forEach((card: any) => {
+            const product = products.find(p => p.product_code === card.product_code);
+            if (product) {
+              card.products = [{ product_name: product.product_name }];
+            }
+          });
+        }
+        
+        console.log('🎴 Final customerCards:', JSON.stringify(customerCards));
+      }
       
       if (cardsError) {
         setErrorMessage('שגיאה בטעינת כרטיסיות. נסה שוב.');
@@ -973,15 +995,15 @@ export default function PunchCard() {
                 >
                   <View style={styles.cardOptionContent}>
                     <View style={styles.cardOptionInfo}>
-                      <Text style={styles.cardOptionTitle}>
-                        {card.products?.[0]?.product_name || `מוצר ${index + 1}`}
+                      <Text style={styles.cardOptionTitle} numberOfLines={1} ellipsizeMode="tail">
+                        כרטיסיית {card.products?.[0]?.product_name || card.product_code || `מוצר ${index + 1}`}
                       </Text>
                       <Text style={styles.cardOptionProgress}>
                         {card.used_punches} / {card.total_punches} ניקובים
                       </Text>
                     </View>
-                    <View style={styles.cardOptionIcon}>
-                      <Text style={styles.cardOptionArrow}>←</Text>
+                    <View style={styles.cardOptionSelectButton}>
+                      <Text style={styles.cardOptionSelectText}>בחר</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -1560,12 +1582,13 @@ const styles = StyleSheet.create({
      backgroundColor: '#216265',
    },
    cardOptionContent: {
-     flexDirection: 'row',
-     justifyContent: 'space-between',
+     flexDirection: 'column',
      alignItems: 'center',
    },
    cardOptionInfo: {
-     flex: 1,
+     width: '100%',
+     alignItems: 'center',
+     paddingTop: 5,
    },
    cardOptionTitle: {
      fontSize: 18,
@@ -1573,6 +1596,8 @@ const styles = StyleSheet.create({
      color: '#FFFFFF',
      fontFamily: 'Rubik',
      marginBottom: 4,
+     marginTop: -5,
+     textAlign: 'center',
    },
    cardOptionCode: {
      fontSize: 14,
@@ -1585,12 +1610,21 @@ const styles = StyleSheet.create({
      color: '#FFFFFF',
      fontFamily: 'Rubik',
    },
-   cardOptionIcon: {
-     marginLeft: 10,
+   cardOptionSelectButton: {
+     paddingVertical: 6,
+     paddingHorizontal: 16,
+     backgroundColor: '#216265',
+     borderWidth: 0.5,
+     borderColor: '#FFFFFF',
+     borderRadius: 8,
+     marginTop: 8,
+     alignSelf: 'center',
    },
-   cardOptionArrow: {
-     fontSize: 24,
+   cardOptionSelectText: {
+     fontSize: 14,
      color: '#FFFFFF',
+     fontWeight: 'bold',
+     fontFamily: 'Rubik',
    },
    cardSelectionCancel: {
      marginTop: 15,
