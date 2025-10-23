@@ -49,6 +49,7 @@ export default function PunchCard() {
     card_number: string;
     used_punches: number;
     total_punches: number;
+    products?: { product_name: string }[];
   }>>([]);
   const [localBusiness, setLocalBusiness] = useState<{
     business_code: string;
@@ -101,10 +102,16 @@ export default function PunchCard() {
       }
       setCustomer(customers[0]);
       
-      // בדיקה כמה כרטיסיות יש ללקוח בעסק זה
+      // בדיקה כמה כרטיסיות יש ללקוח בעסק זה (כולל שם מוצר)
       const { data: customerCards, error: cardsError } = await supabase
         .from('PunchCards')
-        .select('product_code, card_number, used_punches, total_punches')
+        .select(`
+          product_code, 
+          card_number, 
+          used_punches, 
+          total_punches,
+          products!inner(product_name)
+        `)
         .eq('customer_phone', phoneStr)
         .eq('business_code', businessCode)
         .eq('status', 'active');
@@ -967,10 +974,7 @@ export default function PunchCard() {
                   <View style={styles.cardOptionContent}>
                     <View style={styles.cardOptionInfo}>
                       <Text style={styles.cardOptionTitle}>
-                        כרטיסייה #{index + 1}
-                      </Text>
-                      <Text style={styles.cardOptionCode}>
-                        {card.product_code}
+                        {card.products?.[0]?.product_name || `מוצר ${index + 1}`}
                       </Text>
                       <Text style={styles.cardOptionProgress}>
                         {card.used_punches} / {card.total_punches} ניקובים
