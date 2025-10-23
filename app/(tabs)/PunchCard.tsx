@@ -113,17 +113,12 @@ export default function PunchCard() {
       // שליפת שמות המוצרים
       if (customerCards && customerCards.length > 0) {
         const productCodes = customerCards.map(c => c.product_code);
-        console.log('🔍 Product codes:', productCodes);
-        console.log('🔍 Business code:', businessCode);
         
-        const { data: products, error: productsError } = await supabase
+        const { data: products } = await supabase
           .from('products')
           .select('product_code, product_name')
           .in('product_code', productCodes)
           .eq('business_code', businessCode);
-        
-        console.log('📦 Products from DB:', products);
-        console.log('❌ Products error:', productsError);
         
         // חיבור שמות המוצרים לכרטיסיות
         if (products) {
@@ -134,8 +129,6 @@ export default function PunchCard() {
             }
           });
         }
-        
-        console.log('🎴 Final customerCards:', JSON.stringify(customerCards));
       }
       
       if (cardsError) {
