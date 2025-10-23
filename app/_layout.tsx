@@ -1,14 +1,16 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack } from 'expo-router';
 import Head from 'expo-router/head';
-import { Platform } from 'react-native';
 import { useEffect } from 'react';
-import messaging from '@react-native-firebase/messaging';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 export default function RootLayout() {
   // Global FCM Setup - מאזין לכל הפושים בלי קשר למסך הנוכחי
   useEffect(() => {
     if (Platform.OS === 'web') return;
+    
+    // Dynamic import של Firebase - רק ב-native
+    const messaging = require('@react-native-firebase/messaging').default;
 
     // בקשת הרשאות להתראות
     const requestPermissions = async () => {
@@ -27,7 +29,7 @@ export default function RootLayout() {
     requestPermissions();
 
     // Listener להודעות שמגיעות כשהאפליקציה פתוחה (Foreground)
-    const unsubscribeOnMessage = messaging().onMessage(async (remoteMessage) => {
+    const unsubscribeOnMessage = messaging().onMessage(async (remoteMessage: any) => {
       if (!remoteMessage.data) return;
 
       const { businessCode, customerPhone } = remoteMessage.data;
@@ -64,14 +66,14 @@ export default function RootLayout() {
     });
 
     // Listener להודעות שנפתחו מה-notification tray
-    const unsubscribeOnNotificationOpenedApp = messaging().onNotificationOpenedApp((remoteMessage) => {
+    const unsubscribeOnNotificationOpenedApp = messaging().onNotificationOpenedApp((remoteMessage: any) => {
       // כאן אפשר לנתב למסך מסוים אם צריך
     });
 
     // בדיקה אם האפליקציה נפתחה מהודעה
     messaging()
       .getInitialNotification()
-      .then((remoteMessage) => {
+      .then((remoteMessage: any) => {
         if (remoteMessage) {
           // כאן אפשר לנתב למסך מסוים אם צריך
         }
