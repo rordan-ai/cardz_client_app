@@ -1,7 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Barcode } from 'react-native-svg-barcode';
 import { useBusiness } from '../../components/BusinessContext';
 import { getCurrentLogoScale } from '../../components/LogoUtils';
@@ -11,6 +12,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function PunchCard() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { business, refresh: refreshBusiness } = useBusiness();
   const { phone } = useLocalSearchParams();
   const phoneStr = typeof phone === 'string' ? phone.trim() : Array.isArray(phone) ? phone[0].trim() : '';
@@ -23,7 +25,8 @@ export default function PunchCard() {
     card_number: string; 
     used_punches: number; 
     benefit: string; 
-    prepaid: string; 
+    prepaid: string;
+    product_code?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -31,8 +34,22 @@ export default function PunchCard() {
   const [iconsLoading, setIconsLoading] = useState<{ [key: number]: boolean }>({});
   const [menuVisible, setMenuVisible] = useState(false);
   const [mailVisible, setMailVisible] = useState(false);
-  const [unreadMessages, setUnreadMessages] = useState(2);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [notifications, setNotifications] = useState<Array<{
+    id: string;
+    title: string;
+    body: string;
+    timestamp: number;
+    read: boolean;
+  }>>([]);
   const [referralVisible, setReferralVisible] = useState(false);
+  const [cardSelectionVisible, setCardSelectionVisible] = useState(false);
+  const [availableCards, setAvailableCards] = useState<Array<{
+    product_code: string;
+    card_number: string;
+    used_punches: number;
+    total_punches: number;
+  }>>([]);
   const [localBusiness, setLocalBusiness] = useState<{
     business_code: string;
     name: string;
@@ -58,11 +75,19 @@ export default function PunchCard() {
     const fetchData = async () => {
       setLoading(true);
       setErrorMessage(null);
-      // שליפת לקוח לפי customer_phone
+      // שליפת לקוח לפי customer_phone ו-business_code
+      const businessCode = business?.business_code;
+      if (!businessCode) {
+        setErrorMessage('לא נמצא קוד עסק. נא לחזור למסך הראשי.');
+        setLoading(false);
+        return;
+      }
+      
       const { data: customers, error: customerError } = await supabase
         .from('customers')
         .select('*')
         .eq('customer_phone', phoneStr)
+        .eq('business_code', businessCode)
         .limit(1);
       if (customerError) {
         setErrorMessage('לא נמצאה כרטיסייה מתאימה למספר זה. ודא שהזנת את המספר הנכון או שנרשמת לעסק.');
@@ -75,10 +100,42 @@ export default function PunchCard() {
         return;
       }
       setCustomer(customers[0]);
-      // שליפת business_code מתוך הלקוח
-      const businessCode = customers[0].business_code; // לדוג' '0001'
-      const productCode = '12'; // קוד מוצר בן 2 ספרות בלבד
-      const cardNumber = `${businessCode}${phoneStr}${productCode}`; // 16 ספרות בלבד
+      
+      // בדיקה כמה כרטיסיות יש ללקוח בעסק זה
+      const { data: customerCards, error: cardsError } = await supabase
+        .from('PunchCards')
+        .select('product_code, card_number, used_punches, total_punches')
+        .eq('customer_phone', phoneStr)
+        .eq('business_code', businessCode)
+        .eq('status', 'active');
+      
+      if (cardsError) {
+        setErrorMessage('שגיאה בטעינת כרטיסיות. נסה שוב.');
+        setLoading(false);
+        return;
+      }
+      
+      // אם אין כרטיסיות כלל
+      if (!customerCards || customerCards.length === 0) {
+        setErrorMessage('לא נמצאו כרטיסיות פעילות עבור לקוח זה. נא ליצור קשר עם בית העסק.');
+        setLoading(false);
+        return;
+      }
+      
+      let cardNumber: string;
+      let productCode: string;
+      
+      // אם יש יותר מכרטיסייה אחת - צריך לבחור
+      if (customerCards.length > 1) {
+        setAvailableCards(customerCards);
+        setCardSelectionVisible(true);
+        setLoading(false);
+        return; // נעצור כאן ונמתין לבחירת המשתמש
+      } else {
+        // יש כרטיסייה אחת בלבד
+        cardNumber = customerCards[0].card_number;
+        productCode = customerCards[0].product_code;
+      }
       
       // שליפת נתוני העסק (כולל max_punches)
       const { data: businessData, error: businessError } = await supabase
@@ -121,13 +178,13 @@ export default function PunchCard() {
         setLoading(false);
         return;
       }
-              setPunchCard(punchCards[0]);
+              setPunchCard(punchCards[0] as typeof punchCard);
       setLoading(false);
     };
     if (phoneStr) {
       fetchData();
     }
-  }, [phoneStr]);
+  }, [phoneStr, business?.business_code]); // תלות רק בקוד העסק, לא בכל האובייקט
 
   // --- REALTIME START ---
   // חיבור ל-Realtime לעדכונים מיידיים
@@ -153,7 +210,7 @@ export default function PunchCard() {
         },
                  (payload: { new?: Record<string, any>; old?: Record<string, any> }) => {
            if (payload.new) {
-            setPunchCard(payload.new);
+            setPunchCard(payload.new as typeof punchCard);
           }
         }
       )
@@ -185,6 +242,91 @@ export default function PunchCard() {
     };
   }, [phoneStr, customer?.business_code]);
   // --- REALTIME END ---
+
+  // רישום FCM Token לעסק הספציפי
+  useEffect(() => {
+    // רישום FCM Token לעסק הספציפי
+    
+    // ה-listeners עברו ל-_layout.tsx כדי שיעבדו גלובלית
+    
+    const registerFCM = async () => {
+      if (!customer || !localBusiness) {
+        return;
+      }
+      
+      const storageKey = `last_fcm_token_${localBusiness.business_code}`;
+      
+      try {
+        // קבלת הטוקן הגלובלי מ-AsyncStorage
+        const fcmToken = await AsyncStorage.getItem('global_fcm_token');
+        if (!fcmToken) {
+          return;
+        }
+        
+        // בדיקת Guard - האם הטוקן השתנה
+        let savedToken = await AsyncStorage.getItem(storageKey);
+        
+        // הקוד למטה היה לבדיקה בלבד - הוסר לייצור
+        // if (savedToken) {
+        
+        if (savedToken === fcmToken) {
+          return;
+        }
+        
+        // רישום הטוקן
+        const { data, error } = await supabase.functions.invoke('register-device-token', {
+          body: {
+            business_code: localBusiness.business_code,
+            phone_number: customer.customer_phone,
+            token: fcmToken,
+            platform: Platform.OS,
+            environment: 'prod',
+            app_version: '1.0.0',
+            device_info: {
+              model: 'mobile',
+              os: Platform.Version
+            }
+          }
+        });
+        
+        if (error) {
+          // FCM registration error - handled silently
+        } else {
+          await AsyncStorage.setItem(storageKey, fcmToken);
+        }
+      } catch (error) {
+        // FCM setup error - handled silently
+      }
+    };
+    
+    registerFCM();
+    
+  }, [customer, localBusiness]);
+
+  // טעינת הודעות מ-AsyncStorage
+  useEffect(() => {
+    const loadNotifications = async () => {
+      try {
+        if (!customer || !localBusiness) return;
+        
+        const storageKey = `notifications_${localBusiness.business_code}_${customer.customer_phone}`;
+        const savedNotifications = await AsyncStorage.getItem(storageKey);
+        
+        if (savedNotifications) {
+          const parsedNotifications = JSON.parse(savedNotifications);
+          setNotifications(parsedNotifications);
+          
+          // ספירת הודעות שלא נקראו
+          const unreadCount = parsedNotifications.filter((n: any) => !n.read).length;
+          setUnreadMessages(unreadCount);
+        }
+      } catch (error) {
+        // Error loading notifications - handled silently
+      }
+    };
+    
+    loadNotifications();
+  }, [customer, localBusiness]);
 
   if (loading) {
     return (
@@ -233,8 +375,8 @@ export default function PunchCard() {
 
   
 
-  // עיצוב גריד סימטרי (למשל 3x4, 2x5 וכו')
-  const iconsPerRow = Math.ceil(Math.sqrt(totalPunches));
+  // עיצוב גריד 4 אייקונים בשורה
+  const iconsPerRow = 4;
   const rows = [];
   for (let i = 0; i < iconsArr.length; i += iconsPerRow) {
     rows.push(iconsArr.slice(i, i + iconsPerRow));
@@ -246,20 +388,75 @@ export default function PunchCard() {
   const cardTextColor = business?.card_text_color || '#6B3F1D';
 
   // הודעות דמי פשוטות - 2 הודעות לדמו
-  const demoMessages = [
-    {
-      id: 1,
-      from: business?.name || 'העסק',
-      subject: 'הודעה ראשונה',
-      content: 'זו הודעה ראשונה מהעסק. כאן יופיעו הודעות מהעסק ללקוחותיו.'
-    },
-    {
-      id: 2,
-      from: 'מערכת CARDZ',
-      subject: 'הודעה שנייה',
-      content: 'זו הודעה שנייה מהמערכת. כאן יופיעו הודעות מהמערכת ללקוחות.'
+  // פונקציה למחיקת הודעה
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      const storageKey = `notifications_${localBusiness?.business_code}_${customer?.customer_phone}`;
+      const updatedNotifications = notifications.filter(n => n.id !== notificationId);
+      setNotifications(updatedNotifications);
+      await AsyncStorage.setItem(storageKey, JSON.stringify(updatedNotifications));
+      
+      // עדכון מספר ההודעות שלא נקראו
+      const unreadCount = updatedNotifications.filter(n => !n.read).length;
+      setUnreadMessages(unreadCount);
+    } catch (error) {
+      // Error deleting notification - handled silently
     }
-  ];
+  };
+  
+  // פונקציה לסימון הודעה כנקראה
+  const markAsRead = async (notificationId: string) => {
+    try {
+      const storageKey = `notifications_${localBusiness?.business_code}_${customer?.customer_phone}`;
+      const updatedNotifications = notifications.map(n => 
+        n.id === notificationId ? { ...n, read: true } : n
+      );
+      setNotifications(updatedNotifications);
+      await AsyncStorage.setItem(storageKey, JSON.stringify(updatedNotifications));
+      
+      // עדכון מספר ההודעות שלא נקראו
+      const unreadCount = updatedNotifications.filter(n => !n.read).length;
+      setUnreadMessages(unreadCount);
+    } catch (error) {
+      // Error marking as read - handled silently
+    }
+  };
+
+  // פונקציה לבחירת כרטיסייה
+  const handleCardSelection = async (selectedCard: typeof availableCards[0]) => {
+    setCardSelectionVisible(false);
+    setLoading(true);
+    
+    // המשך טעינת נתוני הכרטיסייה שנבחרה
+    const { data: punchCard, error: punchCardError } = await supabase
+      .from('PunchCards')
+      .select('*')
+      .eq('card_number', selectedCard.card_number)
+      .single();
+
+    if (punchCardError || !punchCard) {
+      setErrorMessage('שגיאה בטעינת הכרטיסייה. נסה שוב.');
+      setLoading(false);
+      return;
+    }
+
+    // שליפת נתוני העסק
+    const { data: businessData, error: businessError } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('business_code', business?.business_code)
+      .single();
+
+    if (businessError || !businessData) {
+      setErrorMessage('שגיאה בטעינת נתוני העסק. נסה שוב.');
+      setLoading(false);
+      return;
+    }
+
+    setLocalBusiness(businessData);
+    setPunchCard(punchCard);
+    setLoading(false);
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -360,30 +557,57 @@ export default function PunchCard() {
             {row.map((icon, j) => {
               const iconIndex = idx * iconsPerRow + j;
               const isIconLoading = iconsLoading[iconIndex] !== false;
+              const isPunched = iconIndex < usedPunches;
               
               return (
                 <View key={j} style={{ position: 'relative' }}>
                   {isIconLoading && (
                     <View style={{
                       position: 'absolute',
-                      width: 146,
-                      height: 146,
+                      width: 55,
+                      height: 55,
                       backgroundColor: '#f0f0f0',
-                      borderRadius: 73,
+                      borderRadius: 27.5,
                       justifyContent: 'center',
                       alignItems: 'center',
                       zIndex: 1
                     }}>
-                      <Text style={{ color: '#999', fontSize: 10, fontFamily: 'Rubik' }}>טוען...</Text>
+                      <Text style={{ color: '#999', fontSize: 7, fontFamily: 'Rubik' }}>טוען...</Text>
                     </View>
                   )}
-                  <Image
-                    source={{ uri: icon }}
-                    style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
-                    resizeMode="contain"
-                    onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                    onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                  />
+                  {isPunched ? (
+                    <>
+                      {/* כוס קפה בתור בסיס */}
+                      <Image
+                        source={{ uri: unpunchedIcon }}
+                        style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
+                        resizeMode="contain"
+                        onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                        onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                      />
+                      {/* חור ניקוב מעל הכוס - גדול ב-50% */}
+                      <Image
+                        source={{ uri: 'https://noqfwkxzmvpkorcaymcb.supabase.co/storage/v1/object/public/icons/punched_icones/punch_overlay.png' }}
+                        style={[styles.icon, { 
+                          position: 'absolute', 
+                          top: -13.75, 
+                          left: -13.75, 
+                          width: 82.5, 
+                          height: 82.5, 
+                          opacity: isIconLoading ? 0 : 1 
+                        }]}
+                        resizeMode="contain"
+                      />
+                    </>
+                  ) : (
+                    <Image
+                      source={{ uri: icon }}
+                      style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
+                      resizeMode="contain"
+                      onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                      onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                    />
+                  )}
                 </View>
               );
             })}
@@ -411,11 +635,13 @@ export default function PunchCard() {
       </View>
       
       {/* ברקוד */}
-      <View style={styles.barcodeBox}>
-        <Barcode value={cardCode} format="CODE128" height={60} />
-      </View>
+      {cardCode && (
+        <View style={styles.barcodeBox}>
+          <Barcode value={cardCode} format="CODE128" height={60} />
+        </View>
+      )}
       {/* מספר סידורי */}
-      <Text style={styles.cardCode}>#{cardCode}</Text>
+      {cardCode && <Text style={styles.cardCode}>#{cardCode}</Text>}
       </View>
       
              {/* מודאל תפריט המבורגר */}
@@ -479,34 +705,59 @@ export default function PunchCard() {
                <Text style={[styles.mailTitle, { color: cardTextColor }]}>הודעות</Text>
                <TouchableOpacity 
                  style={styles.closeX}
-                 onPress={() => {
-                   setMailVisible(false);
-                   setUnreadMessages(0);
-                 }}
+                onPress={() => {
+                  setMailVisible(false);
+                  // לא מאפסים אוטומטית - רק כשקוראים הודעה
+                }}
                >
                  <Text style={styles.closeXText}>×</Text>
                </TouchableOpacity>
              </View>
              
-             <ScrollView style={styles.messagesScrollView} showsVerticalScrollIndicator={true}>
-               {demoMessages.map((message, index) => (
-                 <View key={message.id} style={styles.messageItem}>
-                   <View style={styles.messageHeader}>
-                     <Text style={styles.messageFrom}>מאת: {message.from}</Text>
-                     <Text style={styles.messageNumber}>{index + 1}</Text>
-                   </View>
-                   <View style={styles.subjectRow}>
-                     <Text style={styles.messageSubject}>נושא: {message.subject}</Text>
-                     <TouchableOpacity 
-                       style={[styles.openButton, { backgroundColor: cardTextColor }]}
-                       onPress={() => alert(message.content)}
-                     >
-                       <Text style={styles.openButtonText}>פתח</Text>
-                     </TouchableOpacity>
-                   </View>
-                 </View>
-               ))}
-             </ScrollView>
+            <ScrollView style={styles.messagesScrollView} showsVerticalScrollIndicator={true}>
+              {notifications.length === 0 ? (
+                <View style={styles.emptyMessagesContainer}>
+                  <Text style={styles.emptyMessagesText}>אין הודעות חדשות</Text>
+                </View>
+              ) : (
+                notifications.map((notification, index) => (
+                  <View key={notification.id} style={[styles.messageItem, !notification.read && styles.unreadMessage]}>
+                    <View style={styles.messageHeader}>
+                      <Text style={styles.messageFrom}>{notification.title}</Text>
+                      <Text style={styles.messageNumber}>{index + 1}</Text>
+                    </View>
+                    <View style={styles.messageBody}>
+                      <Text style={styles.messageContent} numberOfLines={2}>{notification.body}</Text>
+                      <Text style={styles.messageTime}>
+                        {new Date(notification.timestamp).toLocaleString('he-IL', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          day: '2-digit',
+                          month: '2-digit'
+                        })}
+                      </Text>
+                    </View>
+                    <View style={styles.messageActions}>
+                      <TouchableOpacity 
+                        style={[styles.actionButton, { backgroundColor: cardTextColor }]}
+                        onPress={() => {
+                          markAsRead(notification.id);
+                          Alert.alert(notification.title, notification.body);
+                        }}
+                      >
+                        <Text style={styles.actionButtonText}>קרא</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.actionButton, styles.deleteButton]}
+                        onPress={() => deleteNotification(notification.id)}
+                      >
+                        <Text style={styles.actionButtonText}>מחק</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
              </View>
            </View>
          </Modal>
@@ -549,7 +800,7 @@ export default function PunchCard() {
                          await Clipboard.setStringAsync(referralCode);
                          Alert.alert('הקופון הועתק!', `קופון ההזמנה ${referralCode} הועתק ללוח`);
                       } catch (error: unknown) {
-                        console.error('שגיאה בהעתקת מספר הקופון:', error);
+                        // שגיאה בהעתקה - handled silently
                         Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${(error as Error).message || error}`);
                       }
                     }}
@@ -570,7 +821,7 @@ export default function PunchCard() {
                          await Clipboard.setStringAsync(referralCode);
                          Alert.alert('הקופון הועתק!', `קופון ההזמנה ${referralCode} הועתק ללוח`);
                       } catch (error: unknown) {
-                        console.error('שגיאה בהעתקה מכפתור:', error);
+                        // שגיאה בהעתקה - handled silently
                         Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${(error as Error).message || error}`);
                       }
                     }}
@@ -695,6 +946,58 @@ export default function PunchCard() {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* מודל בחירת כרטיסייה */}
+      <Modal visible={cardSelectionVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.cardSelectionContent}>
+            <View style={styles.cardSelectionHeader}>
+              <Text style={styles.cardSelectionTitle}>בחר כרטיסייה</Text>
+              <Text style={styles.cardSelectionSubtitle}>
+                נמצאו {availableCards.length} כרטיסיות פעילות עבורך בעסק זה
+              </Text>
+            </View>
+            
+            <ScrollView style={styles.cardsScrollView}>
+              {availableCards.map((card, index) => (
+                <TouchableOpacity
+                  key={card.card_number}
+                  style={styles.cardOption}
+                  onPress={() => handleCardSelection(card)}
+                >
+                  <View style={styles.cardOptionContent}>
+                    <View style={styles.cardOptionInfo}>
+                      <Text style={styles.cardOptionTitle}>
+                        כרטיסייה #{index + 1}
+                      </Text>
+                      <Text style={styles.cardOptionCode}>
+                        {card.product_code}
+                      </Text>
+                      <Text style={styles.cardOptionProgress}>
+                        {card.used_punches} / {card.total_punches} ניקובים
+                      </Text>
+                    </View>
+                    <View style={styles.cardOptionIcon}>
+                      <Text style={styles.cardOptionArrow}>←</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            <TouchableOpacity
+              style={styles.cardSelectionCancel}
+              onPress={() => {
+                setCardSelectionVisible(false);
+                // חזרה למסך הראשי
+                navigation.goBack();
+              }}
+            >
+              <Text style={styles.cardSelectionCancelText}>ביטול</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
@@ -704,7 +1007,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     backgroundColor: '#FBF8F8',
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingBottom: 150,
     paddingHorizontal: 8,
   },
   topIconOffsetClean: {
@@ -717,7 +1021,7 @@ const styles = StyleSheet.create({
     transform: [{ translateY: height * -0.10 }],
   },
   bottomContentOffset: {
-    transform: [{ translateY: height * 0.095 }],
+    transform: [{ translateY: height * 0.095 + 67 }],
   },
   bottomTextsUpOffset: {
     transform: [{ translateY: height * -0.07 }],
@@ -766,12 +1070,12 @@ const styles = StyleSheet.create({
   iconsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: -64,
+    marginBottom: 8,
   },
   icon: {
-    width: 146,
-    height: 146,
-    marginHorizontal: -40,
+    width: 55,
+    height: 55,
+    marginHorizontal: 2,
   },
   punchCount: {
     fontSize: 18,
@@ -994,6 +1298,52 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 10,
   },
+  unreadMessage: {
+    backgroundColor: '#f0f8ff',
+  },
+  messageBody: {
+    marginVertical: 8,
+  },
+  messageContent: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'right',
+    fontFamily: 'Rubik',
+  },
+  messageTime: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'right',
+    marginTop: 4,
+    fontFamily: 'Rubik',
+  },
+  messageActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  actionButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 15,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Rubik',
+  },
+  deleteButton: {
+    backgroundColor: '#dc3545',
+  },
+  emptyMessagesContainer: {
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  emptyMessagesText: {
+    fontSize: 16,
+    color: '#888',
+    fontFamily: 'Rubik',
+  },
   noMessages: {
     textAlign: 'center',
     color: '#888',
@@ -1163,5 +1513,92 @@ const styles = StyleSheet.create({
      fontSize: 24,
      fontWeight: 'bold',
      color: '#666',
+   },
+   // סגנונות למודל בחירת כרטיסייה
+   cardSelectionContent: {
+     backgroundColor: 'white',
+     width: '90%',
+     maxHeight: '70%',
+     borderRadius: 20,
+     padding: 20,
+     elevation: 5,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.25,
+     shadowRadius: 3.84,
+   },
+   cardSelectionHeader: {
+     marginBottom: 20,
+     alignItems: 'center',
+   },
+   cardSelectionTitle: {
+     fontSize: 22,
+     fontWeight: 'bold',
+     color: '#333',
+     fontFamily: 'Rubik',
+     marginBottom: 8,
+   },
+   cardSelectionSubtitle: {
+     fontSize: 16,
+     color: '#666',
+     fontFamily: 'Rubik',
+     textAlign: 'center',
+   },
+   cardsScrollView: {
+     maxHeight: 300,
+   },
+   cardOption: {
+     borderWidth: 1,
+     borderColor: '#E0E0E0',
+     borderRadius: 15,
+     padding: 15,
+     marginBottom: 10,
+     backgroundColor: '#216265',
+   },
+   cardOptionContent: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+   },
+   cardOptionInfo: {
+     flex: 1,
+   },
+   cardOptionTitle: {
+     fontSize: 18,
+     fontWeight: 'bold',
+     color: '#FFFFFF',
+     fontFamily: 'Rubik',
+     marginBottom: 4,
+   },
+   cardOptionCode: {
+     fontSize: 14,
+     color: '#FFFFFF',
+     fontFamily: 'Rubik',
+     marginBottom: 4,
+   },
+   cardOptionProgress: {
+     fontSize: 14,
+     color: '#FFFFFF',
+     fontFamily: 'Rubik',
+   },
+   cardOptionIcon: {
+     marginLeft: 10,
+   },
+   cardOptionArrow: {
+     fontSize: 24,
+     color: '#FFFFFF',
+   },
+   cardSelectionCancel: {
+     marginTop: 15,
+     paddingVertical: 12,
+     paddingHorizontal: 40,
+     backgroundColor: '#E0E0E0',
+     borderRadius: 20,
+     alignSelf: 'center',
+   },
+   cardSelectionCancelText: {
+     fontSize: 16,
+     color: '#666',
+     fontFamily: 'Rubik',
    },
  }); 
