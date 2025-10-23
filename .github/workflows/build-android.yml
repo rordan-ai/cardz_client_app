@@ -26,6 +26,11 @@ jobs:
       env:
         GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
       run: |
+        if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+          echo "Error: GOOGLE_SERVICES_JSON secret is not set!"
+          echo "Please add the secret in GitHub Settings > Secrets > Actions"
+          exit 1
+        fi
         echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
     - name: Set up JDK
@@ -40,7 +45,7 @@ jobs:
         ./gradlew assembleRelease
 
     - name: Upload APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: app-release
         path: android/app/build/outputs/apk/release/app-release.apk
