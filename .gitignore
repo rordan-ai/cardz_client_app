@@ -36,4 +36,8 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Firebase sensitive files
+android/app/google-services.json
+ios/GoogleService-Info.plist
+
 app-example
