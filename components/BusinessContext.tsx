@@ -26,6 +26,8 @@ interface BusinessContextType {
   refresh: () => Promise<void>;
   setBusiness: (business: Business) => void;
   setBusinessCode: (code: string) => Promise<void>;
+  setCustomerPhone: (phone: string) => void;
+  customerPhone: string | null;
 }
 
 const BusinessContext = createContext<BusinessContextType>({

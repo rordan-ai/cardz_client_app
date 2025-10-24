@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "127384108600",
+    "project_id": "business-digital-punch-cards",
+    "storage_bucket": "business-digital-punch-cards.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:127384108600:android:866b74f495ebe72f5570cd",
+        "android_client_info": {
+          "package_name": "com.anonymous.mynewtestapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkohJJJc4c8x6aIiobK6Lft7Ihiy8usqU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+
