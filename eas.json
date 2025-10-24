@@ -1,0 +1,22 @@
+{
+  "cli": {
+    "version": ">= 13.0.0"
+  },
+  "build": {
+    "production": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "GOOGLE_SERVICES_JSON_BASE64": ""
+      },
+      "hooks": {
+        "prebuild": {
+          "command": "node scripts/write-google-services-json.js"
+        }
+      }
+    }
+  }
+}
+
+
