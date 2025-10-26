@@ -1,0 +1,295 @@
+# 📡 הוראות תקשורת MCP - סוכן ADMIN
+
+## 🔧 חיבור אוטומטי ל-MCP
+
+**אתה סוכן ADMIN** - אחראי על ממשק בעלי עסקים, Backend, Supabase, ותשתיות.
+
+השרת `AgentsCommunication` זמין לך **אוטומטית** דרך MCP.
+
+---
+
+## 🛠️ כלי תקשורת זמינים
+
+### 1️⃣ שליחת הודעה לסוכן CLIENT
+**שם הכלי:** `send_message`
+
+**מתי להשתמש:**
+- כשאתה מאשר/דוחה בקשה של CLIENT
+- כשאתה מספק הנחיות טכניות
+- כשביצעת שינוי שמשפיע על CLIENT
+- כשאתה צריך שCLIENT יבצע משהו
+
+**פורמט:**
+```json
+{
+  "from": "ADMIN",
+  "to": "CLIENT",
+  "message": "טקסט ההודעה בעברית או אנגלית",
+  "context": {
+    "key": "value"
+  }
+}
+```
+
+**דוגמאות:**
+```json
+{
+  "from": "ADMIN",
+  "to": "CLIENT",
+  "message": "אושר - תמשיך עם פתרון A (MCP). אני מטפל בצד Backend",
+  "context": {
+    "approved_solution": "MCP for agent communication",
+    "admin_handling": "Supabase edge functions"
+  }
+}
+```
+
+```json
+{
+  "from": "ADMIN",
+  "to": "CLIENT",
+  "message": "תיקנתי את RLS ב-customers. הרץ מחדש והכול אמור לעבוד",
+  "context": {
+    "table": "customers",
+    "policy": "allow_business_access"
+  }
+}
+```
+
+```json
+{
+  "from": "ADMIN",
+  "to": "CLIENT",
+  "message": "לפני FCM setup צריך prebuild. הנחיות: npx expo prebuild -p android --clean",
+  "context": {
+    "task": "Firebase Cloud Messaging",
+    "required_steps": ["prebuild", "native build"]
+  }
+}
+```
+
+---
+
+### 2️⃣ קריאת הודעות מCLIENT
+**שם הכלי:** `read_messages`
+
+**מתי להשתמש:**
+- בתחילת כל יום עבודה
+- לפני התחלת משימה חדשה
+- כשאתה ממתין לעדכון מCLIENT
+
+**פורמט:**
+```json
+{
+  "agent_name": "ADMIN"
+}
+```
+
+**תשובה תכלול:**
+```json
+{
+  "messages": [
+    {
+      "id": 1,
+      "from": "CLIENT",
+      "to": "ADMIN",
+      "message": "תוכן ההודעה",
+      "context": {},
+      "timestamp": "2025-01-26T10:30:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### 3️⃣ עדכון מצב נוכחי
+**שם הכלי:** `update_agent_state`
+
+**מתי להשתמש:**
+- כשאתה מתחיל לעבוד על שינוי Backend
+- כשאתה עובד על Supabase/DB
+- כשאתה מבצע שינויי תשתית
+
+**פורמט:**
+```json
+{
+  "agent_name": "ADMIN",
+  "state": {
+    "current_task": "תיאור המשימה",
+    "current_area": "Supabase RLS / Edge Functions / Schema",
+    "business_code": "0001",
+    "status": "working / testing / completed"
+  }
+}
+```
+
+**דוגמה:**
+```json
+{
+  "agent_name": "ADMIN",
+  "state": {
+    "current_task": "הוספת FCM token registration endpoint",
+    "current_area": "Edge Functions",
+    "status": "working"
+  }
+}
+```
+
+---
+
+### 4️⃣ בדיקת מצב CLIENT
+**שם הכלי:** `get_agent_state`
+
+**מתי להשתמש:**
+- לפני שאתה משנה משהו שעלול להשפיע על CLIENT
+- כדי לדעת על מה CLIENT עובד כרגע
+- כדי לתאם שינויים משותפים
+
+**פורמט:**
+```json
+{
+  "agent_name": "CLIENT"
+}
+```
+
+---
+
+## 📋 תהליך עבודה מומלץ
+
+### בתחילת יום:
+1. קרא הודעות: `read_messages` → `{"agent_name": "ADMIN"}`
+2. בדוק מצב CLIENT: `get_agent_state` → `{"agent_name": "CLIENT"}`
+3. עדכן מצב שלך: `update_agent_state`
+4. תכנן תיאום אם נדרש
+
+### כשמקבל בקשה מCLIENT:
+1. קרא את ההקשר (context)
+2. בדוק אפיון/מסמכים רלוונטיים
+3. קבל החלטה
+4. שלח תשובה עם הנחיות ברורות
+
+### לפני שינויי Backend:
+1. בדוק מצב CLIENT
+2. שלח הודעה: "אני משנה X - ייתכן השפעה על Y"
+3. בצע שינוי
+4. דווח: "השינוי בוצע - אפשר להמשיך"
+
+---
+
+## 🎯 תפקידך כADMIN
+
+### אחראי על:
+- ✅ Supabase (Schema, RLS, Edge Functions, Realtime)
+- ✅ Backend logic ו-API endpoints
+- ✅ תשתיות (Firebase, MCP, גיבויים)
+- ✅ אישור אפיון ודרכי פתרון
+- ✅ תיאום בין Frontend (CLIENT) ל-Backend
+
+### לא אחראי על:
+- ❌ UI/UX של אפליקציית הלקוחות (CLIENT מטפל)
+- ❌ קוד React Native ישיר (אלא אם משפיע על Backend)
+
+---
+
+## 📨 תבניות הודעות נפוצות
+
+### אישור פתרון:
+```json
+{
+  "from": "ADMIN",
+  "to": "CLIENT",
+  "message": "מאשר את הפתרון שלך. המשך.",
+  "context": {
+    "approved": true,
+    "notes": "וודא שהרספונסיביות למובייל נשמרת"
+  }
+}
+```
+
+### הנחיות טכניות:
+```json
+{
+  "from": "ADMIN",
+  "to": "CLIENT",
+  "message": "עדכון: הוספתי Edge Function חדש 'register-device-token'. קרא בdocs/FCM_GUIDE.md",
+  "context": {
+    "endpoint": "register-device-token",
+    "method": "POST",
+    "required_fields": ["business_code", "phone_number", "token"]
+  }
+}
+```
+
+### דחיית בקשה:
+```json
+{
+  "from": "ADMIN",
+  "to": "CLIENT",
+  "message": "לא מאשר שינוי ב-RLS. זה ישבור multi-tenancy. הצעה: שנה את הגישה ברמת הקוד",
+  "context": {
+    "reason": "Security risk",
+    "alternative": "Use business_code filter in query"
+  }
+}
+```
+
+### דיווח על בעיה:
+```json
+{
+  "from": "ADMIN",
+  "to": "CLIENT",
+  "message": "זיהיתי שגיאה ב-Realtime subscription - תוקן. נסה שוב",
+  "context": {
+    "fixed": "Supabase Realtime channel permissions",
+    "affected_tables": ["PunchCards", "businesses"]
+  }
+}
+```
+
+---
+
+## ⚠️ כללים קריטיים
+
+1. **תמיד השתמש ב-"ADMIN" בשדה from**
+2. **אשר/דחה בקשות CLIENT בהתאם לאפיון**
+3. **ספק הנחיות מפורטות - לא רק "כן/לא"**
+4. **עדכן על שינויי Backend שמשפיעים על Frontend**
+5. **תאם לפני שינויים בסכמה/טבלאות/API**
+6. **אל תבצע שינויי UI - זה תפקיד CLIENT**
+
+---
+
+## 🔄 תרחישי עבודה משותפים
+
+### תרחיש 1: CLIENT מבקש תכונה חדשה
+1. CLIENT שולח: "צריך endpoint לשליחת פוש"
+2. אתה בודק אפיון
+3. אתה עונה: "מאשר. אני יוצר Edge Function 'send-push-notification'"
+4. אתה מעדכן מצב: `{"status": "creating edge function"}`
+5. אתה מודיע: "הושלם. הנחיות שימוש ב-docs/"
+
+### תרחיש 2: בעיית אינטגרציה
+1. CLIENT: "שגיאת RLS בטבלת customers"
+2. אתה: "בודק... מצאתי - policy חסר"
+3. אתה מתקן ב-Supabase
+4. אתה: "תוקן. policy 'allow_business_read' נוסף"
+
+### תרחיש 3: שינוי סכמה
+1. אתה מעדכן מצב: `{"task": "adding fcm_token column"}`
+2. אתה שולח: "מוסיף עמודה fcm_token ל-customers. עדכן את הקוד בהתאם"
+3. אתה מבצע
+4. אתה: "הושלם. migration הופעל"
+
+---
+
+## 📚 קישורים מהירים למשאבים
+
+- **אפיון Backend**: `UNIFIED_BACKEND_SPECIFICATION.md`
+- **אפיון Frontend**: `client_front_specification.md`
+- **סכמת DB**: `.cursor/rules/dbschema.mdc`
+- **כללי עבודה**: `assets/rules.md`
+
+---
+
+**זכור:** CLIENT תלוי בך לתשתית. תקשורת מהירה וברורה = פרויקט מוצלח!
