@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Barcode } from 'react-native-svg-barcode';
 import { useBusiness } from '../../components/BusinessContext';
+import FCMService from '../../components/FCMService';
 import { getCurrentLogoScale } from '../../components/LogoUtils';
 import { supabase } from '../../components/supabaseClient';
 
@@ -265,90 +266,38 @@ export default function PunchCard() {
   }, [phoneStr, customer?.business_code]);
   // --- REALTIME END ---
 
-  // רישום FCM Token לעסק הספציפי
+  // רישום העסק למכשיר (ללא תלות במספר טלפון)
   useEffect(() => {
-    // רישום FCM Token לעסק הספציפי
-    
-    // ה-listeners עברו ל-_layout.tsx כדי שיעבדו גלובלית
-    
-    const registerFCM = async () => {
-      if (!customer || !localBusiness) {
-        return;
-      }
+    const registerBusiness = async () => {
+      if (!localBusiness) return;
       
-      const storageKey = `last_fcm_token_${localBusiness.business_code}`;
-      
-      try {
-        // קבלת הטוקן הגלובלי מ-AsyncStorage
-        const fcmToken = await AsyncStorage.getItem('global_fcm_token');
-        if (!fcmToken) {
-          return;
-        }
-        
-        // בדיקת Guard - האם הטוקן השתנה
-        let savedToken = await AsyncStorage.getItem(storageKey);
-        
-        // הקוד למטה היה לבדיקה בלבד - הוסר לייצור
-        // if (savedToken) {
-        
-        if (savedToken === fcmToken) {
-          return;
-        }
-        
-        // רישום הטוקן
-        const { data, error } = await supabase.functions.invoke('register-device-token', {
-          body: {
-            business_code: localBusiness.business_code,
-            phone_number: customer.customer_phone,
-            token: fcmToken,
-            platform: Platform.OS,
-            environment: 'prod',
-            app_version: '1.0.0',
-            device_info: {
-              model: 'mobile',
-              os: Platform.Version
-            }
-          }
-        });
-        
-        if (error) {
-          // FCM registration error - handled silently
-        } else {
-          await AsyncStorage.setItem(storageKey, fcmToken);
-        }
-      } catch (error) {
-        // FCM setup error - handled silently
-      }
+      // רישום העסק למכשיר זה
+      await FCMService.addBusinessCode(localBusiness.business_code);
     };
     
-    registerFCM();
-    
-  }, [customer, localBusiness]);
+    registerBusiness();
+  }, [localBusiness]);
 
   // טעינת הודעות מ-AsyncStorage
   useEffect(() => {
     const loadNotifications = async () => {
       try {
-        if (!customer || !localBusiness) return;
+        if (!localBusiness) return;
         
-        const storageKey = `notifications_${localBusiness.business_code}_${customer.customer_phone}`;
-        const savedNotifications = await AsyncStorage.getItem(storageKey);
+        // קריאת הודעות מ-FCMService (ללא תלות במספר טלפון)
+        const savedNotifications = await FCMService.getNotifications(localBusiness.business_code);
+        setNotifications(savedNotifications);
         
-        if (savedNotifications) {
-          const parsedNotifications = JSON.parse(savedNotifications);
-          setNotifications(parsedNotifications);
-          
-          // ספירת הודעות שלא נקראו
-          const unreadCount = parsedNotifications.filter((n: any) => !n.read).length;
-          setUnreadMessages(unreadCount);
-        }
+        // ספירת הודעות שלא נקראו
+        const unreadCount = savedNotifications.filter((n: any) => !n.read).length;
+        setUnreadMessages(unreadCount);
       } catch (error) {
         // Error loading notifications - handled silently
       }
     };
     
     loadNotifications();
-  }, [customer, localBusiness]);
+  }, [localBusiness]);
 
   if (loading) {
     return (
