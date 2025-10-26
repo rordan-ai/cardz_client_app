@@ -1,5 +1,7 @@
 google-services.json
 android/app/google-services.json
+assets/temp_for_deleet/google-services-servises.json
+gservices.b64.txt
 ios/GoogleService-Info.plist
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
