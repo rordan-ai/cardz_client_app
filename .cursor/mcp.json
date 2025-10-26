@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "Context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "AgentsCommunication": {
+      "command": "node",
+      "args": ["shared-mcp-server/agents-comm.js"]
+    }
+  }
+}
+
