@@ -76,3 +76,12 @@ node .cursor/auto-notify-admin.js
 - ההודעות נשמרות ב-shared-mcp-server
 - האדמין יכול לקרוא את ההודעות בכל עת
 
+
+
+
+
+
+
+
+
+

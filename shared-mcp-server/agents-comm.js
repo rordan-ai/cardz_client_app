@@ -1,12 +1,16 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import { createClient } from '@supabase/supabase-js';
 
-// MCP Server for Agent-to-Agent Communication
-// Allows CLIENT and ADMIN agents to exchange messages, share context, and coordinate
+// Supabase client - משותף לשני הסוכנים
+const SUPABASE_URL = 'https://noqfwkxzmvpkorcaymcb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vcWZ3a3h6bXZwa29yY2F5bWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU0MTgzMTgsImV4cCI6MjA2MDk5NDMxOH0.LNozVpUNhbNR09WGCb79vKgUnrtflG2bEwPKQO7Q1oM';
 
-const messages = []; // In-memory message queue
-const agentState = {}; // Shared state for each agent
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const server = new Server(
   {
@@ -16,92 +20,12 @@ const server = new Server(
   {
     capabilities: {
       tools: {},
-      resources: {},
     },
   }
 );
 
-// Tool: Send Message
-server.setRequestHandler("tools/call", async (request) => {
-  const { name, arguments: args } = request.params;
-
-  if (name === "send_message") {
-    const { from, to, message, context } = args;
-    const msg = {
-      id: messages.length + 1,
-      from,
-      to,
-      message,
-      context: context || null,
-      timestamp: new Date().toISOString(),
-      read: false
-    };
-    messages.push(msg);
-    
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({ success: true, messageId: msg.id })
-        }
-      ]
-    };
-  }
-
-  if (name === "read_messages") {
-    const { agent_name } = args;
-    const agentMessages = messages.filter(m => m.to === agent_name && !m.read);
-    
-    // Mark as read
-    agentMessages.forEach(m => m.read = true);
-    
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({ messages: agentMessages })
-        }
-      ]
-    };
-  }
-
-  if (name === "update_agent_state") {
-    const { agent_name, state } = args;
-    agentState[agent_name] = {
-      ...agentState[agent_name],
-      ...state,
-      lastUpdate: new Date().toISOString()
-    };
-    
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({ success: true })
-        }
-      ]
-    };
-  }
-
-  if (name === "get_agent_state") {
-    const { agent_name } = args;
-    const state = agentState[agent_name] || null;
-    
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({ state })
-        }
-      ]
-    };
-  }
-
-  throw new Error(`Unknown tool: ${name}`);
-});
-
 // List available tools
-server.setRequestHandler("tools/list", async () => {
+server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
@@ -110,22 +34,10 @@ server.setRequestHandler("tools/list", async () => {
         inputSchema: {
           type: "object",
           properties: {
-            from: {
-              type: "string",
-              description: "שם הסוכן השולח (CLIENT/ADMIN)"
-            },
-            to: {
-              type: "string",
-              description: "שם הסוכן היעד (CLIENT/ADMIN)"
-            },
-            message: {
-              type: "string",
-              description: "תוכן ההודעה"
-            },
-            context: {
-              type: "object",
-              description: "קונטקסט נוסף (אופציונלי)"
-            }
+            from: { type: "string", description: "שם הסוכן השולח (CLIENT/ADMIN)" },
+            to: { type: "string", description: "שם הסוכן היעד (CLIENT/ADMIN)" },
+            message: { type: "string", description: "תוכן ההודעה" },
+            context: { type: "object", description: "קונטקסט נוסף (אופציונלי)" }
           },
           required: ["from", "to", "message"]
         }
@@ -136,10 +48,7 @@ server.setRequestHandler("tools/list", async () => {
         inputSchema: {
           type: "object",
           properties: {
-            agent_name: {
-              type: "string",
-              description: "שם הסוכן (CLIENT/ADMIN)"
-            }
+            agent_name: { type: "string", description: "שם הסוכן (CLIENT/ADMIN)" }
           },
           required: ["agent_name"]
         }
@@ -150,14 +59,8 @@ server.setRequestHandler("tools/list", async () => {
         inputSchema: {
           type: "object",
           properties: {
-            agent_name: {
-              type: "string",
-              description: "שם הסוכן"
-            },
-            state: {
-              type: "object",
-              description: "מצב/קונטקסט לשיתוף"
-            }
+            agent_name: { type: "string", description: "שם הסוכן" },
+            state: { type: "object", description: "מצב/קונטקסט לשיתוף" }
           },
           required: ["agent_name", "state"]
         }
@@ -168,10 +71,7 @@ server.setRequestHandler("tools/list", async () => {
         inputSchema: {
           type: "object",
           properties: {
-            agent_name: {
-              type: "string",
-              description: "שם הסוכן"
-            }
+            agent_name: { type: "string", description: "שם הסוכן" }
           },
           required: ["agent_name"]
         }
@@ -180,7 +80,134 @@ server.setRequestHandler("tools/list", async () => {
   };
 });
 
+// Handle tool calls
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+
+  if (name === "send_message") {
+    const { from, to, message, context } = args;
+    
+    const { data, error } = await supabase
+      .from('agent_messages')
+      .insert([{
+        from_agent: from,
+        to_agent: to,
+        message: message,
+        context: context || {}
+      }])
+      .select()
+      .single();
+    
+    if (error) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ success: false, error: error.message })
+        }]
+      };
+    }
+    
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({ success: true, messageId: data.id })
+      }]
+    };
+  }
+
+  if (name === "read_messages") {
+    const { agent_name } = args;
+    
+    const { data, error } = await supabase
+      .from('agent_messages')
+      .select('*')
+      .eq('to_agent', agent_name)
+      .eq('read', false)
+      .order('created_at', { ascending: true });
+    
+    if (error) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ messages: [], error: error.message })
+        }]
+      };
+    }
+    
+    // Mark as read
+    if (data && data.length > 0) {
+      const ids = data.map(m => m.id);
+      await supabase
+        .from('agent_messages')
+        .update({ read: true, read_at: new Date().toISOString() })
+        .in('id', ids);
+    }
+    
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({ messages: data || [] })
+      }]
+    };
+  }
+
+  if (name === "update_agent_state") {
+    const { agent_name, state } = args;
+    
+    const { error } = await supabase
+      .from('agent_state')
+      .upsert({
+        agent_name: agent_name,
+        state: state,
+        last_update: new Date().toISOString()
+      });
+    
+    if (error) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ success: false, error: error.message })
+        }]
+      };
+    }
+    
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({ success: true })
+      }]
+    };
+  }
+
+  if (name === "get_agent_state") {
+    const { agent_name } = args;
+    
+    const { data, error } = await supabase
+      .from('agent_state')
+      .select('state, last_update')
+      .eq('agent_name', agent_name)
+      .single();
+    
+    if (error) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ state: null, error: error.message })
+        }]
+      };
+    }
+    
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({ state: data })
+      }]
+    };
+  }
+
+  throw new Error(`Unknown tool: ${name}`);
+});
+
 // Start server
 const transport = new StdioServerTransport();
-server.connect(transport);
-
+await server.connect(transport);

@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
-import { Platform } from 'react-native';
+import { Platform, DeviceEventEmitter, Linking } from 'react-native';
 import { supabase } from './supabaseClient';
 
 class FCMService {
   private static instance: FCMService;
   private deviceId: string | null = null;
+  private initializationPromise: Promise<void> | null = null;
   
   private constructor() {}
   
@@ -19,6 +20,16 @@ class FCMService {
   // אתחול FCM - לקרוא מיד בהפעלת האפליקציה
   async initialize() {
     if (Platform.OS === 'web') return;
+    
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+    
+    this.initializationPromise = this.doInitialize();
+    return this.initializationPromise;
+  }
+  
+  private async doInitialize() {
     
     try {
       // בקשת הרשאות
@@ -60,16 +71,35 @@ class FCMService {
         if (remoteMessage.data?.business_code) {
           await this.saveNotification(remoteMessage);
         }
+        // הצגת אינדיקציה למשתמש כאשר האפליקציה בחזית (דרך אירוע גלובלי במקום Alert ש-LTR בלבד)
+        const title = remoteMessage.notification?.title || 'הודעה חדשה';
+        const body = remoteMessage.notification?.body || '';
+        const voucherUrl = remoteMessage.data?.voucher_url;
+        DeviceEventEmitter.emit('show_inapp_notification', { title, body, voucherUrl });
       });
 
-      // האזנה להודעות (background)
-      messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-        console.log('FCM Background message:', remoteMessage);
-        if (remoteMessage.data?.business_code) {
-          await this.saveNotification(remoteMessage);
+      // פתיחת קישורי שובר בעת לחיצה על ההתראה כשהאפליקציה ברקע
+      messaging().onNotificationOpenedApp(async (remoteMessage) => {
+        const voucherUrl = remoteMessage?.data?.voucher_url;
+        if (voucherUrl) {
+          try {
+            await Linking.openURL(voucherUrl);
+          } catch (err) {
+            console.error('Failed to open voucher URL from notification (background):', err);
+          }
         }
-        return Promise.resolve();
       });
+
+      // פתיחת קישורי שובר כאשר האפליקציה נפתחת מתוך התראה במצב סגור
+      const initialNotification = await messaging().getInitialNotification();
+      const initialVoucherUrl = initialNotification?.data?.voucher_url;
+      if (initialVoucherUrl) {
+        try {
+          await Linking.openURL(initialVoucherUrl);
+        } catch (err) {
+          console.error('Failed to open voucher URL from initial notification:', err);
+        }
+      }
 
     } catch (error) {
       console.error('FCM initialization error:', error);
@@ -81,13 +111,25 @@ class FCMService {
     if (!this.deviceId) return;
 
     try {
-      const { error } = await supabase.functions.invoke('register-device-token', {
+      console.log('[FCM] Calling register-device-token with:', {
+        device_id: this.deviceId,
+        token: token.substring(0, 20) + '...',
+        platform: Platform.OS,
+        environment: 'prod'
+      });
+      
+      const { data, error } = await supabase.functions.invoke('register-device-token', {
         body: {
           device_id: this.deviceId,
           token: token,
           platform: Platform.OS,
           environment: 'prod'
         }
+      });
+
+      console.log('[FCM] register-device-token response:', {
+        data: data,
+        error: error
       });
 
       if (error) {
@@ -102,14 +144,33 @@ class FCMService {
 
   // הוספת business_code למכשיר
   async addBusinessCode(businessCode: string) {
-    if (!this.deviceId) return;
+    console.log('FCMService: addBusinessCode called with:', businessCode);
+    
+    // ודא שהאתחול הושלם
+    if (this.initializationPromise) {
+      console.log('FCMService: Waiting for initialization to complete...');
+      await this.initializationPromise;
+    }
+    
+    console.log('FCMService: deviceId:', this.deviceId);
+    
+    if (!this.deviceId) {
+      console.error('FCMService: No deviceId available even after initialization');
+      return;
+    }
 
     try {
-      const { error } = await supabase.functions.invoke('add-business-to-device', {
+      console.log('FCMService: Calling add-business-to-device edge function');
+      const { data, error } = await supabase.functions.invoke('add-business-to-device', {
         body: {
           device_id: this.deviceId,
           business_code: businessCode
         }
+      });
+      
+      console.log('[FCM] add-business-to-device response:', {
+        data: data,
+        error: error
       });
 
       if (!error) {

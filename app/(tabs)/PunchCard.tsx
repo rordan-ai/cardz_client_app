@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// AsyncStorage no longer used for inbox; messages loaded from Supabase inbox table
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -268,36 +268,61 @@ export default function PunchCard() {
 
   // רישום העסק למכשיר (ללא תלות במספר טלפון)
   useEffect(() => {
+    console.log('PunchCard: localBusiness changed:', localBusiness);
     const registerBusiness = async () => {
       if (!localBusiness) return;
       
       // רישום העסק למכשיר זה
+      console.log('PunchCard: Registering business to device:', localBusiness.business_code);
       await FCMService.addBusinessCode(localBusiness.business_code);
     };
     
     registerBusiness();
   }, [localBusiness]);
 
-  // טעינת הודעות מ-AsyncStorage
+  // טעינת הודעות מתיבת inbox ב-Supabase
   useEffect(() => {
-    const loadNotifications = async () => {
+    const loadInbox = async () => {
       try {
-        if (!localBusiness) return;
-        
-        // קריאת הודעות מ-FCMService (ללא תלות במספר טלפון)
-        const savedNotifications = await FCMService.getNotifications(localBusiness.business_code);
-        setNotifications(savedNotifications);
-        
-        // ספירת הודעות שלא נקראו
-        const unreadCount = savedNotifications.filter((n: any) => !n.read).length;
-        setUnreadMessages(unreadCount);
-      } catch (error) {
-        // Error loading notifications - handled silently
+        const effectivePhone = customer?.customer_phone || phoneStr;
+        if (!localBusiness || !effectivePhone) return;
+
+        console.log('[Inbox] Loading from Supabase with:', {
+          business_code: localBusiness.business_code,
+          customer_phone: effectivePhone,
+        });
+
+        const { data, error } = await supabase
+          .from('inbox')
+          .select('id, message, status, created_at')
+          .eq('business_code', localBusiness.business_code)
+          .eq('customer_phone', effectivePhone)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.log('[Inbox] Supabase error:', error);
+          return;
+        }
+
+        const mapped = (data || []).map((row: any, idx: number) => ({
+          id: String(row.id),
+          title: business?.name || 'הודעה',
+          body: row.message || '',
+          timestamp: row.created_at ? new Date(row.created_at).getTime() : Date.now() - idx,
+          read: row.status !== 'unread',
+        }));
+
+        setNotifications(mapped);
+        setUnreadMessages(mapped.filter((n: any) => !n.read).length);
+
+        console.log('[Inbox] Loaded messages count:', mapped.length);
+      } catch (_) {
+        // ignore
       }
     };
-    
-    loadNotifications();
-  }, [localBusiness]);
+
+    loadInbox();
+  }, [localBusiness, customer?.customer_phone, phoneStr, mailVisible]);
 
   if (loading) {
     return (
@@ -362,34 +387,26 @@ export default function PunchCard() {
   // פונקציה למחיקת הודעה
   const deleteNotification = async (notificationId: string) => {
     try {
-      const storageKey = `notifications_${localBusiness?.business_code}_${customer?.customer_phone}`;
+      await supabase.from('inbox').delete().eq('id', Number(notificationId));
       const updatedNotifications = notifications.filter(n => n.id !== notificationId);
       setNotifications(updatedNotifications);
-      await AsyncStorage.setItem(storageKey, JSON.stringify(updatedNotifications));
-      
-      // עדכון מספר ההודעות שלא נקראו
-      const unreadCount = updatedNotifications.filter(n => !n.read).length;
-      setUnreadMessages(unreadCount);
-    } catch (error) {
-      // Error deleting notification - handled silently
+      setUnreadMessages(updatedNotifications.filter(n => !n.read).length);
+    } catch (_) {
+      // ignore
     }
   };
   
   // פונקציה לסימון הודעה כנקראה
   const markAsRead = async (notificationId: string) => {
     try {
-      const storageKey = `notifications_${localBusiness?.business_code}_${customer?.customer_phone}`;
+      await supabase.from('inbox').update({ status: 'read' }).eq('id', Number(notificationId));
       const updatedNotifications = notifications.map(n => 
         n.id === notificationId ? { ...n, read: true } : n
       );
       setNotifications(updatedNotifications);
-      await AsyncStorage.setItem(storageKey, JSON.stringify(updatedNotifications));
-      
-      // עדכון מספר ההודעות שלא נקראו
-      const unreadCount = updatedNotifications.filter(n => !n.read).length;
-      setUnreadMessages(unreadCount);
-    } catch (error) {
-      // Error marking as read - handled silently
+      setUnreadMessages(updatedNotifications.filter(n => !n.read).length);
+    } catch (_) {
+      // ignore
     }
   };
 
@@ -671,9 +688,11 @@ export default function PunchCard() {
        {/* מודאל הודעות דואר */}
        <Modal visible={mailVisible} transparent animationType="slide">
          <View style={styles.modalOverlay}>
-           <View style={styles.mailContent}>
-             <View style={styles.mailHeader}>
-               <Text style={[styles.mailTitle, { color: cardTextColor }]}>הודעות</Text>
+        <View style={[styles.mailContent, { direction: 'rtl' }]}>
+            <View style={styles.mailHeader}>
+              <View style={styles.mailTitleWrap}>
+                <Text style={[styles.mailTitle, { color: cardTextColor }]}>הודעות</Text>
+              </View>
                <TouchableOpacity 
                  style={styles.closeX}
                 onPress={() => {
@@ -694,11 +713,11 @@ export default function PunchCard() {
                 notifications.map((notification, index) => (
                   <View key={notification.id} style={[styles.messageItem, !notification.read && styles.unreadMessage]}>
                     <View style={styles.messageHeader}>
-                      <Text style={styles.messageFrom}>{notification.title}</Text>
+                      <Text style={[styles.messageFrom, { writingDirection: 'rtl', textAlign: 'right' }]}>{notification.title}</Text>
                       <Text style={styles.messageNumber}>{index + 1}</Text>
                     </View>
                     <View style={styles.messageBody}>
-                      <Text style={styles.messageContent} numberOfLines={2}>{notification.body}</Text>
+                      <Text style={[styles.messageContent, { writingDirection: 'rtl', textAlign: 'right' }]} numberOfLines={2}>{notification.body}</Text>
                       <Text style={styles.messageTime}>
                         {new Date(notification.timestamp).toLocaleString('he-IL', {
                           hour: '2-digit',
@@ -1189,19 +1208,24 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
   },
   mailHeader: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     paddingBottom: 10,
+    position: 'relative',
+  },
+  mailTitleWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
   mailTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    textAlign: 'center',
-    flex: 1,
+    textAlign: 'right',
     fontFamily: 'Rubik',
   },
   closeX: {
@@ -1211,6 +1235,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f0f0f0',
     borderRadius: 15,
+    position: 'absolute',
+    left: 0,
   },
   closeXText: {
     fontSize: 20,
