@@ -6,6 +6,9 @@ import { supabase } from './supabaseClient';
 class FCMService {
   private static instance: FCMService;
   private deviceId: string | null = null;
+  private businessCode: string | null = null;
+  private customerPhone: string | null = null;
+  private currentToken: string | null = null;
   private initializationPromise: Promise<void> | null = null;
   
   private constructor() {}
@@ -51,15 +54,23 @@ class FCMService {
       }
       this.deviceId = deviceId;
 
+      // טעינת פרטי משתמש קודמים (במידה וקיימים)
+      const storedBusinessCode = await AsyncStorage.getItem('current_business_code');
+      const storedCustomerPhone = await AsyncStorage.getItem('current_customer_phone');
+      this.businessCode = storedBusinessCode || null;
+      this.customerPhone = storedCustomerPhone || null;
+
       // קבלת FCM token
       const token = await messaging().getToken();
       if (token) {
+        this.currentToken = token;
         await this.registerDevice(token);
         await AsyncStorage.setItem('global_fcm_token', token);
       }
 
       // האזנה לעדכוני טוקן
       messaging().onTokenRefresh(async (newToken) => {
+        this.currentToken = newToken;
         await this.registerDevice(newToken);
         await AsyncStorage.setItem('global_fcm_token', newToken);
       });
@@ -111,20 +122,28 @@ class FCMService {
     if (!this.deviceId) return;
 
     try {
-      console.log('[FCM] Calling register-device-token with:', {
+      const payload: Record<string, any> = {
         device_id: this.deviceId,
-        token: token.substring(0, 20) + '...',
+        token: token,
         platform: Platform.OS,
         environment: 'prod'
+      };
+
+      if (this.businessCode) {
+        payload.business_code = this.businessCode;
+      }
+
+      if (this.customerPhone) {
+        payload.phone_number = this.customerPhone;
+      }
+
+      console.log('[FCM] Calling register-device-token with:', {
+        ...payload,
+        token: token.substring(0, 20) + '...'
       });
-      
+
       const { data, error } = await supabase.functions.invoke('register-device-token', {
-        body: {
-          device_id: this.deviceId,
-          token: token,
-          platform: Platform.OS,
-          environment: 'prod'
-        }
+        body: payload
       });
 
       console.log('[FCM] register-device-token response:', {
@@ -184,6 +203,31 @@ class FCMService {
       }
     } catch (error) {
       console.error('Add business code error:', error);
+    }
+  }
+
+  // עדכון פרטי המשתמש לצורך רישום טוקן מלא (כולל טלפון)
+  async setUserContext(businessCode: string | null, customerPhone: string | null) {
+    console.log('[FCM] setUserContext called with:', { businessCode, customerPhone });
+    
+    this.businessCode = businessCode;
+    this.customerPhone = customerPhone;
+
+    if (businessCode) {
+      await AsyncStorage.setItem('current_business_code', businessCode);
+    } else {
+      await AsyncStorage.removeItem('current_business_code');
+    }
+
+    if (customerPhone) {
+      await AsyncStorage.setItem('current_customer_phone', customerPhone);
+    } else {
+      await AsyncStorage.removeItem('current_customer_phone');
+    }
+
+    if (this.currentToken) {
+      console.log('[FCM] Re-registering device with phone:', customerPhone);
+      await this.registerDevice(this.currentToken);
     }
   }
 

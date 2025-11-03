@@ -3,6 +3,8 @@ import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { Barcode } from 'react-native-svg-barcode';
 import { useBusiness } from '../../components/BusinessContext';
 import FCMService from '../../components/FCMService';
@@ -26,7 +28,7 @@ export default function PunchCard() {
     card_number: string; 
     used_punches: number; 
     benefit: string; 
-    prepaid: string;
+    prepaid: string; 
     product_code?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,13 +38,16 @@ export default function PunchCard() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [mailVisible, setMailVisible] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [inboxLoading, setInboxLoading] = useState(false);
   const [notifications, setNotifications] = useState<Array<{
     id: string;
     title: string;
     body: string;
     timestamp: number;
     read: boolean;
+    voucherUrl?: string;
   }>>([]);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const [referralVisible, setReferralVisible] = useState(false);
   const [cardSelectionVisible, setCardSelectionVisible] = useState(false);
   const [availableCards, setAvailableCards] = useState<Array<{
@@ -280,49 +285,97 @@ export default function PunchCard() {
     registerBusiness();
   }, [localBusiness]);
 
-  // טעינת הודעות מתיבת inbox ב-Supabase
+  // עדכון פרטי משתמש עבור רישום טוקן מלא (טלפון + קוד עסק)
   useEffect(() => {
-    const loadInbox = async () => {
-      try {
-        const effectivePhone = customer?.customer_phone || phoneStr;
-        if (!localBusiness || !effectivePhone) return;
+    const businessCode = localBusiness?.business_code;
+    if (!businessCode || !phoneStr) return;
 
-        console.log('[Inbox] Loading from Supabase with:', {
-          business_code: localBusiness.business_code,
-          customer_phone: effectivePhone,
-        });
+    console.log('[PunchCard] Setting user context:', { businessCode, phoneStr });
+    FCMService.setUserContext(businessCode, phoneStr).catch(() => {});
+  }, [localBusiness?.business_code, phoneStr]);
 
-        const { data, error } = await supabase
-          .from('inbox')
-          .select('id, message, status, created_at')
-          .eq('business_code', localBusiness.business_code)
-          .eq('customer_phone', effectivePhone)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.log('[Inbox] Supabase error:', error);
-          return;
+  // טעינת מספר הודעות לא נקראות בלבד (לBadge)
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      if (localBusiness && phoneStr) {
+        try {
+          const { count } = await supabase
+            .from('inbox')
+            .select('*', { count: 'exact', head: true })
+            .eq('business_code', localBusiness.business_code)
+            .eq('customer_phone', phoneStr)
+            .eq('status', 'unread');
+          
+          if (count !== null) {
+            setUnreadMessages(count);
+            console.log('[Inbox] Unread count loaded:', count);
+          }
+        } catch (error) {
+          console.error('[Inbox] Error loading unread count:', error);
         }
-
-        const mapped = (data || []).map((row: any, idx: number) => ({
-          id: String(row.id),
-          title: business?.name || 'הודעה',
-          body: row.message || '',
-          timestamp: row.created_at ? new Date(row.created_at).getTime() : Date.now() - idx,
-          read: row.status !== 'unread',
-        }));
-
-        setNotifications(mapped);
-        setUnreadMessages(mapped.filter((n: any) => !n.read).length);
-
-        console.log('[Inbox] Loaded messages count:', mapped.length);
-      } catch (_) {
-        // ignore
       }
     };
+    
+    loadUnreadCount();
+  }, [localBusiness?.business_code, phoneStr]);
 
-    loadInbox();
-  }, [localBusiness, customer?.customer_phone, phoneStr, mailVisible]);
+  // עדכון Badge באייקון האפליקציה באמצעות expo-notifications
+  useEffect(() => {
+    const updateBadge = async () => {
+      try {
+        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+          await Notifications.setBadgeCountAsync(unreadMessages);
+        }
+      } catch (error) {
+        console.log('[Inbox] Failed to update app badge:', error);
+      }
+    };
+    updateBadge();
+  }, [unreadMessages]);
+
+  // האזנת Realtime ל-inbox לרענון מיידי של רשימה וחיווי
+  useEffect(() => {
+    const businessCode = localBusiness?.business_code;
+    if (!phoneStr || !businessCode) return;
+
+    const channel = supabase
+      .channel(`inbox-${businessCode}-${phoneStr}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inbox',
+        filter: `business_code=eq.${businessCode}`,
+      }, (payload: any) => {
+        const row = payload.new || payload.old;
+        if (!row) return;
+        if (row.customer_phone !== phoneStr) return;
+        // ריענון רשימה וספירה
+        (async () => {
+          try {
+            const { data } = await supabase
+              .from('inbox')
+              .select('id, title, message, status, created_at')
+              .eq('business_code', businessCode)
+              .eq('customer_phone', phoneStr)
+              .order('created_at', { ascending: false });
+            const mapped = (data || []).map((r: any, idx: number) => ({
+              id: String(r.id),
+              title: r.title || business?.name || 'הודעה',
+              body: r.message || '',
+              timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now() - idx,
+              read: r.status !== 'unread',
+            }));
+            setNotifications(mapped);
+            setUnreadMessages(mapped.filter((n: any) => !n.read).length);
+          } catch (_) {}
+        })();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [localBusiness?.business_code, phoneStr]);
 
   if (loading) {
     return (
@@ -387,7 +440,7 @@ export default function PunchCard() {
   // פונקציה למחיקת הודעה
   const deleteNotification = async (notificationId: string) => {
     try {
-      await supabase.from('inbox').delete().eq('id', Number(notificationId));
+      await supabase.from('inbox').delete().eq('id', notificationId);
       const updatedNotifications = notifications.filter(n => n.id !== notificationId);
       setNotifications(updatedNotifications);
       setUnreadMessages(updatedNotifications.filter(n => !n.read).length);
@@ -399,7 +452,7 @@ export default function PunchCard() {
   // פונקציה לסימון הודעה כנקראה
   const markAsRead = async (notificationId: string) => {
     try {
-      await supabase.from('inbox').update({ status: 'read' }).eq('id', Number(notificationId));
+      await supabase.from('inbox').update({ status: 'read' }).eq('id', notificationId);
       const updatedNotifications = notifications.map(n => 
         n.id === notificationId ? { ...n, read: true } : n
       );
@@ -463,7 +516,55 @@ export default function PunchCard() {
       {/* אייקון הודעות דואר */}
       <TouchableOpacity 
         style={[styles.mailIconContainer, styles.topIconOffsetClean]}
-        onPress={() => setMailVisible(true)}
+        onPress={async () => {
+          console.log('[Inbox] Mail button clicked!');
+          console.log('[Inbox] localBusiness:', localBusiness);
+          console.log('[Inbox] phoneStr:', phoneStr);
+          
+          setMailVisible(true);
+          
+          // טעינה מיידית של ההודעות
+          if (localBusiness && phoneStr) {
+            console.log('[Inbox] Loading messages...');
+            setInboxLoading(true);
+            
+            try {
+              const { data, error } = await supabase
+                .from('inbox')
+                .select('id, title, message, status, created_at')
+                .eq('business_code', localBusiness.business_code)
+                .eq('customer_phone', phoneStr)
+                .order('created_at', { ascending: false });
+              
+              console.log('[Inbox] Query result - data:', data?.length, 'error:', error);
+              
+              if (error) {
+                console.error('[Inbox] Supabase error:', error);
+              } else if (data) {
+                const mapped = data.map((row: any) => ({
+                  id: String(row.id),
+                  title: row.title || 'הודעה',
+                  body: row.message || '',
+                  timestamp: new Date(row.created_at).getTime(),
+                  read: row.status !== 'unread',
+                }));
+                console.log('[Inbox] Mapped messages:', mapped);
+                console.log('[Inbox] Current notifications before set:', notifications);
+                setNotifications(mapped);
+                setUnreadMessages(mapped.filter(n => !n.read).length);
+              }
+              
+              setInboxLoading(false);
+              console.log('[Inbox] Loading completed, inboxLoading set to false');
+            } catch (err) {
+              console.error('[Inbox] Exception:', err);
+              setInboxLoading(false);
+            }
+          } else {
+            console.log('[Inbox] Missing data - not loading');
+            setInboxLoading(false);
+          }
+        }}
       >
         <Image 
           source={{ uri: 'https://noqfwkxzmvpkorcaymcb.supabase.co/storage/v1/object/public/icons//my_mail.png' }}
@@ -588,13 +689,13 @@ export default function PunchCard() {
                       />
                     </>
                   ) : (
-                    <Image
-                      source={{ uri: icon }}
-                      style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
-                      resizeMode="contain"
-                      onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                      onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                    />
+                  <Image
+                    source={{ uri: icon }}
+                    style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
+                    resizeMode="contain"
+                    onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                    onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                  />
                   )}
                 </View>
               );
@@ -624,9 +725,9 @@ export default function PunchCard() {
       
       {/* ברקוד */}
       {cardCode && (
-        <View style={styles.barcodeBox}>
-          <Barcode value={cardCode} format="CODE128" height={60} />
-        </View>
+      <View style={styles.barcodeBox}>
+        <Barcode value={cardCode} format="CODE128" height={60} />
+      </View>
       )}
       {/* מספר סידורי */}
       {cardCode && <Text style={styles.cardCode}>#{cardCode}</Text>}
@@ -685,72 +786,203 @@ export default function PunchCard() {
                  </TouchableWithoutFeedback>
        </Modal>
 
-       {/* מודאל הודעות דואר */}
-       <Modal visible={mailVisible} transparent animationType="slide">
-         <View style={styles.modalOverlay}>
-        <View style={[styles.mailContent, { direction: 'rtl' }]}>
-            <View style={styles.mailHeader}>
-              <View style={styles.mailTitleWrap}>
-                <Text style={[styles.mailTitle, { color: cardTextColor }]}>הודעות</Text>
-              </View>
-               <TouchableOpacity 
-                 style={styles.closeX}
-                onPress={() => {
-                  setMailVisible(false);
-                  // לא מאפסים אוטומטית - רק כשקוראים הודעה
+       {/* מודאל תיבת דואר - גרסה מתוקנת */}
+      <Modal 
+        visible={mailVisible} 
+        transparent={true}
+        animationType="slide">
+        <TouchableWithoutFeedback onPress={() => setMailVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={{ 
+            backgroundColor: '#CFB589', 
+            width: '90%',
+            maxHeight: '80%',
+            padding: 20, 
+            borderRadius: 10 
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 30 }} />
+              <Text style={{ fontSize: 20, textAlign: 'center', fontWeight: 'bold', flex: 1 }}>
+                תיבת דואר ({notifications.length} הודעות)
+              </Text>
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  console.log('X button pressed - closing mail modal');
+                  try {
+                    setMailVisible(false);
+                    console.log('Mail modal should be closed now');
+                  } catch (error) {
+                    console.error('Error closing modal:', error);
+                  }
                 }}
-               >
-                 <Text style={styles.closeXText}>×</Text>
-               </TouchableOpacity>
-             </View>
+                style={{ padding: 5 }}
+              >
+                <Text style={{ fontSize: 30, color: '#000000' }}>×</Text>
+              </TouchableOpacity>
+            </View>
              
-            <ScrollView style={styles.messagesScrollView} showsVerticalScrollIndicator={true}>
-              {notifications.length === 0 ? (
-                <View style={styles.emptyMessagesContainer}>
-                  <Text style={styles.emptyMessagesText}>אין הודעות חדשות</Text>
+            <ScrollView showsVerticalScrollIndicator={true} style={{ backgroundColor: '#D9CFB8' }}>
+              {/* הצגת דיבאג אם יש */}
+              {debugInfo && (
+                <View style={{ 
+                  backgroundColor: '#FFE4B5', 
+                  padding: 15, 
+                  margin: 10, 
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: '#FFA500'
+                }}>
+                  <Text style={{ fontWeight: 'bold', marginBottom: 5 }}>מידע דיבאג:</Text>
+                  <Text style={{ fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                    {debugInfo}
+                  </Text>
+                  <TouchableOpacity 
+                    onPress={() => setDebugInfo('')}
+                    style={{ 
+                      backgroundColor: '#FFA500', 
+                      padding: 8, 
+                      marginTop: 10, 
+                      borderRadius: 5,
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>סגור דיבאג</Text>
+                  </TouchableOpacity>
                 </View>
+              )}
+              
+              {notifications.length === 0 ? (
+                <Text style={{ textAlign: 'center', padding: 20, color: '#999' }}>
+                  אין הודעות חדשות
+                </Text>
               ) : (
-                notifications.map((notification, index) => (
-                  <View key={notification.id} style={[styles.messageItem, !notification.read && styles.unreadMessage]}>
-                    <View style={styles.messageHeader}>
-                      <Text style={[styles.messageFrom, { writingDirection: 'rtl', textAlign: 'right' }]}>{notification.title}</Text>
-                      <Text style={styles.messageNumber}>{index + 1}</Text>
-                    </View>
-                    <View style={styles.messageBody}>
-                      <Text style={[styles.messageContent, { writingDirection: 'rtl', textAlign: 'right' }]} numberOfLines={2}>{notification.body}</Text>
-                      <Text style={styles.messageTime}>
-                        {new Date(notification.timestamp).toLocaleString('he-IL', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          day: '2-digit',
-                          month: '2-digit'
-                        })}
-                      </Text>
-                    </View>
-                    <View style={styles.messageActions}>
-                      <TouchableOpacity 
-                        style={[styles.actionButton, { backgroundColor: cardTextColor }]}
-                        onPress={() => {
-                          markAsRead(notification.id);
-                          Alert.alert(notification.title, notification.body);
-                        }}
-                      >
-                        <Text style={styles.actionButtonText}>קרא</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.actionButton, styles.deleteButton]}
-                        onPress={() => deleteNotification(notification.id)}
-                      >
-                        <Text style={styles.actionButtonText}>מחק</Text>
-                      </TouchableOpacity>
+                notifications.map((msg, idx) => (
+                  <View key={`msg-${idx}`} style={{
+                    backgroundColor: '#947A3D',
+                    padding: 18,
+                    marginBottom: 10,
+                    borderRadius: 12,
+                    borderWidth: 0.5,
+                    borderColor: '#7F6A98'
+                  }}>
+                    <Text style={{ fontSize: 11, color: '#CFC7DA', textAlign: 'center', marginBottom: 6 }}>
+                      {new Date(msg.timestamp).toLocaleString('he-IL', {
+                        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </Text>
+                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {!msg.read && (
+                          <TouchableOpacity
+                            onPress={() => markAsRead(msg.id)}
+                            style={{ marginRight: 12 }}
+                          >
+                            <Ionicons name="checkmark" size={20} color="#4CAF50" />
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity onPress={() => deleteNotification(msg.id)}>
+                          <Ionicons name="trash" size={20} color="#e57373" />
+                        </TouchableOpacity>
+                      </View>
+                       <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 6, textAlign: 'right', color: '#FFFFFF' }}>
+                           {msg.title}
+                         </Text>
+                        <Text style={{ fontSize: 13, textAlign: 'right', color: '#EDE8F6', lineHeight: 20 }}>
+                           {msg.body
+                             .replace(/(https?:\/\/[^\s]+)/g, '')
+                             .replace(/קישור לשובר/g, '')
+                             .replace(/🎁/g, '')
+                             .replace(/:/g, '')
+                             .trim()}
+                         </Text>
+                         {msg.body.includes('http') && (
+                           <TouchableOpacity
+                             onPress={(e) => {
+                               e.stopPropagation();
+                               
+                               // איסוף מידע לדיבאג
+                               let debug = 'דיבאג קישור שובר:\n\n';
+                               debug += '1. תוכן ההודעה:\n' + msg.body + '\n\n';
+                               
+                               const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
+                               if (urlMatch) {
+                                 debug += '2. URL שנמצא:\n' + urlMatch[0] + '\n\n';
+                                 
+                                 // מנקה תווים מיותרים בסוף ה-URL
+                                 let rawUrl = urlMatch[0];
+                                 // מסיר תווי פיסוק וסוגריים מהסוף
+                                 rawUrl = rawUrl.replace(/[)\],.;:!?]+$/,'');
+                                 // מסיר מרכאות אם יש
+                                 rawUrl = rawUrl.replace(/['"]+$/,'');
+                                 debug += '3. URL אחרי ניקוי:\n' + rawUrl + '\n\n';
+                                 
+                                 // לא מקודד את ה-URL אם הוא כבר מקודד
+                                 const safeUrl = rawUrl.includes('%') ? rawUrl : encodeURI(rawUrl);
+                                 debug += '4. URL סופי:\n' + safeUrl + '\n\n';
+                                 
+                                 setDebugInfo(debug);
+                                 
+                                 // בדיקה שה-URL תקין
+                                 if (!safeUrl || safeUrl.length < 10) {
+                                   console.error('[Voucher Link] Invalid URL:', safeUrl);
+                                   Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
+                                   return;
+                                 }
+                                 
+                                // פותח את השובר ישירות
+                                console.log('[Voucher Link] Opening URL:', safeUrl);
+                                // הוספת בדיקה אם ניתן לפתוח את ה-URL
+                                Linking.canOpenURL(safeUrl).then((supported) => {
+                                  if (supported) {
+                                    Linking.openURL(safeUrl).catch(err => {
+                                      console.error('[Voucher Link] Failed to open URL:', err);
+                                      setDebugInfo(debug + '\n5. שגיאה בפתיחה:\n' + err.toString());
+                                      Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור: ' + err.message);
+                                    });
+                                  } else {
+                                    console.error('[Voucher Link] URL not supported:', safeUrl);
+                                    setDebugInfo(debug + '\n5. URL לא נתמך על ידי המכשיר');
+                                    Alert.alert('שגיאה', 'הקישור אינו נתמך במכשיר זה');
+                                  }
+                                }).catch(err => {
+                                  console.error('[Voucher Link] Error checking URL:', err);
+                                  setDebugInfo(debug + '\n5. שגיאה בבדיקת URL:\n' + err.toString());
+                                  Alert.alert('שגיאה', 'שגיאה בבדיקת הקישור');
+                                });
+                               } else {
+                                 const debug = 'דיבאג קישור שובר:\n\nלא נמצא URL בהודעה!\n\nתוכן ההודעה:\n' + msg.body;
+                                 setDebugInfo(debug);
+                                 Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
+                               }
+                             }}
+                             style={{
+                               flexDirection: 'row',
+                               alignItems: 'center',
+                               marginTop: 10,
+                               alignSelf: 'flex-end'
+                             }}
+                           >
+                             <Text style={{ color: '#2196F3', fontSize: 14, marginRight: 5 }}>
+                               קישור לשובר
+                             </Text>
+                             <Text style={{ fontSize: 18 }}>🎁</Text>
+                           </TouchableOpacity>
+                         )}
+                       </View>
                     </View>
                   </View>
                 ))
               )}
-            </ScrollView>
-             </View>
-           </View>
-         </Modal>
+             </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+       </Modal>
 
              {/* חלונית חבר מביא חבר */}
        <Modal 
@@ -1246,6 +1478,8 @@ const styles = StyleSheet.create({
   messagesScrollView: {
     flex: 1,
     maxHeight: 400,
+    minHeight: 100,
+    backgroundColor: '#f0f0f0', // נוסיף רקע כדי לראות אם הקונטיינר נראה
   },
   messageItem: {
     borderBottomWidth: 1,
@@ -1328,6 +1562,17 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: '#dc3545',
+  },
+  voucherButton: {
+    backgroundColor: '#0F9FB8',
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  voucherButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    fontFamily: 'Rubik',
   },
   emptyMessagesContainer: {
     alignItems: 'center',
@@ -1606,5 +1851,5 @@ const styles = StyleSheet.create({
      fontSize: 16,
      color: '#666',
      fontFamily: 'Rubik',
-   },
- }); 
+  },
+});

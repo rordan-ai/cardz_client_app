@@ -62,7 +62,7 @@ export default function Layout() {
       </Modal>
     </BusinessProvider>
   );
-}
+} 
 
 const styles = StyleSheet.create({
   modalBackdrop: {

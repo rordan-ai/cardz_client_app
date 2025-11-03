@@ -6,7 +6,10 @@
     },
     "AgentsCommunication": {
       "command": "node",
-      "args": ["shared-mcp-server/agents-comm.js"]
+      "args": ["shared-mcp-server/agents-comm.js"],
+      "env": {
+        "AGENT_NAME": "CLIENT"
+      }
     }
   }
 }
