@@ -920,9 +920,17 @@ export default function PunchCard() {
                                  rawUrl = rawUrl.replace(/['"]+$/,'');
                                  debug += '3. URL אחרי ניקוי:\n' + rawUrl + '\n\n';
                                  
-                                 // לא מקודד את ה-URL אם הוא כבר מקודד
-                                 const safeUrl = rawUrl.includes('%') ? rawUrl : encodeURI(rawUrl);
-                                 debug += '4. URL סופי:\n' + safeUrl + '\n\n';
+                                // לא מקודד את ה-URL אם הוא כבר מקודד
+                                let safeUrl = rawUrl.includes('%') ? rawUrl : encodeURI(rawUrl);
+                                
+                                // הוספת פרמטר phone לפרסונליזציה
+                                if (phoneStr) {
+                                  const separator = safeUrl.includes('?') ? '&' : '?';
+                                  safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
+                                  debug += '3.5. הוספת פרמטר phone: ' + phoneStr + '\n\n';
+                                }
+                                
+                                debug += '4. URL סופי:\n' + safeUrl + '\n\n';
                                  
                                  setDebugInfo(debug);
                                  

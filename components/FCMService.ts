@@ -94,7 +94,13 @@ class FCMService {
         const voucherUrl = remoteMessage?.data?.voucher_url;
         if (voucherUrl) {
           try {
-            await Linking.openURL(voucherUrl);
+            // הוספת פרמטר phone לפרסונליזציה
+            let url = voucherUrl;
+            if (this.customerPhone) {
+              const separator = url.includes('?') ? '&' : '?';
+              url = `${url}${separator}phone=${this.customerPhone}`;
+            }
+            await Linking.openURL(url);
           } catch (err) {
             console.error('Failed to open voucher URL from notification (background):', err);
           }
@@ -106,7 +112,13 @@ class FCMService {
       const initialVoucherUrl = initialNotification?.data?.voucher_url;
       if (initialVoucherUrl) {
         try {
-          await Linking.openURL(initialVoucherUrl);
+          // הוספת פרמטר phone לפרסונליזציה
+          let url = initialVoucherUrl;
+          if (this.customerPhone) {
+            const separator = url.includes('?') ? '&' : '?';
+            url = `${url}${separator}phone=${this.customerPhone}`;
+          }
+          await Linking.openURL(url);
         } catch (err) {
           console.error('Failed to open voucher URL from initial notification:', err);
         }
@@ -291,6 +303,11 @@ class FCMService {
     const notifications = JSON.parse(data);
     const filtered = notifications.filter((n: any) => n.id !== notificationId);
     await AsyncStorage.setItem(storageKey, JSON.stringify(filtered));
+  }
+  
+  // גישה למספר הטלפון הנוכחי
+  getCurrentPhone(): string | null {
+    return this.customerPhone;
   }
 }
 

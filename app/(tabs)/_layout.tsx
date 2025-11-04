@@ -46,7 +46,14 @@ export default function Layout() {
                 style={styles.modalActionButton}
                 onPress={() => {
                   if (notification?.voucherUrl) {
-                    Linking.openURL(notification.voucherUrl);
+                    // הוספת פרמטר phone לפרסונליזציה
+                    let url = notification.voucherUrl;
+                    const phone = FCMService.getCurrentPhone();
+                    if (phone) {
+                      const separator = url.includes('?') ? '&' : '?';
+                      url = `${url}${separator}phone=${phone}`;
+                    }
+                    Linking.openURL(url);
                   }
                 }}
               >
