@@ -2,7 +2,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
@@ -52,6 +52,50 @@ export default function PunchCard() {
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [referralVisible, setReferralVisible] = useState(false);
   const [cardSelectionVisible, setCardSelectionVisible] = useState(false);
+  const [preferencesVisible, setPreferencesVisible] = useState(false);
+  const [pushOptIn, setPushOptIn] = useState(true);
+  const [smsOptIn, setSmsOptIn] = useState(true);
+  const [detailsVisible, setDetailsVisible] = useState(false);
+  const [nameEdit, setNameEdit] = useState<string>('');
+  const [birthdayEdit, setBirthdayEdit] = useState<string>('');
+
+  const updateBlacklist = async (channel: 'push' | 'sms', isOptIn: boolean) => {
+    try {
+      const businessCode = localBusiness?.business_code || customer?.business_code;
+      const cphone = customer?.customer_phone || phoneStr;
+      if (!businessCode || !cphone) return;
+      if (isOptIn) {
+        // הסרה מהבלקליסט
+        await supabase
+          .from('notifications_blacklist')
+          .delete()
+          .eq('business_code', businessCode)
+          .eq('customer_phone', cphone)
+          .eq('channel', channel);
+        // ניסיון להסרה גם מטבלאות ייעודיות אם קיימות
+        const tableName = channel === 'push' ? 'push_blacklist' : 'sms_blacklist';
+        await supabase
+          .from(tableName)
+          .delete()
+          .eq('business_code', businessCode)
+          .eq('customer_phone', cphone);
+      } else {
+        // הוספה לבלקליסט
+        await supabase
+          .from('notifications_blacklist')
+          .upsert({ business_code: businessCode, customer_phone: cphone, channel })
+          .select();
+        // ניסיון גיבוי לטבלאות ייעודיות אם קיימות
+        const tableName = channel === 'push' ? 'push_blacklist' : 'sms_blacklist';
+        await supabase
+          .from(tableName)
+          .upsert({ business_code: businessCode, customer_phone: cphone })
+          .select();
+      }
+    } catch (_) {
+      // swallow
+    }
+  };
   const [availableCards, setAvailableCards] = useState<Array<{
     product_code: string;
     card_number: string;
@@ -518,10 +562,13 @@ export default function PunchCard() {
         style={[styles.hamburgerContainer, styles.topIconOffsetClean]}
         onPress={() => setMenuVisible(true)}
       >
-        <View style={styles.hamburgerButton}>
-          <View style={[styles.hamburgerLine, { backgroundColor: cardTextColor }]} />
-          <View style={[styles.hamburgerLine, { backgroundColor: cardTextColor }]} />
-          <View style={[styles.hamburgerLine, { backgroundColor: cardTextColor }]} />
+        <View style={{ alignItems: 'center' }}>
+          <View style={styles.hamburgerButton}>
+            <View style={[styles.hamburgerLine, { backgroundColor: cardTextColor }]} />
+            <View style={[styles.hamburgerLine, { backgroundColor: cardTextColor }]} />
+            <View style={[styles.hamburgerLine, { backgroundColor: cardTextColor }]} />
+          </View>
+          <Text style={[styles.communityIconLabel, { color: cardTextColor, transform: [{ translateY: 2.5 }] }]}>אפשרויות נוספות</Text>
         </View>
       </TouchableOpacity>
 
@@ -578,16 +625,21 @@ export default function PunchCard() {
           }
         }}
       >
-        <Image 
-          source={{ uri: 'https://noqfwkxzmvpkorcaymcb.supabase.co/storage/v1/object/public/icons//my_mail.png' }}
-          style={[styles.mailIcon, { tintColor: cardTextColor }]}
-          resizeMode="contain"
-        />
-        {unreadMessages > 0 && (
-          <View style={styles.messageBadge}>
-            <Text style={styles.badgeText}>{unreadMessages}</Text>
+        <View style={{ alignItems: 'center' }}>
+          <View style={styles.mailIconWrap}>
+            <Image 
+              source={{ uri: 'https://noqfwkxzmvpkorcaymcb.supabase.co/storage/v1/object/public/icons//my_mail.png' }}
+              style={[styles.mailIcon, { tintColor: cardTextColor }]}
+              resizeMode="contain"
+            />
+            {unreadMessages > 0 && (
+              <View style={styles.messageBadge}>
+                <Text style={styles.badgeText}>{unreadMessages}</Text>
+              </View>
+            )}
           </View>
-        )}
+          <Text style={[styles.communityIconLabel, { color: cardTextColor }]}>הדואר שלי</Text>
+        </View>
       </TouchableOpacity>
 
       {/* אייקון קבוצה באמצע */}
@@ -595,11 +647,14 @@ export default function PunchCard() {
         style={[styles.communityIconContainer, styles.topIconOffsetClean]}
         onPress={() => setReferralVisible(true)}
       >
-        <Image 
-          source={{ uri: 'https://cdn-icons-png.flaticon.com/512/681/681443.png' }}
-          style={[styles.communityIcon, { tintColor: cardTextColor }]}
-          resizeMode="contain"
-        />
+        <View style={{ alignItems: 'center' }}>
+          <Image 
+            source={{ uri: 'https://cdn-icons-png.flaticon.com/512/681/681443.png' }}
+            style={[styles.communityIcon, { tintColor: cardTextColor }]}
+            resizeMode="contain"
+          />
+          <Text style={[styles.communityIconLabel, { color: cardTextColor }]}>הזמן חבר</Text>
+        </View>
       </TouchableOpacity>
       
       {/* מקשה אחת - לוגו, שם עסק ושם לקוח */}
@@ -762,32 +817,32 @@ export default function PunchCard() {
                  <Text style={styles.menuCloseText}>×</Text>
                </TouchableOpacity>
                
-               <Text style={[styles.menuTitle, { color: cardTextColor }]}>תפריט</Text>
-              
-              <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
-                <Text style={styles.menuItemText}>הוראות שימוש</Text>
+              <Text style={[styles.menuTitle, { color: cardTextColor }]}>תפריט</Text>
+
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setDetailsVisible(true); setNameEdit(customer?.name || ''); }}>
+                <Text style={styles.menuItemText}>הפרטים שלי</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
-                <Text style={styles.menuItemText}>מדיניות פרטיות</Text>
+
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setPreferencesVisible(true); }}>
+                <Text style={styles.menuItemText}>ההעדפות שלי</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
                 <Text style={styles.menuItemText}>הפעילות שלי</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
-                <Text style={styles.menuItemText}>הפרופיל שלי</Text>
+                <Text style={[styles.menuItemText, { textAlign: 'center' }]}>שלח שובר מתנה עם{"\n"}ברכה</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
-                <Text style={styles.menuItemText}>אודותינו</Text>
+                <Text style={styles.menuItemText}>אודותנו</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
-                <Text style={styles.menuItemText}>יציאה מהיישום</Text>
+                <Text style={styles.menuItemText}>מדיניות פרטיות</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
                 <Text style={styles.menuItemText}>צור קשר</Text>
               </TouchableOpacity>
@@ -1191,6 +1246,145 @@ export default function PunchCard() {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* מודאל העדפות */}
+      <Modal 
+        visible={preferencesVisible}
+        transparent 
+        animationType="slide"
+        onRequestClose={() => setPreferencesVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setPreferencesVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={{ backgroundColor: 'white', borderRadius: 16, padding: 20, width: '85%' }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 12, fontFamily: 'Rubik' }}>העדפות</Text>
+                <TouchableOpacity
+                  onPress={() => setPushOptIn(v => !v)}
+                  style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}
+                >
+                  <Text style={{ fontSize: 16, fontFamily: 'Rubik' }}>לקבל הודעות פוש</Text>
+                  <Ionicons name={pushOptIn ? 'checkbox-outline' : 'square-outline'} size={22} color={pushOptIn ? '#1E51E9' : '#999'} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setSmsOptIn(v => !v)}
+                  style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}
+                >
+                  <Text style={{ fontSize: 16, fontFamily: 'Rubik' }}>לקבל הודעות SMS</Text>
+                  <Ionicons name={smsOptIn ? 'checkbox-outline' : 'square-outline'} size={22} color={smsOptIn ? '#1E51E9' : '#999'} />
+                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 16 }}>
+                  <TouchableOpacity 
+                    onPress={() => setPreferencesVisible(false)}
+                    style={{ backgroundColor: '#E0E0E0', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 }}
+                  >
+                    <Text style={{ fontFamily: 'Rubik' }}>סגור</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={async () => {
+                      await updateBlacklist('push', pushOptIn);
+                      await updateBlacklist('sms', smsOptIn);
+                      setPreferencesVisible(false);
+                    }}
+                    style={{ backgroundColor: '#1E51E9', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 }}
+                  >
+                    <Text style={{ color: 'white', fontFamily: 'Rubik' }}>שמור</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* מודאל פרטים שלי */}
+      <Modal 
+        visible={detailsVisible}
+        transparent 
+        animationType="slide"
+        onRequestClose={() => setDetailsVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setDetailsVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={{ backgroundColor: 'white', borderRadius: 16, padding: 20, width: '90%' }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 12, fontFamily: 'Rubik' }}>הפרטים שלי</Text>
+                <View style={{ gap: 12 }}>
+                  <View>
+                    <Text style={{ fontSize: 12, color: '#666', marginBottom: 4, textAlign: 'right', fontFamily: 'Rubik' }}>שם מלא</Text>
+                    <TextInput
+                      value={nameEdit}
+                      onChangeText={setNameEdit}
+                      style={{ borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, padding: 10, textAlign: 'right', fontFamily: 'Rubik' }}
+                    />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 12, color: '#666', marginBottom: 4, textAlign: 'right', fontFamily: 'Rubik' }}>תאריך יום הולדת (YYYY-MM-DD)</Text>
+                    <TextInput
+                      value={birthdayEdit}
+                      onChangeText={setBirthdayEdit}
+                      placeholder="1990-01-31"
+                      style={{ borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, padding: 10, textAlign: 'right', fontFamily: 'Rubik' }}
+                    />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 12, color: '#666', marginBottom: 4, textAlign: 'right', fontFamily: 'Rubik' }}>מספר טלפון</Text>
+                    <Text style={{ borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, padding: 10, textAlign: 'right', color: '#888', fontFamily: 'Rubik' }}>
+                      {customer?.customer_phone || phoneStr}
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 18 }}>
+                  <TouchableOpacity 
+                    onPress={() => setDetailsVisible(false)}
+                    style={{ backgroundColor: '#E0E0E0', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 }}
+                  >
+                    <Text style={{ fontFamily: 'Rubik' }}>ביטול</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={async () => {
+                      try {
+                        const businessCode = customer?.business_code || localBusiness?.business_code;
+                        const cphone = customer?.customer_phone || phoneStr;
+                        if (businessCode && cphone) {
+                          // ניסיון ראשון: עדכון name + birthday
+                          let updatePayload: any = { name: nameEdit || '' };
+                          if (birthdayEdit) updatePayload.birthday = birthdayEdit;
+                          let { error } = await supabase
+                            .from('customers')
+                            .update(updatePayload)
+                            .eq('business_code', businessCode)
+                            .eq('customer_phone', cphone);
+                          // אם עמודת birthday לא קיימת, ננסה בשם חלופי
+                          if (error && birthdayEdit) {
+                            const fallbackPayload: any = { name: nameEdit || '' };
+                            fallbackPayload.date_of_birth = birthdayEdit;
+                            const retry = await supabase
+                              .from('customers')
+                              .update(fallbackPayload)
+                              .eq('business_code', businessCode)
+                              .eq('customer_phone', cphone);
+                            if (!retry.error) {
+                              error = null as any;
+                            }
+                          }
+                          if (!error) {
+                            setCustomer(prev => prev ? { ...prev, name: nameEdit || '' } : prev);
+                            setDetailsVisible(false);
+                          }
+                        }
+                      } catch (_) {}
+                    }}
+                    style={{ backgroundColor: '#1E51E9', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 }}
+                  >
+                    <Text style={{ color: 'white', fontFamily: 'Rubik' }}>שמירה</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       {/* מודל בחירת כרטיסייה */}
       <Modal visible={cardSelectionVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -1346,6 +1540,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    transform: [{ translateY: 20 }],
   },
   cardCode: {
     fontSize: 18,
@@ -1354,6 +1549,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
     fontFamily: 'Rubik',
+    transform: [{ translateY: 20 }],
   },
   mailIconContainer: {
     position: 'absolute',
@@ -1365,6 +1561,9 @@ const styles = StyleSheet.create({
     width: 41.75,
     height: 33.4,
   },
+  mailIconWrap: {
+    transform: [{ translateY: 2 }],
+  },
   communityIconContainer: {
     position: 'absolute',
     top: 10,
@@ -1375,6 +1574,12 @@ const styles = StyleSheet.create({
   communityIcon: {
     width: 41.75,
     height: 33.4,
+  },
+  communityIconLabel: {
+    fontSize: 10,
+    marginTop: 0,
+    textAlign: 'center',
+    fontFamily: 'Rubik',
   },
   hamburgerContainer: {
     position: 'absolute',
