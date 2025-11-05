@@ -20,6 +20,7 @@ export default function PunchCard() {
   const { business, refresh: refreshBusiness } = useBusiness();
   const { phone } = useLocalSearchParams();
   const phoneStr = typeof phone === 'string' ? phone.trim() : Array.isArray(phone) ? phone[0].trim() : '';
+  const phoneIntl = phoneStr && /^05\d{8}$/.test(phoneStr) ? `972${phoneStr.slice(1)}` : phoneStr;
   const [customer, setCustomer] = useState<{ 
     business_code: string; 
     name: string; 
@@ -304,7 +305,7 @@ export default function PunchCard() {
             .from('inbox')
             .select('*', { count: 'exact', head: true })
             .eq('business_code', localBusiness.business_code)
-            .eq('customer_phone', phoneStr)
+            .in('customer_phone', [phoneStr, phoneIntl])
             .eq('status', 'unread');
           
           if (count !== null) {
@@ -349,7 +350,7 @@ export default function PunchCard() {
       }, (payload: any) => {
         const row = payload.new || payload.old;
         if (!row) return;
-        if (row.customer_phone !== phoneStr) return;
+        if (![phoneStr, phoneIntl].includes(row.customer_phone)) return;
         // ריענון רשימה וספירה
         (async () => {
           try {
@@ -357,7 +358,7 @@ export default function PunchCard() {
               .from('inbox')
               .select('id, title, message, status, created_at')
               .eq('business_code', businessCode)
-              .eq('customer_phone', phoneStr)
+              .in('customer_phone', [phoneStr, phoneIntl])
               .order('created_at', { ascending: false });
             const mapped = (data || []).map((r: any, idx: number) => ({
               id: String(r.id),
@@ -544,7 +545,7 @@ export default function PunchCard() {
                 .from('inbox')
                 .select('id, title, message, status, created_at')
                 .eq('business_code', localBusiness.business_code)
-                .eq('customer_phone', phoneStr)
+                .in('customer_phone', [phoneStr, phoneIntl])
                 .order('created_at', { ascending: false });
               
               console.log('[Inbox] Query result - data:', data?.length, 'error:', error);
