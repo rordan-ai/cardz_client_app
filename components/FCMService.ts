@@ -35,8 +35,22 @@ class FCMService {
   private async doInitialize() {
     
     try {
+      // רישום מכשירי iOS לקבלת פושים
+      if (Platform.OS === 'ios') {
+        try {
+          await messaging().registerDeviceForRemoteMessages();
+        } catch (registerError) {
+          console.error('FCM iOS registerDeviceForRemoteMessages error:', registerError);
+        }
+      }
+
       // בקשת הרשאות
-      const authStatus = await messaging().requestPermission();
+      const authStatus = await messaging().requestPermission({
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false
+      });
       const enabled =
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;

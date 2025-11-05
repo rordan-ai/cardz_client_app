@@ -8,7 +8,15 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.mynewtestapp",
+      "googleServicesFile": "./ios/GoogleService-Info.plist",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "NSUserNotificationUsageDescription": "האפליקציה שולחת התראות על שוברים והטבות חדשות."
+      }
     },
     "android": {
       "adaptiveIcon": {

@@ -3,6 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { Barcode } from 'react-native-svg-barcode';
@@ -794,8 +795,11 @@ export default function PunchCard() {
         <TouchableWithoutFeedback onPress={() => setMailVisible(false)}>
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
             <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={{ 
-            backgroundColor: '#CFB589', 
+              <LinearGradient
+                colors={['#f1f1f1', '#d5d5d5']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ 
             width: '90%',
             maxHeight: '80%',
             padding: 20, 
@@ -824,7 +828,7 @@ export default function PunchCard() {
               </TouchableOpacity>
             </View>
              
-            <ScrollView showsVerticalScrollIndicator={true} style={{ backgroundColor: '#D9CFB8' }}>
+            <ScrollView showsVerticalScrollIndicator={true} style={{ backgroundColor: 'transparent' }}>
               {/* הצגת דיבאג אם יש */}
               {debugInfo && (
                 <View style={{ 
@@ -861,14 +865,14 @@ export default function PunchCard() {
               ) : (
                 notifications.map((msg, idx) => (
                   <View key={`msg-${idx}`} style={{
-                    backgroundColor: '#947A3D',
+                    backgroundColor: 'transparent',
                     padding: 18,
                     marginBottom: 10,
                     borderRadius: 12,
-                    borderWidth: 0.5,
-                    borderColor: '#7F6A98'
+                    borderWidth: 1.5,
+                    borderColor: 'rgba(0,0,0,0.35)'
                   }}>
-                    <Text style={{ fontSize: 11, color: '#CFC7DA', textAlign: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 11, color: '#000000', textAlign: 'center', marginBottom: 6 }}>
                       {new Date(msg.timestamp).toLocaleString('he-IL', {
                         day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
                       })}
@@ -888,10 +892,10 @@ export default function PunchCard() {
                         </TouchableOpacity>
                       </View>
                        <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 6, textAlign: 'right', color: '#FFFFFF' }}>
+                        <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 6, textAlign: 'right', color: '#000000' }}>
                            {msg.title}
                          </Text>
-                        <Text style={{ fontSize: 13, textAlign: 'right', color: '#EDE8F6', lineHeight: 20 }}>
+                        <Text style={{ fontSize: 13, textAlign: 'right', color: '#222222', lineHeight: 20 }}>
                            {msg.body
                              .replace(/(https?:\/\/[^\s]+)/g, '')
                              .replace(/קישור לשובר/g, '')
@@ -986,7 +990,7 @@ export default function PunchCard() {
                 ))
               )}
              </ScrollView>
-              </View>
+              </LinearGradient>
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
