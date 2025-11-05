@@ -441,7 +441,12 @@ export default function PunchCard() {
   // פונקציה למחיקת הודעה
   const deleteNotification = async (notificationId: string) => {
     try {
-      await supabase.from('inbox').delete().eq('id', notificationId);
+      await supabase
+        .from('inbox')
+        .delete()
+        .eq('id', notificationId)
+        .eq('business_code', localBusiness?.business_code || '')
+        .eq('customer_phone', phoneStr || '');
       const updatedNotifications = notifications.filter(n => n.id !== notificationId);
       setNotifications(updatedNotifications);
       setUnreadMessages(updatedNotifications.filter(n => !n.read).length);
@@ -453,7 +458,12 @@ export default function PunchCard() {
   // פונקציה לסימון הודעה כנקראה
   const markAsRead = async (notificationId: string) => {
     try {
-      await supabase.from('inbox').update({ status: 'read' }).eq('id', notificationId);
+      await supabase
+        .from('inbox')
+        .update({ status: 'read' })
+        .eq('id', notificationId)
+        .eq('business_code', localBusiness?.business_code || '')
+        .eq('customer_phone', phoneStr || '');
       const updatedNotifications = notifications.map(n => 
         n.id === notificationId ? { ...n, read: true } : n
       );

@@ -77,12 +77,12 @@ export default function NewClientForm() {
         .single();
 
       if (businessError) {
-        return { maxPunches: 10, defaultProduct: '12' }; // ברירת מחדל
+        return { maxPunches: 10, defaultProduct: '0001' }; // ברירת מחדל 4 ספרות
       }
 
       const result = {
         maxPunches: businessData?.max_punches || 10,
-        defaultProduct: businessData?.default_product || '12'
+        defaultProduct: (businessData?.default_product || '0001').toString().padStart(4, '0')
       };
       
       return result;
@@ -270,23 +270,27 @@ export default function NewClientForm() {
 
     try {
       
-      // בדיקה אם הלקוח כבר קיים באותו עסק
-      const { data: existingCustomer, error: checkError } = await supabase
+      // עדכון/יצירה של לקוח (upsert) עבור פרסונליזציה
+      const normalizedPhone = phone.replace(/[^0-9]/g, '');
+      const { data: upsertedCustomer, error: upsertError } = await supabase
         .from('customers')
-        .select('*')
-        .eq('customer_phone', phone)
-        .eq('business_code', selectedBusiness.id)
+        .upsert(
+          {
+            name: firstName + ' ' + lastName,
+            customer_phone: normalizedPhone,
+            business_code: selectedBusiness.id
+          },
+          { onConflict: 'business_code,customer_phone' }
+        )
+        .select()
         .maybeSingle();
-      
 
-
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = לא נמצא
-        setErrorModal({ visible: true, message: 'תקלה זמנית במערכת- אנו מתנצלים על התקלה ועושים כמיטב יכולתנו לתקנה מהר ככל הניתן. נסו שוב מאוחר יותר . אתכם הסליחה' });
+      if (upsertError) {
+        setErrorModal({ visible: true, message: 'תקלה זמנית במערכת. נסו שוב מאוחר יותר.' });
         return;
       }
 
-      // אם הלקוח קיים באותו עסק, צור כרטיסיה עם המוצר שנבחר
-      if (existingCustomer) {
+      // לאחר upsert, המשך תהליך רגיל
         // אם יש קוד הזמנה - שליחה לטבלת referrals גם עבור לקוח קיים
         if (referralCode && referralCode.trim()) {
           try {
@@ -327,26 +331,12 @@ export default function NewClientForm() {
           }
         }
 
-        const result = await createCardWithProduct(selectedProduct.product_code);
-        
-        if (result.success) {
-          router.push('/(tabs)/thank_you');
-        } else {
-          setErrorModal({ visible: true, message: 'שגיאה ביצירת כרטיסיה. נסה שוב מאוחר יותר.' });
-        }
-        return;
-      }
-
-      // אם הלקוח לא קיים באותו עסק, הוסף אותו
-      const { data: customerData, error: customerError } = await supabase.from('customers').insert({
-      name: firstName + ' ' + lastName,
-        customer_phone: phone,
-        business_code: selectedBusiness.id,
-      }).select();
-
-      if (customerError) {
-        setErrorModal({ visible: true, message: 'שגיאה בהוספת לקוח. נסה שוב מאוחר יותר.' });
-        return;
+      const result = await createCardWithProduct((selectedProduct.product_code || '').toString().padStart(4, '0'));
+      
+      if (result.success) {
+        router.push('/(tabs)/thank_you');
+      } else {
+        setErrorModal({ visible: true, message: 'שגיאה ביצירת כרטיסיה. נסה שוב מאוחר יותר.' });
       }
 
       // אם יש קוד הזמנה - שליחה לטבלת referrals
@@ -389,14 +379,7 @@ export default function NewClientForm() {
         }
       }
 
-      // צור כרטיסיה חדשה ללקוח החדש
-      const result = await createCardWithProduct(selectedProduct.product_code);
-      
-      if (result.success) {
-      router.push('/(tabs)/thank_you');
-    } else {
-        setErrorModal({ visible: true, message: 'שגיאה ביצירת כרטיסיה. נסה שוב מאוחר יותר.' });
-      }
+      // (בוטל) יצירת כרטיסיה לאחר הוספת לקוח בוצעה כבר לעיל
     } catch (error) {
       setErrorModal({ visible: true, message: 'תקלה זמנית במערכת- אנו מתנצלים על התקלה ועושים כמיטב יכולתנו לתקנה מהר ככל הניתן. נסו שוב מאוחר יותר . אתכם הסליחה' });
     }

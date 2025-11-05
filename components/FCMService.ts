@@ -143,6 +143,16 @@ class FCMService {
     }
   }
 
+  private normalizePhone(input: string | null): string | null {
+    if (!input) return null;
+    const onlyDigits = input.replace(/[^0-9]/g, '');
+    // מצפה לפורמט ישראלי: 05XXXXXXXX
+    if (onlyDigits.startsWith('0')) {
+      return onlyDigits.slice(0, 10);
+    }
+    return `0${onlyDigits}`.slice(0, 10);
+  }
+
   // רישום המכשיר בסופרבייס (ללא תלות במספר טלפון)
   private async registerDevice(token: string) {
     if (!this.deviceId) return;
@@ -160,7 +170,7 @@ class FCMService {
       }
 
       if (this.customerPhone) {
-        payload.phone_number = this.customerPhone;
+        payload.phone_number = this.normalizePhone(this.customerPhone);
       }
 
       console.log('[FCM] Calling register-device-token with:', {
@@ -237,7 +247,7 @@ class FCMService {
     console.log('[FCM] setUserContext called with:', { businessCode, customerPhone });
     
     this.businessCode = businessCode;
-    this.customerPhone = customerPhone;
+    this.customerPhone = this.normalizePhone(customerPhone);
 
     if (businessCode) {
       await AsyncStorage.setItem('current_business_code', businessCode);
