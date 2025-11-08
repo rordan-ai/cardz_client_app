@@ -56,7 +56,9 @@ class FCMService {
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
       if (!enabled) {
-        console.log('FCM permissions not granted');
+        if (__DEV__) {
+          console.warn('FCM permissions not granted');
+        }
         return;
       }
 
@@ -91,7 +93,9 @@ class FCMService {
 
       // האזנה להודעות (foreground)
       messaging().onMessage(async (remoteMessage) => {
-        console.log('FCM Message received:', remoteMessage);
+        if (__DEV__) {
+          console.log('FCM Message received');
+        }
         // שמירת ההודעה ב-AsyncStorage
         if (remoteMessage.data?.business_code) {
           await this.saveNotification(remoteMessage);
@@ -116,7 +120,9 @@ class FCMService {
             }
             await Linking.openURL(url);
           } catch (err) {
-            console.error('Failed to open voucher URL from notification (background):', err);
+            if (__DEV__) {
+              console.error('Failed to open voucher URL from notification (background):', err);
+            }
           }
         }
       });
@@ -134,12 +140,16 @@ class FCMService {
           }
           await Linking.openURL(url);
         } catch (err) {
-          console.error('Failed to open voucher URL from initial notification:', err);
+          if (__DEV__) {
+            console.error('Failed to open voucher URL from initial notification:', err);
+          }
         }
       }
 
     } catch (error) {
-      console.error('FCM initialization error:', error);
+      if (__DEV__) {
+        console.error('FCM initialization error:', error);
+      }
     }
   }
 
@@ -173,49 +183,63 @@ class FCMService {
         payload.phone_number = this.normalizePhone(this.customerPhone);
       }
 
-      console.log('[FCM] Calling register-device-token with:', {
-        ...payload,
-        token: token.substring(0, 20) + '...'
-      });
+      if (__DEV__) {
+        console.log('[FCM] Calling register-device-token');
+      }
 
       const { data, error } = await supabase.functions.invoke('register-device-token', {
         body: payload
       });
 
-      console.log('[FCM] register-device-token response:', {
-        data: data,
-        error: error
-      });
+      if (__DEV__) {
+        console.log('[FCM] register-device-token response');
+      }
 
       if (error) {
-        console.error('Device registration error:', error);
+        if (__DEV__) {
+          console.error('Device registration error:', error);
+        }
       } else {
-        console.log('Device registered successfully');
+        if (__DEV__) {
+          console.log('Device registered successfully');
+        }
       }
     } catch (error) {
-      console.error('Device registration error:', error);
+      if (__DEV__) {
+        console.error('Device registration error:', error);
+      }
     }
   }
 
   // הוספת business_code למכשיר
   async addBusinessCode(businessCode: string) {
-    console.log('FCMService: addBusinessCode called with:', businessCode);
+    if (__DEV__) {
+      console.log('FCMService: addBusinessCode called');
+    }
     
     // ודא שהאתחול הושלם
     if (this.initializationPromise) {
-      console.log('FCMService: Waiting for initialization to complete...');
+      if (__DEV__) {
+        console.log('FCMService: Waiting for initialization to complete...');
+      }
       await this.initializationPromise;
     }
     
-    console.log('FCMService: deviceId:', this.deviceId);
+    if (__DEV__) {
+      console.log('FCMService: deviceId set');
+    }
     
     if (!this.deviceId) {
-      console.error('FCMService: No deviceId available even after initialization');
+      if (__DEV__) {
+        console.error('FCMService: No deviceId available even after initialization');
+      }
       return;
     }
 
     try {
-      console.log('FCMService: Calling add-business-to-device edge function');
+      if (__DEV__) {
+        console.log('FCMService: Calling add-business-to-device edge function');
+      }
       const { data, error } = await supabase.functions.invoke('add-business-to-device', {
         body: {
           device_id: this.deviceId,
@@ -223,10 +247,9 @@ class FCMService {
         }
       });
       
-      console.log('[FCM] add-business-to-device response:', {
-        data: data,
-        error: error
-      });
+      if (__DEV__) {
+        console.log('[FCM] add-business-to-device response');
+      }
 
       if (!error) {
         // שמירה מקומית של העסקים הרשומים
@@ -238,13 +261,17 @@ class FCMService {
         }
       }
     } catch (error) {
-      console.error('Add business code error:', error);
+      if (__DEV__) {
+        console.error('Add business code error:', error);
+      }
     }
   }
 
   // עדכון פרטי המשתמש לצורך רישום טוקן מלא (כולל טלפון)
   async setUserContext(businessCode: string | null, customerPhone: string | null) {
-    console.log('[FCM] setUserContext called with:', { businessCode, customerPhone });
+    if (__DEV__) {
+      console.log('[FCM] setUserContext called');
+    }
     
     this.businessCode = businessCode;
     this.customerPhone = this.normalizePhone(customerPhone);
@@ -262,7 +289,9 @@ class FCMService {
     }
 
     if (this.currentToken) {
-      console.log('[FCM] Re-registering device with phone:', customerPhone);
+      if (__DEV__) {
+        console.log('[FCM] Re-registering device with phone');
+      }
       await this.registerDevice(this.currentToken);
     }
   }

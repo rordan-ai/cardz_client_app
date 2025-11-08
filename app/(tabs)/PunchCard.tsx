@@ -49,7 +49,6 @@ export default function PunchCard() {
     read: boolean;
     voucherUrl?: string;
   }>>([]);
-  const [debugInfo, setDebugInfo] = useState<string>('');
   const [referralVisible, setReferralVisible] = useState(false);
   const [cardSelectionVisible, setCardSelectionVisible] = useState(false);
   const [preferencesVisible, setPreferencesVisible] = useState(false);
@@ -319,12 +318,10 @@ export default function PunchCard() {
 
   // רישום העסק למכשיר (ללא תלות במספר טלפון)
   useEffect(() => {
-    console.log('PunchCard: localBusiness changed:', localBusiness);
     const registerBusiness = async () => {
       if (!localBusiness) return;
       
       // רישום העסק למכשיר זה
-      console.log('PunchCard: Registering business to device:', localBusiness.business_code);
       await FCMService.addBusinessCode(localBusiness.business_code);
     };
     
@@ -336,7 +333,6 @@ export default function PunchCard() {
     const businessCode = localBusiness?.business_code;
     if (!businessCode || !phoneStr) return;
 
-    console.log('[PunchCard] Setting user context:', { businessCode, phoneStr });
     FCMService.setUserContext(businessCode, phoneStr).catch(() => {});
   }, [localBusiness?.business_code, phoneStr]);
 
@@ -354,10 +350,11 @@ export default function PunchCard() {
           
           if (count !== null) {
             setUnreadMessages(count);
-            console.log('[Inbox] Unread count loaded:', count);
           }
         } catch (error) {
-          console.error('[Inbox] Error loading unread count:', error);
+          if (__DEV__) {
+            console.error('[Inbox] Error loading unread count:', error);
+          }
         }
       }
     };
@@ -373,7 +370,9 @@ export default function PunchCard() {
           await Notifications.setBadgeCountAsync(unreadMessages);
         }
       } catch (error) {
-        console.log('[Inbox] Failed to update app badge:', error);
+        if (__DEV__) {
+          console.warn('[Inbox] Failed to update app badge:', error);
+        }
       }
     };
     updateBadge();
@@ -576,15 +575,10 @@ export default function PunchCard() {
       <TouchableOpacity 
         style={[styles.mailIconContainer, styles.topIconOffsetClean]}
         onPress={async () => {
-          console.log('[Inbox] Mail button clicked!');
-          console.log('[Inbox] localBusiness:', localBusiness);
-          console.log('[Inbox] phoneStr:', phoneStr);
-          
           setMailVisible(true);
           
           // טעינה מיידית של ההודעות
           if (localBusiness && phoneStr) {
-            console.log('[Inbox] Loading messages...');
             setInboxLoading(true);
             
             try {
@@ -594,11 +588,10 @@ export default function PunchCard() {
                 .eq('business_code', localBusiness.business_code)
                 .in('customer_phone', [phoneStr, phoneIntl])
                 .order('created_at', { ascending: false });
-              
-              console.log('[Inbox] Query result - data:', data?.length, 'error:', error);
-              
               if (error) {
-                console.error('[Inbox] Supabase error:', error);
+                if (__DEV__) {
+                  console.error('[Inbox] Supabase error:', error);
+                }
               } else if (data) {
                 const mapped = data.map((row: any) => ({
                   id: String(row.id),
@@ -608,21 +601,18 @@ export default function PunchCard() {
                   read: row.status !== 'unread',
                   voucherUrl: row.data?.voucher_url || null,
                 }));
-                console.log('[Inbox] Mapped messages:', mapped);
-                console.log('[Inbox] Sample message with voucher:', mapped.find(m => m.voucherUrl));
-                console.log('[Inbox] Current notifications before set:', notifications);
                 setNotifications(mapped);
                 setUnreadMessages(mapped.filter(n => !n.read).length);
               }
               
               setInboxLoading(false);
-              console.log('[Inbox] Loading completed, inboxLoading set to false');
             } catch (err) {
-              console.error('[Inbox] Exception:', err);
+              if (__DEV__) {
+                console.error('[Inbox] Exception:', err);
+              }
               setInboxLoading(false);
             }
           } else {
-            console.log('[Inbox] Missing data - not loading');
             setInboxLoading(false);
           }
         }}
@@ -882,12 +872,18 @@ export default function PunchCard() {
                 onPress={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
-                  console.log('X button pressed - closing mail modal');
+                  if (__DEV__) {
+                    console.log('X button pressed - closing mail modal');
+                  }
                   try {
                     setMailVisible(false);
-                    console.log('Mail modal should be closed now');
+                    if (__DEV__) {
+                      console.log('Mail modal should be closed now');
+                    }
                   } catch (error) {
-                    console.error('Error closing modal:', error);
+                    if (__DEV__) {
+                      console.error('Error closing modal:', error);
+                    }
                   }
                 }}
                 style={{ padding: 5 }}
@@ -897,35 +893,6 @@ export default function PunchCard() {
             </View>
              
             <ScrollView showsVerticalScrollIndicator={true} style={{ backgroundColor: 'transparent' }}>
-              {/* הצגת דיבאג אם יש */}
-              {debugInfo && (
-                <View style={{ 
-                  backgroundColor: '#FFE4B5', 
-                  padding: 15, 
-                  margin: 10, 
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: '#FFA500'
-                }}>
-                  <Text style={{ fontWeight: 'bold', marginBottom: 5 }}>מידע דיבאג:</Text>
-                  <Text style={{ fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
-                    {debugInfo}
-                  </Text>
-                  <TouchableOpacity 
-                    onPress={() => setDebugInfo('')}
-                    style={{ 
-                      backgroundColor: '#FFA500', 
-                      padding: 8, 
-                      marginTop: 10, 
-                      borderRadius: 5,
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Text style={{ color: 'white', fontWeight: 'bold' }}>סגור דיבאג</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              
               {notifications.length === 0 ? (
                 <Text style={{ textAlign: 'center', padding: 20, color: '#999' }}>
                   אין הודעות חדשות
@@ -975,81 +942,60 @@ export default function PunchCard() {
                           <TouchableOpacity
                             onPress={(e) => {
                               e.stopPropagation();
-                              
-                              // איסוף מידע לדיבאג
-                              let debug = 'דיבאג קישור שובר:\n\n';
-                              
-                              let finalUrl = '';
-                              
-                              // קודם נבדוק אם יש voucher_url ישיר
+
+                              let finalUrl: string | null = null;
+
                               if (msg.voucherUrl) {
-                                debug += '1. נמצא voucher_url מ-data:\n' + msg.voucherUrl + '\n\n';
                                 finalUrl = msg.voucherUrl;
                               } else {
-                                // אם לא, נחפש בתוך ה-body (לתאימות אחורה)
-                                debug += '1. תוכן ההודעה:\n' + msg.body + '\n\n';
                                 const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
                                 if (urlMatch) {
-                                  debug += '2. URL שנמצא בהודעה:\n' + urlMatch[0] + '\n\n';
-                                  
-                                  // מנקה תווים מיותרים בסוף ה-URL
                                   let rawUrl = urlMatch[0];
-                                  // מסיר תווי פיסוק וסוגריים מהסוף
-                                  rawUrl = rawUrl.replace(/[)\],.;:!?]+$/,'');
-                                  // מסיר מרכאות אם יש
-                                  rawUrl = rawUrl.replace(/['"]+$/,'');
-                                  debug += '3. URL אחרי ניקוי:\n' + rawUrl + '\n\n';
+                                  rawUrl = rawUrl.replace(/[)\],.;:!?]+$/, '');
+                                  rawUrl = rawUrl.replace(/['"]+$/, '');
                                   finalUrl = rawUrl;
                                 }
                               }
-                              
-                              if (finalUrl) {
-                                // לא מקודד את ה-URL אם הוא כבר מקודד
-                                let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
-                                
-                                // הוספת פרמטר phone לפרסונליזציה
-                                if (phoneStr) {
-                                  const separator = safeUrl.includes('?') ? '&' : '?';
-                                  safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
-                                  debug += '4. הוספת פרמטר phone: ' + phoneStr + '\n\n';
+
+                              if (!finalUrl) {
+                                Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
+                                return;
+                              }
+
+                              let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
+
+                              if (phoneStr) {
+                                const separator = safeUrl.includes('?') ? '&' : '?';
+                                safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
+                              }
+
+                              if (!safeUrl || safeUrl.length < 10) {
+                                if (__DEV__) {
+                                  console.warn('[Voucher Link] Invalid URL value detected');
                                 }
-                                
-                                debug += '5. URL סופי:\n' + safeUrl + '\n\n';
-                                 
-                                setDebugInfo(debug);
-                                
-                                // בדיקה שה-URL תקין
-                                if (!safeUrl || safeUrl.length < 10) {
-                                  console.error('[Voucher Link] Invalid URL:', safeUrl);
-                                  Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
-                                  return;
-                                }
-                                
-                                // פותח את השובר ישירות
-                                console.log('[Voucher Link] Opening URL:', safeUrl);
-                                // הוספת בדיקה אם ניתן לפתוח את ה-URL
-                                Linking.canOpenURL(safeUrl).then((supported) => {
+                                Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
+                                return;
+                              }
+
+                              Linking.canOpenURL(safeUrl)
+                                .then((supported) => {
                                   if (supported) {
-                                    Linking.openURL(safeUrl).catch(err => {
-                                      console.error('[Voucher Link] Failed to open URL:', err);
-                                      setDebugInfo(debug + '\n6. שגיאה בפתיחה:\n' + err.toString());
-                                      Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור: ' + err.message);
+                                    Linking.openURL(safeUrl).catch((err) => {
+                                      if (__DEV__) {
+                                        console.error('[Voucher Link] Failed to open URL:', err);
+                                      }
+                                      Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור');
                                     });
                                   } else {
-                                    console.error('[Voucher Link] URL not supported:', safeUrl);
-                                    setDebugInfo(debug + '\n6. URL לא נתמך על ידי המכשיר');
                                     Alert.alert('שגיאה', 'הקישור אינו נתמך במכשיר זה');
                                   }
-                                }).catch(err => {
-                                  console.error('[Voucher Link] Error checking URL:', err);
-                                  setDebugInfo(debug + '\n6. שגיאה בבדיקת URL:\n' + err.toString());
+                                })
+                                .catch((err) => {
+                                  if (__DEV__) {
+                                    console.error('[Voucher Link] Error checking URL:', err);
+                                  }
                                   Alert.alert('שגיאה', 'שגיאה בבדיקת הקישור');
                                 });
-                              } else {
-                                const debug = 'דיבאג קישור שובר:\n\nלא נמצא URL בהודעה!\n\nתוכן ההודעה:\n' + msg.body;
-                                setDebugInfo(debug);
-                                Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
-                              }
                             }}
                             style={{
                               flexDirection: 'row',

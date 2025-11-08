@@ -28,13 +28,8 @@ export default function CustomersLogin() {
 
   // Debug נתוני עסק
   useEffect(() => {
-    if (business) {
-      console.log('🏢 נתוני עסק נטענו:', {
-        name: business.name,
-        business_phone: business.business_phone,
-        business_whatsapp: business.business_whatsapp,
-        phone: business.phone
-      });
+    if (__DEV__ && business) {
+      console.log('Business data loaded');
     }
   }, [business]);
 
@@ -82,7 +77,9 @@ export default function CustomersLogin() {
   };
 
   const openMenu = () => {
-    console.log('🍔 פותח תפריט המבורגר');
+    if (__DEV__) {
+      console.log('Opening hamburger menu');
+    }
     setMenuVisible(true);
     Animated.timing(slideAnim, {
       toValue: 0,
@@ -107,40 +104,38 @@ export default function CustomersLogin() {
   };
 
   const handleWhatsappChat = () => {
-    console.log('🔍 בדיקת וואטסאפ:', business?.business_whatsapp);
     if (business?.business_whatsapp) {
       const phone = getInternationalPhone(business.business_whatsapp);
-      console.log('📞 מספר וואטסאפ מעובד:', phone);
       const url = `https://wa.me/${phone}`;
-      console.log('🔗 URL:', url);
       Linking.openURL(url);
     } else {
-      console.log('❌ אין מספר וואטסאפ');
+      if (__DEV__) {
+        console.log('No whatsapp number');
+      }
     }
   };
 
   const handlePhoneCall = () => {
-    console.log('🔍 בדיקת טלפון:', business?.business_phone);
     if (business?.business_phone) {
       const phone = business.business_phone.replace(/[^0-9]/g, '');
-      console.log('📞 מספר טלפון מעובד:', phone);
       const url = `tel:${phone}`;
-      console.log('🔗 URL:', url);
       Linking.openURL(url);
     } else {
-      console.log('❌ אין מספר טלפון');
+      if (__DEV__) {
+        console.log('No phone number');
+      }
     }
   };
 
   const handleShareWhatsapp = () => {
-    console.log('🔍 בדיקת שיתוף:', business?.name);
     if (business?.name) {
       const message = `היי, שמעת על הכרטיסייה האלקטרונית של ${business.name}? מעבר להטבה על מספר ניקובים יש שם הגרלות והפתעות, משקיעים בנו 😉.`;
       const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-      console.log('🔗 שיתוף URL:', url);
       Linking.openURL(url);
     } else {
-      console.log('❌ אין שם עסק');
+      if (__DEV__) {
+        console.log('No business name');
+      }
     }
   };
 
@@ -230,7 +225,7 @@ export default function CustomersLogin() {
             {/* אייקון וואטסאפ */}
             <TouchableOpacity 
               onPress={() => {
-                console.log('👆 לחיצה על וואטסאפ');
+                if (__DEV__) { console.log('Whatsapp pressed'); }
                 closeMenu();
                 handleWhatsappChat();
               }}
@@ -244,7 +239,7 @@ export default function CustomersLogin() {
             {/* אייקון טלפון */}
             <TouchableOpacity 
               onPress={() => {
-                console.log('👆 לחיצה על טלפון');
+                if (__DEV__) { console.log('Phone pressed'); }
                 closeMenu();
                 handlePhoneCall();
               }}
@@ -258,7 +253,7 @@ export default function CustomersLogin() {
             {/* אייקון חץ */}
             <TouchableOpacity 
               onPress={() => {
-                console.log('👆 לחיצה על שיתוף');
+                if (__DEV__) { console.log('Share pressed'); }
                 closeMenu();
                 handleShareWhatsapp();
               }}
@@ -272,7 +267,7 @@ export default function CustomersLogin() {
             {/* אייקון הגרלות */}
             <TouchableOpacity 
               onPress={() => {
-                console.log('👆 לחיצה על הגרלות (עדיין לא מוטמע)');
+                if (__DEV__) { console.log('Lottery pressed'); }
                 closeMenu();
               }}
               style={{ paddingVertical: 8, paddingHorizontal: 4 }}
