@@ -590,7 +590,7 @@ export default function PunchCard() {
             try {
               const { data, error } = await supabase
                 .from('inbox')
-                .select('id, title, message, status, created_at')
+                .select('id, title, message, status, created_at, data')
                 .eq('business_code', localBusiness.business_code)
                 .in('customer_phone', [phoneStr, phoneIntl])
                 .order('created_at', { ascending: false });
@@ -606,8 +606,10 @@ export default function PunchCard() {
                   body: row.message || '',
                   timestamp: new Date(row.created_at).getTime(),
                   read: row.status !== 'unread',
+                  voucherUrl: row.data?.voucher_url || null,
                 }));
                 console.log('[Inbox] Mapped messages:', mapped);
+                console.log('[Inbox] Sample message with voucher:', mapped.find(m => m.voucherUrl));
                 console.log('[Inbox] Current notifications before set:', notifications);
                 setNotifications(mapped);
                 setUnreadMessages(mapped.filter(n => !n.read).length);
@@ -969,48 +971,60 @@ export default function PunchCard() {
                              .replace(/:/g, '')
                              .trim()}
                          </Text>
-                         {msg.body.includes('http') && (
-                           <TouchableOpacity
-                             onPress={(e) => {
-                               e.stopPropagation();
-                               
-                               // איסוף מידע לדיבאג
-                               let debug = 'דיבאג קישור שובר:\n\n';
-                               debug += '1. תוכן ההודעה:\n' + msg.body + '\n\n';
-                               
-                               const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
-                               if (urlMatch) {
-                                 debug += '2. URL שנמצא:\n' + urlMatch[0] + '\n\n';
-                                 
-                                 // מנקה תווים מיותרים בסוף ה-URL
-                                 let rawUrl = urlMatch[0];
-                                 // מסיר תווי פיסוק וסוגריים מהסוף
-                                 rawUrl = rawUrl.replace(/[)\],.;:!?]+$/,'');
-                                 // מסיר מרכאות אם יש
-                                 rawUrl = rawUrl.replace(/['"]+$/,'');
-                                 debug += '3. URL אחרי ניקוי:\n' + rawUrl + '\n\n';
-                                 
+                        {(msg.voucherUrl || msg.body.includes('http')) && (
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              
+                              // איסוף מידע לדיבאג
+                              let debug = 'דיבאג קישור שובר:\n\n';
+                              
+                              let finalUrl = '';
+                              
+                              // קודם נבדוק אם יש voucher_url ישיר
+                              if (msg.voucherUrl) {
+                                debug += '1. נמצא voucher_url מ-data:\n' + msg.voucherUrl + '\n\n';
+                                finalUrl = msg.voucherUrl;
+                              } else {
+                                // אם לא, נחפש בתוך ה-body (לתאימות אחורה)
+                                debug += '1. תוכן ההודעה:\n' + msg.body + '\n\n';
+                                const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
+                                if (urlMatch) {
+                                  debug += '2. URL שנמצא בהודעה:\n' + urlMatch[0] + '\n\n';
+                                  
+                                  // מנקה תווים מיותרים בסוף ה-URL
+                                  let rawUrl = urlMatch[0];
+                                  // מסיר תווי פיסוק וסוגריים מהסוף
+                                  rawUrl = rawUrl.replace(/[)\],.;:!?]+$/,'');
+                                  // מסיר מרכאות אם יש
+                                  rawUrl = rawUrl.replace(/['"]+$/,'');
+                                  debug += '3. URL אחרי ניקוי:\n' + rawUrl + '\n\n';
+                                  finalUrl = rawUrl;
+                                }
+                              }
+                              
+                              if (finalUrl) {
                                 // לא מקודד את ה-URL אם הוא כבר מקודד
-                                let safeUrl = rawUrl.includes('%') ? rawUrl : encodeURI(rawUrl);
+                                let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
                                 
                                 // הוספת פרמטר phone לפרסונליזציה
                                 if (phoneStr) {
                                   const separator = safeUrl.includes('?') ? '&' : '?';
                                   safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
-                                  debug += '3.5. הוספת פרמטר phone: ' + phoneStr + '\n\n';
+                                  debug += '4. הוספת פרמטר phone: ' + phoneStr + '\n\n';
                                 }
                                 
-                                debug += '4. URL סופי:\n' + safeUrl + '\n\n';
+                                debug += '5. URL סופי:\n' + safeUrl + '\n\n';
                                  
-                                 setDebugInfo(debug);
-                                 
-                                 // בדיקה שה-URL תקין
-                                 if (!safeUrl || safeUrl.length < 10) {
-                                   console.error('[Voucher Link] Invalid URL:', safeUrl);
-                                   Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
-                                   return;
-                                 }
-                                 
+                                setDebugInfo(debug);
+                                
+                                // בדיקה שה-URL תקין
+                                if (!safeUrl || safeUrl.length < 10) {
+                                  console.error('[Voucher Link] Invalid URL:', safeUrl);
+                                  Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
+                                  return;
+                                }
+                                
                                 // פותח את השובר ישירות
                                 console.log('[Voucher Link] Opening URL:', safeUrl);
                                 // הוספת בדיקה אם ניתן לפתוח את ה-URL
@@ -1018,38 +1032,38 @@ export default function PunchCard() {
                                   if (supported) {
                                     Linking.openURL(safeUrl).catch(err => {
                                       console.error('[Voucher Link] Failed to open URL:', err);
-                                      setDebugInfo(debug + '\n5. שגיאה בפתיחה:\n' + err.toString());
+                                      setDebugInfo(debug + '\n6. שגיאה בפתיחה:\n' + err.toString());
                                       Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור: ' + err.message);
                                     });
                                   } else {
                                     console.error('[Voucher Link] URL not supported:', safeUrl);
-                                    setDebugInfo(debug + '\n5. URL לא נתמך על ידי המכשיר');
+                                    setDebugInfo(debug + '\n6. URL לא נתמך על ידי המכשיר');
                                     Alert.alert('שגיאה', 'הקישור אינו נתמך במכשיר זה');
                                   }
                                 }).catch(err => {
                                   console.error('[Voucher Link] Error checking URL:', err);
-                                  setDebugInfo(debug + '\n5. שגיאה בבדיקת URL:\n' + err.toString());
+                                  setDebugInfo(debug + '\n6. שגיאה בבדיקת URL:\n' + err.toString());
                                   Alert.alert('שגיאה', 'שגיאה בבדיקת הקישור');
                                 });
-                               } else {
-                                 const debug = 'דיבאג קישור שובר:\n\nלא נמצא URL בהודעה!\n\nתוכן ההודעה:\n' + msg.body;
-                                 setDebugInfo(debug);
-                                 Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
-                               }
-                             }}
-                             style={{
-                               flexDirection: 'row',
-                               alignItems: 'center',
-                               marginTop: 10,
-                               alignSelf: 'flex-end'
-                             }}
-                           >
-                             <Text style={{ color: '#2196F3', fontSize: 14, marginRight: 5 }}>
-                               קישור לשובר
-                             </Text>
-                             <Text style={{ fontSize: 18 }}>🎁</Text>
-                           </TouchableOpacity>
-                         )}
+                              } else {
+                                const debug = 'דיבאג קישור שובר:\n\nלא נמצא URL בהודעה!\n\nתוכן ההודעה:\n' + msg.body;
+                                setDebugInfo(debug);
+                                Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
+                              }
+                            }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 10,
+                              alignSelf: 'flex-end'
+                            }}
+                          >
+                            <Text style={{ color: '#2196F3', fontSize: 14, marginRight: 5 }}>
+                              קישור לשובר
+                            </Text>
+                            <Text style={{ fontSize: 18 }}>🎁</Text>
+                          </TouchableOpacity>
+                        )}
                        </View>
                     </View>
                   </View>
