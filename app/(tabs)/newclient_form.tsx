@@ -284,7 +284,7 @@ export default function NewClientForm() {
         )
         .select()
         .maybeSingle();
-
+      
       if (upsertError) {
         setErrorModal({ visible: true, message: 'תקלה זמנית במערכת. נסו שוב מאוחר יותר.' });
         return;
@@ -332,11 +332,11 @@ export default function NewClientForm() {
         }
 
       const result = await createCardWithProduct((selectedProduct.product_code || '').toString().padStart(4, '0'));
-      
-      if (result.success) {
-        router.push('/(tabs)/thank_you');
-      } else {
-        setErrorModal({ visible: true, message: 'שגיאה ביצירת כרטיסיה. נסה שוב מאוחר יותר.' });
+        
+        if (result.success) {
+          router.push('/(tabs)/thank_you');
+        } else {
+          setErrorModal({ visible: true, message: 'שגיאה ביצירת כרטיסיה. נסה שוב מאוחר יותר.' });
       }
 
       // אם יש קוד הזמנה - שליחה לטבלת referrals

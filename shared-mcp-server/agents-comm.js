@@ -432,17 +432,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       console.log(`✅ הודעה תקינה מ-${from}: "${message.substring(0, 50)}..."`);
       
       // Send message using existing schema
-      const { data, error } = await supabase
-        .from('agent_messages')
-        .insert([{
-          from_agent: from,
-          to_agent: to,
+    const { data, error } = await supabase
+      .from('agent_messages')
+      .insert([{
+        from_agent: from,
+        to_agent: to,
           message_type: 'info',
           content: message
-        }])
-        .select()
-        .single();
-      
+      }])
+      .select()
+      .single();
+    
       if (error) throw error;
       
       return {
@@ -454,17 +454,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           })
         }]
       };
-      
+    
     } catch (error) {
-      return {
-        content: [{
-          type: "text",
+    return {
+      content: [{
+        type: "text",
           text: JSON.stringify({ 
             success: false, 
             error: error.message
           })
-        }]
-      };
+      }]
+    };
     }
   }
 
@@ -476,14 +476,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (enableEventListener) {
         setupEventListener(agent_name);
       }
-      
-      const { data, error } = await supabase
-        .from('agent_messages')
-        .select('*')
-        .eq('to_agent', agent_name)
+    
+    const { data, error } = await supabase
+      .from('agent_messages')
+      .select('*')
+      .eq('to_agent', agent_name)
         .order('created_at', { ascending: false })
         .limit(10);
-        
+    
       if (error) throw error;
       
       return {
@@ -497,15 +497,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
       
     } catch (error) {
-      return {
-        content: [{
-          type: "text",
+    return {
+      content: [{
+        type: "text",
           text: JSON.stringify({ 
             messages: [], 
             error: error.message
           })
-        }]
-      };
+      }]
+    };
     }
   }
 
@@ -513,14 +513,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { agent_name, state } = args;
     
     try {
-      const { error } = await supabase
-        .from('agent_state')
-        .upsert({
-          agent_name: agent_name,
-          state: state,
-          last_update: new Date().toISOString()
-        });
-        
+    const { error } = await supabase
+      .from('agent_state')
+      .upsert({
+        agent_name: agent_name,
+        state: state,
+        last_update: new Date().toISOString()
+      });
+    
       if (error) throw error;
       
       return {
@@ -544,12 +544,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { agent_name } = args;
     
     try {
-      const { data, error } = await supabase
-        .from('agent_state')
-        .select('state, last_update')
-        .eq('agent_name', agent_name)
-        .single();
-        
+    const { data, error } = await supabase
+      .from('agent_state')
+      .select('state, last_update')
+      .eq('agent_name', agent_name)
+      .single();
+    
       if (error) throw error;
       
       return {
