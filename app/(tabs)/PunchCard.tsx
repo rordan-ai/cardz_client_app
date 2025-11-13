@@ -868,28 +868,7 @@ export default function PunchCard() {
               <Text style={{ fontSize: 20, textAlign: 'center', fontWeight: 'bold', flex: 1 }}>
                 תיבת דואר ({notifications.length} הודעות)
               </Text>
-              <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  if (__DEV__) {
-                    console.log('X button pressed - closing mail modal');
-                  }
-                  try {
-                    setMailVisible(false);
-                    if (__DEV__) {
-                      console.log('Mail modal should be closed now');
-                    }
-                  } catch (error) {
-                    if (__DEV__) {
-                      console.error('Error closing modal:', error);
-                    }
-                  }
-                }}
-                style={{ padding: 5 }}
-              >
-                <Text style={{ fontSize: 30, color: '#000000' }}>×</Text>
-              </TouchableOpacity>
+              <View style={{ width: 30 }} />
             </View>
              
             <ScrollView showsVerticalScrollIndicator={true} style={{ backgroundColor: 'transparent' }}>
