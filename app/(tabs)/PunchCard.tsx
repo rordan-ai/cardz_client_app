@@ -2,7 +2,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, GestureResponderEvent } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
@@ -877,122 +877,149 @@ export default function PunchCard() {
                   אין הודעות חדשות
                 </Text>
               ) : (
-                notifications.map((msg, idx) => (
-                  <View key={`msg-${idx}`} style={{
-                    backgroundColor: 'transparent',
-                    padding: 18,
-                    marginBottom: 10,
-                    borderRadius: 12,
-                    borderWidth: 1.5,
-                    borderColor: 'rgba(0,0,0,0.35)'
-                  }}>
-                    <Text style={{ fontSize: 11, color: '#000000', textAlign: 'center', marginBottom: 6 }}>
-                      {new Date(msg.timestamp).toLocaleString('he-IL', {
-                        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-                      })}
-                    </Text>
-                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {!msg.read && (
-                          <TouchableOpacity
-                            onPress={() => markAsRead(msg.id)}
-                            style={{ marginRight: 12 }}
-                          >
-                            <Ionicons name="checkmark" size={20} color="#4CAF50" />
-                          </TouchableOpacity>
-                        )}
-                        <TouchableOpacity onPress={() => deleteNotification(msg.id)}>
-                          <Ionicons name="trash" size={20} color="#e57373" />
-                        </TouchableOpacity>
+                notifications.map((msg, idx) => {
+                  const sanitizedBody = msg.body
+                    .replace(/(https?:\/\/[^\s]+)/g, '')
+                    .replace(/קישור לשובר/g, '')
+                    .replace(/🎁/g, '')
+                    .replace(/:/g, '')
+                    .trim();
+                  const hasVoucher = Boolean(msg.voucherUrl) || msg.body.includes('http');
+
+                  const handleOpenVoucher = (event: GestureResponderEvent) => {
+                    event.stopPropagation();
+
+                    let finalUrl: string | null = null;
+
+                    if (msg.voucherUrl) {
+                      finalUrl = msg.voucherUrl;
+                    } else {
+                      const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
+                      if (urlMatch) {
+                        let rawUrl = urlMatch[0];
+                        rawUrl = rawUrl.replace(/[)\],.;:!?]+$/, '');
+                        rawUrl = rawUrl.replace(/['"]+$/, '');
+                        finalUrl = rawUrl;
+                      }
+                    }
+
+                    if (!finalUrl) {
+                      Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
+                      return;
+                    }
+
+                    let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
+
+                    if (phoneStr) {
+                      const separator = safeUrl.includes('?') ? '&' : '?';
+                      safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
+                    }
+
+                    if (!safeUrl || safeUrl.length < 10) {
+                      if (__DEV__) {
+                        console.warn('[Voucher Link] Invalid URL value detected');
+                      }
+                      Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
+                      return;
+                    }
+
+                    Linking.canOpenURL(safeUrl)
+                      .then((supported) => {
+                        if (supported) {
+                          Linking.openURL(safeUrl).catch((err) => {
+                            if (__DEV__) {
+                              console.error('[Voucher Link] Failed to open URL:', err);
+                            }
+                            Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור');
+                          });
+                        } else {
+                          Alert.alert('שגיאה', 'הקישור אינו נתמך במכשיר זה');
+                        }
+                      })
+                      .catch((err) => {
+                        if (__DEV__) {
+                          console.error('[Voucher Link] Error checking URL:', err);
+                        }
+                        Alert.alert('שגיאה', 'שגיאה בבדיקת הקישור');
+                      });
+                  };
+
+                  return (
+                    <View key={`msg-${idx}`} style={styles.pushCardWrapper}>
+                      <View style={styles.pushCardArtContainer}>
+                        <LinearGradient
+                          colors={['#ffffff', '#f5f8ff']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.pushCardArt}
+                        >
+                          <Text style={styles.pushCardArtTitle} numberOfLines={2}>
+                            {msg.title}
+                          </Text>
+                        </LinearGradient>
                       </View>
-                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 6, textAlign: 'right', color: '#000000' }}>
-                           {msg.title}
-                         </Text>
-                        <Text style={{ fontSize: 13, textAlign: 'right', color: '#222222', lineHeight: 20 }}>
-                           {msg.body
-                             .replace(/(https?:\/\/[^\s]+)/g, '')
-                             .replace(/קישור לשובר/g, '')
-                             .replace(/🎁/g, '')
-                             .replace(/:/g, '')
-                             .trim()}
-                         </Text>
-                        {(msg.voucherUrl || msg.body.includes('http')) && (
-                          <TouchableOpacity
-                            onPress={(e) => {
-                              e.stopPropagation();
 
-                              let finalUrl: string | null = null;
+                      <View style={styles.pushCardContent}>
+                        <View style={styles.pushCardHeaderRow}>
+                          <Text style={styles.pushCardTimestamp}>
+                            {new Date(msg.timestamp).toLocaleString('he-IL', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </Text>
+                          <View style={styles.pushCardActions}>
+                            {!msg.read && (
+                              <TouchableOpacity
+                                onPress={() => markAsRead(msg.id)}
+                                style={styles.pushCardActionButton}
+                              >
+                                <Ionicons name="checkmark" size={20} color="#0F9D58" />
+                              </TouchableOpacity>
+                            )}
+                            <TouchableOpacity
+                              onPress={() => deleteNotification(msg.id)}
+                              style={styles.pushCardActionButton}
+                            >
+                              <Ionicons name="trash" size={20} color="#E84A5F" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
 
-                              if (msg.voucherUrl) {
-                                finalUrl = msg.voucherUrl;
-                              } else {
-                                const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
-                                if (urlMatch) {
-                                  let rawUrl = urlMatch[0];
-                                  rawUrl = rawUrl.replace(/[)\],.;:!?]+$/, '');
-                                  rawUrl = rawUrl.replace(/['"]+$/, '');
-                                  finalUrl = rawUrl;
-                                }
-                              }
-
-                              if (!finalUrl) {
-                                Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
-                                return;
-                              }
-
-                              let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
-
-                              if (phoneStr) {
-                                const separator = safeUrl.includes('?') ? '&' : '?';
-                                safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
-                              }
-
-                              if (!safeUrl || safeUrl.length < 10) {
-                                if (__DEV__) {
-                                  console.warn('[Voucher Link] Invalid URL value detected');
-                                }
-                                Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
-                                return;
-                              }
-
-                              Linking.canOpenURL(safeUrl)
-                                .then((supported) => {
-                                  if (supported) {
-                                    Linking.openURL(safeUrl).catch((err) => {
-                                      if (__DEV__) {
-                                        console.error('[Voucher Link] Failed to open URL:', err);
-                                      }
-                                      Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור');
-                                    });
-                                  } else {
-                                    Alert.alert('שגיאה', 'הקישור אינו נתמך במכשיר זה');
-                                  }
-                                })
-                                .catch((err) => {
-                                  if (__DEV__) {
-                                    console.error('[Voucher Link] Error checking URL:', err);
-                                  }
-                                  Alert.alert('שגיאה', 'שגיאה בבדיקת הקישור');
-                                });
-                            }}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              marginTop: 10,
-                              alignSelf: 'flex-end'
-                            }}
-                          >
-                            <Text style={{ color: '#2196F3', fontSize: 14, marginRight: 5 }}>
-                              קישור לשובר
-                            </Text>
-                            <Text style={{ fontSize: 18 }}>🎁</Text>
-                          </TouchableOpacity>
+                        {!!sanitizedBody && (
+                          <Text style={styles.pushCardBodyText}>
+                            {sanitizedBody}
+                          </Text>
                         )}
-                       </View>
+
+                        <View style={styles.pushCardFooter}>
+                          {hasVoucher ? (
+                            <TouchableOpacity
+                              onPress={handleOpenVoucher}
+                              style={styles.pushCardButton}
+                            >
+                              <Text style={styles.pushCardButtonText}>קישור לשובר</Text>
+                              <Text style={styles.pushCardButtonEmoji}>🎁</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              onPress={(event) => {
+                                event.stopPropagation();
+                                setMailVisible(false);
+                              }}
+                              style={[styles.pushCardButton, styles.pushCardCloseButton]}
+                            >
+                              <Text style={[styles.pushCardButtonText, styles.pushCardCloseText]}>
+                                סגור
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                ))
+                  );
+                })
               )}
              </ScrollView>
               </LinearGradient>
@@ -1605,6 +1632,101 @@ const styles = StyleSheet.create({
     padding: 20,
     width: '90%',
     maxHeight: '80%',
+  },
+  pushCardWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 18,
+    overflow: 'hidden',
+    shadowColor: 'rgba(63,69,81,0.35)',
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    width: '100%',
+  },
+  pushCardArtContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  pushCardArt: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: 18,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+  },
+  pushCardArtTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    textAlign: 'right',
+  },
+  pushCardContent: {
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  pushCardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pushCardTimestamp: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'right',
+  },
+  pushCardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pushCardActionButton: {
+    marginLeft: 12,
+  },
+  pushCardBodyText: {
+    fontSize: 14,
+    color: '#1F2937',
+    textAlign: 'right',
+    lineHeight: 20,
+  },
+  pushCardFooter: {
+    marginTop: 18,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  pushCardButton: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#1E51E9',
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    shadowColor: 'rgba(63,69,81,0.18)',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  pushCardButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 10,
+  },
+  pushCardButtonEmoji: {
+    fontSize: 18,
+    marginRight: 2,
+  },
+  pushCardCloseButton: {
+    backgroundColor: '#ECEFF6',
+    borderWidth: 1,
+    borderColor: '#D4DAE8',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  pushCardCloseText: {
+    color: '#1F2937',
   },
   mailHeader: {
     flexDirection: 'row-reverse',
