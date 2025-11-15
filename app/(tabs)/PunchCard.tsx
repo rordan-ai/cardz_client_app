@@ -432,6 +432,9 @@ export default function PunchCard() {
     };
   }, [localBusiness?.business_code, phoneStr, phoneIntl, mailVisible]);
 
+  // דיאגנוסטיקה ל-URL של השובר כשהוא נטען במודאל הפנימי
+  
+
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center' }]}> 

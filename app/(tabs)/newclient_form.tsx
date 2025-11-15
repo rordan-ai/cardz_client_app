@@ -314,7 +314,7 @@ export default function NewClientForm() {
                 .from('referrals')
                 .insert({
                   inviter_phone: inviter.customer_phone,
-                  invited_phone: phone,
+                  invited_phone: normalizedPhone,
                   business_code: selectedBusiness.id,
                   status: 'pending',
                   referral_date: new Date().toISOString()
@@ -339,45 +339,7 @@ export default function NewClientForm() {
           setErrorModal({ visible: true, message: 'שגיאה ביצירת כרטיסיה. נסה שוב מאוחר יותר.' });
       }
 
-      // אם יש קוד הזמנה - שליחה לטבלת referrals
-      if (referralCode && referralCode.trim()) {
-        try {
-          // פענוח קוד ההזמנה: מספר עסק (4) + טלפון (4) + רנדום (4)
-          const businessCode4 = referralCode.slice(0, 4);
-          const phoneLast4 = referralCode.slice(4, 8);
-          
-          // חיפוש המזמין לפי 4 ספרות אחרונות של טלפון ועסק
-          const { data: potentialInviters, error: inviterError } = await supabase
-            .from('customers')
-            .select('customer_phone, business_code')
-            .eq('business_code', businessCode4.replace(/^0+/, '') || businessCode4) // ללא אפסים מובילים
-            .like('customer_phone', `%${phoneLast4}`);
-
-          if (!inviterError && potentialInviters && potentialInviters.length > 0) {
-            // בחירת המזמין הראשון שנמצא (אם יש כמה)
-            const inviter = potentialInviters[0];
-            
-            // יצירת רשומת הזמנה
-            const { error: referralError } = await supabase
-              .from('referrals')
-              .insert({
-                inviter_phone: inviter.customer_phone,
-                invited_phone: phone,
-                business_code: selectedBusiness.id,
-                status: 'pending',
-                referral_date: new Date().toISOString()
-              });
-
-            if (referralError) {
-              console.error('שגיאה בשליחת קוד הזמנה:', referralError);
-              // לא נעצור את התהליך בגלל שגיאה בהזמנה
-            }
-          }
-        } catch (error) {
-          console.error('שגיאה בפענוח קוד הזמנה:', error);
-          // לא נעצור את התהליך בגלל שגיאה בהזמנה
-        }
-      }
+      
 
       // (בוטל) יצירת כרטיסיה לאחר הוספת לקוח בוצעה כבר לעיל
     } catch (error) {
