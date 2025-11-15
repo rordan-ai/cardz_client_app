@@ -2,7 +2,8 @@
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, GestureResponderEvent } from 'react-native';
+import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, FlatList } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
@@ -57,6 +58,11 @@ export default function PunchCard() {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [nameEdit, setNameEdit] = useState<string>('');
   const [birthdayEdit, setBirthdayEdit] = useState<string>('');
+  const [voucherInlineUrl, setVoucherInlineUrl] = useState<string | null>(null);
+  const [voucherToast, setVoucherToast] = useState<{ visible: boolean; message: string }>({
+    visible: false,
+    message: '',
+  });
 
   const updateBlacklist = async (channel: 'push' | 'sms', isOptIn: boolean) => {
     try {
@@ -378,49 +384,52 @@ export default function PunchCard() {
     updateBadge();
   }, [unreadMessages]);
 
-  // האזנת Realtime ל-inbox לרענון מיידי של רשימה וחיווי
+  // האזנת Realtime ל-inbox לרענון מיידי של החיווי בלבד (Badge) כשהמודאל סגור
   useEffect(() => {
     const businessCode = localBusiness?.business_code;
     if (!phoneStr || !businessCode) return;
+    // כאשר מודאל תיבת הדואר פתוח – אין האזנה כלל כדי למנוע קפיצות בגלילה
+    if (mailVisible) return;
 
     const channel = supabase
       .channel(`inbox-${businessCode}-${phoneStr}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'inbox',
-        filter: `business_code=eq.${businessCode}`,
-      }, (payload: any) => {
-        const row = payload.new || payload.old;
-        if (!row) return;
-        if (![phoneStr, phoneIntl].includes(row.customer_phone)) return;
-        // ריענון רשימה וספירה
-        (async () => {
-          try {
-            const { data } = await supabase
-              .from('inbox')
-              .select('id, title, message, status, created_at')
-              .eq('business_code', businessCode)
-              .in('customer_phone', [phoneStr, phoneIntl])
-              .order('created_at', { ascending: false });
-            const mapped = (data || []).map((r: any, idx: number) => ({
-              id: String(r.id),
-              title: r.title || business?.name || 'הודעה',
-              body: r.message || '',
-              timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now() - idx,
-              read: r.status !== 'unread',
-            }));
-            setNotifications(mapped);
-            setUnreadMessages(mapped.filter((n: any) => !n.read).length);
-          } catch (_) {}
-        })();
-      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inbox',
+          filter: `business_code=eq.${businessCode}`,
+        },
+        (payload: any) => {
+          const row = payload.new || payload.old;
+          if (!row) return;
+          if (![phoneStr, phoneIntl].includes(row.customer_phone)) return;
+
+          (async () => {
+            try {
+              const { count } = await supabase
+                .from('inbox')
+                .select('*', { count: 'exact', head: true })
+                .eq('business_code', businessCode)
+                .in('customer_phone', [phoneStr, phoneIntl])
+                .eq('status', 'unread');
+
+              if (count !== null) {
+                setUnreadMessages(count);
+              }
+            } catch (_) {
+              // בליעת שגיאות כדי לא לפגוע ביציבות
+            }
+          })();
+        }
+      )
       .subscribe();
 
     return () => {
       channel.unsubscribe();
     };
-  }, [localBusiness?.business_code, phoneStr]);
+  }, [localBusiness?.business_code, phoneStr, phoneIntl, mailVisible]);
 
   if (loading) {
     return (
@@ -552,6 +561,22 @@ export default function PunchCard() {
     setLocalBusiness(businessData);
     setPunchCard(punchCard);
     setLoading(false);
+  };
+
+  // גשר לביטול alert בדף השובר ולהחליפו בטוסט פנימי
+  const ALERT_BRIDGE_JS = `
+    (function() {
+      var __bridge = window.ReactNativeWebView && window.ReactNativeWebView.postMessage ? window.ReactNativeWebView : null;
+      if (!__bridge) return;
+      window.alert = function(msg){ __bridge.postMessage(JSON.stringify({ type: 'alert', message: String(msg||'') })); };
+      window.confirm = function(msg){ __bridge.postMessage(JSON.stringify({ type: 'confirm', message: String(msg||'') })); return true; };
+      window.prompt = function(msg, def){ __bridge.postMessage(JSON.stringify({ type: 'prompt', message: String(msg||'') })); return ''; };
+    })();
+  `;
+
+  const showVoucherToast = (message: string, ms = 3000) => {
+    setVoucherToast({ visible: true, message });
+    setTimeout(() => setVoucherToast({ visible: false, message: '' }), ms);
   };
 
   return (
@@ -850,10 +875,13 @@ export default function PunchCard() {
         visible={mailVisible} 
         transparent={true}
         animationType="slide">
-        <TouchableWithoutFeedback onPress={() => setMailVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <LinearGradient
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          {/* שכבת רקע לסגירה בלחיצה מחוץ לתוכן */}
+          <TouchableWithoutFeedback onPress={() => setMailVisible(false)}>
+            <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
+          </TouchableWithoutFeedback>
+          {/* תוכן המודאל - ללא עוטף Touchable כדי לא להפריע לגלילה */}
+          <LinearGradient
                 colors={['#f1f1f1', '#d5d5d5']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -863,169 +891,159 @@ export default function PunchCard() {
             padding: 20, 
             borderRadius: 10 
           }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <View style={{ width: 30 }} />
-              <Text style={{ fontSize: 20, textAlign: 'center', fontWeight: 'bold', flex: 1 }}>
-                תיבת דואר ({notifications.length} הודעות)
+            {/* כפתור סגירה X בצד ימין למעלה */}
+            <TouchableOpacity
+              onPress={() => setMailVisible(false)}
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                width: 30,
+                height: 30,
+                borderRadius: 15,
+                backgroundColor: '#f0f0f0',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 2,
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#666' }}>×</Text>
+            </TouchableOpacity>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 20, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+                תיבת דואר
               </Text>
-              <View style={{ width: 30 }} />
+              <Text style={{ fontSize: 13, textAlign: 'center', color: '#555', marginTop: 4 }} numberOfLines={1}>
+                {notifications.filter(n => !n.read).length} הודעות שלא נקראו
+              </Text>
             </View>
              
-            <ScrollView showsVerticalScrollIndicator={true} style={{ backgroundColor: 'transparent' }}>
-              {notifications.length === 0 ? (
+            <FlatList
+              data={notifications}
+              keyExtractor={(msg, index) => msg.id || `msg-${index}`}
+              showsVerticalScrollIndicator={true}
+              scrollEnabled={true}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+              removeClippedSubviews={false}
+              style={{ height: Math.floor(height * 0.6) }}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              ListEmptyComponent={
                 <Text style={{ textAlign: 'center', padding: 20, color: '#999' }}>
                   אין הודעות חדשות
                 </Text>
-              ) : (
-                notifications.map((msg, idx) => {
-                  const sanitizedBody = msg.body
-                    .replace(/(https?:\/\/[^\s]+)/g, '')
-                    .replace(/קישור לשובר/g, '')
-                    .replace(/🎁/g, '')
-                    .replace(/:/g, '')
-                    .trim();
-                  const hasVoucher = Boolean(msg.voucherUrl) || msg.body.includes('http');
+              }
+              renderItem={({ item: msg }) => {
+                const sanitizedBody = msg.body
+                  .replace(/(https?:\/\/[^\s]+)/g, '')
+                  .replace(/קישור לשובר/g, '')
+                  .replace(/🎁/g, '')
+                  .replace(/:/g, '')
+                  .trim();
+                const hasVoucher = Boolean(msg.voucherUrl) || msg.body.includes('http');
 
-                  const handleOpenVoucher = (event: GestureResponderEvent) => {
-                    event.stopPropagation();
-
-                    let finalUrl: string | null = null;
-
-                    if (msg.voucherUrl) {
-                      finalUrl = msg.voucherUrl;
-                    } else {
-                      const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
-                      if (urlMatch) {
-                        let rawUrl = urlMatch[0];
-                        rawUrl = rawUrl.replace(/[)\],.;:!?]+$/, '');
-                        rawUrl = rawUrl.replace(/['"]+$/, '');
-                        finalUrl = rawUrl;
-                      }
-                    }
-
-                    if (!finalUrl) {
-                      Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
-                      return;
-                    }
-
-                    let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
-
-                    if (phoneStr) {
-                      const separator = safeUrl.includes('?') ? '&' : '?';
-                      safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
-                    }
-
-                    if (!safeUrl || safeUrl.length < 10) {
-                      if (__DEV__) {
-                        console.warn('[Voucher Link] Invalid URL value detected');
-                      }
-                      Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
-                      return;
-                    }
-
-                    Linking.canOpenURL(safeUrl)
-                      .then((supported) => {
-                        if (supported) {
-                          Linking.openURL(safeUrl).catch((err) => {
-                            if (__DEV__) {
-                              console.error('[Voucher Link] Failed to open URL:', err);
-                            }
-                            Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור');
-                          });
-                        } else {
-                          Alert.alert('שגיאה', 'הקישור אינו נתמך במכשיר זה');
-                        }
-                      })
-                      .catch((err) => {
-                        if (__DEV__) {
-                          console.error('[Voucher Link] Error checking URL:', err);
-                        }
-                        Alert.alert('שגיאה', 'שגיאה בבדיקת הקישור');
-                      });
-                  };
-
-                  return (
-                    <View key={`msg-${idx}`} style={styles.pushCardWrapper}>
-                      <View style={styles.pushCardArtContainer}>
-                        <LinearGradient
-                          colors={['#ffffff', '#f5f8ff']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.pushCardArt}
-                        >
-                          <Text style={styles.pushCardArtTitle} numberOfLines={2}>
-                            {msg.title}
-                          </Text>
-                        </LinearGradient>
-                      </View>
-
-                      <View style={styles.pushCardContent}>
-                        <View style={styles.pushCardHeaderRow}>
-                          <Text style={styles.pushCardTimestamp}>
-                            {new Date(msg.timestamp).toLocaleString('he-IL', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </Text>
-                          <View style={styles.pushCardActions}>
-                            {!msg.read && (
-                              <TouchableOpacity
-                                onPress={() => markAsRead(msg.id)}
-                                style={styles.pushCardActionButton}
-                              >
-                                <Ionicons name="checkmark" size={20} color="#0F9D58" />
-                              </TouchableOpacity>
-                            )}
-                            <TouchableOpacity
-                              onPress={() => deleteNotification(msg.id)}
-                              style={styles.pushCardActionButton}
-                            >
-                              <Ionicons name="trash" size={20} color="#E84A5F" />
-                            </TouchableOpacity>
+                return (
+                  <View style={{
+                    backgroundColor: 'transparent',
+                    padding: 18,
+                    marginBottom: 10,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: 'rgba(0,0,0,0.35)'
+                  }}>
+                    <Text style={{ fontSize: 11, color: '#000000', textAlign: 'center', marginBottom: 6 }}>
+                      {new Date(msg.timestamp).toLocaleString('he-IL', {
+                        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {!msg.read ? (
+                          <TouchableOpacity
+                            onPress={() => markAsRead(msg.id)}
+                            style={{ marginRight: 12 }}
+                          >
+                            <Ionicons name="checkmark" size={20} color="#4CAF50" />
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={{ marginRight: 12 }}>
+                            <Ionicons name="mail-open-outline" size={20} color="#9E9E9E" />
                           </View>
-                        </View>
-
-                        {!!sanitizedBody && (
-                          <Text style={styles.pushCardBodyText}>
-                            {sanitizedBody}
-                          </Text>
                         )}
+                        <TouchableOpacity onPress={() => deleteNotification(msg.id)}>
+                          <Ionicons name="trash" size={20} color="#e57373" />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 6, textAlign: 'right', color: '#000000' }}>
+                          {msg.title}
+                        </Text>
+                        <Text style={{ fontSize: 13, textAlign: 'right', color: '#222222', lineHeight: 20 }}>
+                          {sanitizedBody}
+                        </Text>
+                        {hasVoucher && (
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation();
 
-                        <View style={styles.pushCardFooter}>
-                          {hasVoucher ? (
-                            <TouchableOpacity
-                              onPress={handleOpenVoucher}
-                              style={styles.pushCardButton}
-                            >
-                              <Text style={styles.pushCardButtonText}>קישור לשובר</Text>
-                              <Text style={styles.pushCardButtonEmoji}>🎁</Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <TouchableOpacity
-                              onPress={(event) => {
-                                event.stopPropagation();
-                                setMailVisible(false);
-                              }}
-                              style={[styles.pushCardButton, styles.pushCardCloseButton]}
-                            >
-                              <Text style={[styles.pushCardButtonText, styles.pushCardCloseText]}>
-                                סגור
-                              </Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
+                              let finalUrl: string | null = null;
+
+                              if (msg.voucherUrl) {
+                                finalUrl = msg.voucherUrl;
+                              } else {
+                                const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
+                                if (urlMatch) {
+                                  let rawUrl = urlMatch[0];
+                                  rawUrl = rawUrl.replace(/[)\],.;:!?]+$/, '');
+                                  rawUrl = rawUrl.replace(/['"]+$/, '');
+                                  finalUrl = rawUrl;
+                                }
+                              }
+
+                              if (!finalUrl) {
+                                Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
+                                return;
+                              }
+
+                              let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
+
+                              if (phoneStr) {
+                                const separator = safeUrl.includes('?') ? '&' : '?';
+                                safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
+                              }
+
+                              if (!safeUrl || safeUrl.length < 10) {
+                                if (__DEV__) {
+                                  console.warn('[Voucher Link] Invalid URL value detected');
+                                }
+                                Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
+                                return;
+                              }
+
+                              // פתיחה פנימית בתוך האפליקציה כדי למנוע הודעות דפדפן
+                              setVoucherInlineUrl(safeUrl);
+                            }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 10,
+                              alignSelf: 'flex-end'
+                            }}
+                          >
+                            <Text style={{ color: '#2196F3', fontSize: 14, marginRight: 5 }}>
+                              קישור לשובר
+                            </Text>
+                            <Text style={{ fontSize: 18 }}>🎁</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </View>
-                  );
-                })
-              )}
-             </ScrollView>
+                  </View>
+                );
+              }}
+            />
               </LinearGradient>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+        </View>
        </Modal>
 
              {/* חלונית חבר מביא חבר */}
@@ -1260,6 +1278,53 @@ export default function PunchCard() {
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* WebView פנימי לצפייה בשובר כדי למנוע הודעות דפדפן */}
+      <Modal visible={!!voucherInlineUrl} transparent animationType="fade" onRequestClose={() => setVoucherInlineUrl(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.webviewCardPunch}>
+            <TouchableOpacity
+              style={styles.webviewClosePunch}
+              onPress={() => setVoucherInlineUrl(null)}
+            >
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#666' }}>×</Text>
+            </TouchableOpacity>
+            {voucherInlineUrl ? (
+              <WebView
+                source={{ uri: voucherInlineUrl }}
+                originWhitelist={['*']}
+                javaScriptEnabled
+                domStorageEnabled
+                allowsInlineMediaPlayback
+                setSupportMultipleWindows={false}
+                injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
+                injectedJavaScript={ALERT_BRIDGE_JS}
+                onMessage={() => showVoucherToast('השובר נשמר לגלריית התמונות בהצלחה')}
+                onShouldStartLoadWithRequest={(req) => {
+                  try {
+                    const next = new URL(req.url);
+                    const base = new URL(voucherInlineUrl);
+                    if (next.origin === base.origin) return true;
+                  } catch {}
+                  return false;
+                }}
+                style={{ flex: 1, backgroundColor: 'transparent' }}
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Toast פנימי בהצגת שובר */}
+      <Modal visible={voucherToast.visible} transparent animationType="fade">
+        <View style={[styles.modalOverlay, { justifyContent: 'flex-end' }]}>
+          <View style={{ width: '100%', alignItems: 'center', marginBottom: 40 }}>
+            <View style={styles.toastCardPunch}>
+              <Text style={styles.toastTextPunch}>{voucherToast.message}</Text>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* מודאל פרטים שלי */}
@@ -1633,101 +1698,6 @@ const styles = StyleSheet.create({
     width: '90%',
     maxHeight: '80%',
   },
-  pushCardWrapper: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 18,
-    overflow: 'hidden',
-    shadowColor: 'rgba(63,69,81,0.35)',
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-    width: '100%',
-  },
-  pushCardArtContainer: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-  },
-  pushCardArt: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    padding: 18,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.08)',
-  },
-  pushCardArtTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    textAlign: 'right',
-  },
-  pushCardContent: {
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-  },
-  pushCardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  pushCardTimestamp: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'right',
-  },
-  pushCardActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  pushCardActionButton: {
-    marginLeft: 12,
-  },
-  pushCardBodyText: {
-    fontSize: 14,
-    color: '#1F2937',
-    textAlign: 'right',
-    lineHeight: 20,
-  },
-  pushCardFooter: {
-    marginTop: 18,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  pushCardButton: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#1E51E9',
-    paddingVertical: 10,
-    paddingHorizontal: 22,
-    borderRadius: 999,
-    shadowColor: 'rgba(63,69,81,0.18)',
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-  pushCardButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 10,
-  },
-  pushCardButtonEmoji: {
-    fontSize: 18,
-    marginRight: 2,
-  },
-  pushCardCloseButton: {
-    backgroundColor: '#ECEFF6',
-    borderWidth: 1,
-    borderColor: '#D4DAE8',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  pushCardCloseText: {
-    color: '#1F2937',
-  },
   mailHeader: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
@@ -1763,6 +1733,38 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#666',
+  },
+  webviewCardPunch: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 8,
+    width: '92%',
+    height: '80%',
+    overflow: 'hidden',
+  },
+  webviewClosePunch: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  toastCardPunch: {
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    maxWidth: '90%',
+  },
+  toastTextPunch: {
+    color: 'white',
+    fontSize: 14,
+    textAlign: 'center',
   },
   messagesScrollView: {
     flex: 1,
