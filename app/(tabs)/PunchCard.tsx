@@ -433,7 +433,11 @@ export default function PunchCard() {
   }, [localBusiness?.business_code, phoneStr, phoneIntl, mailVisible]);
 
   // דיאגנוסטיקה ל-URL של השובר כשהוא נטען במודאל הפנימי
-  
+  useEffect(() => {
+    if (voucherInlineUrl) {
+      runVoucherDiagnostics('INBOX', voucherInlineUrl);
+    }
+  }, [voucherInlineUrl]);
 
   if (loading) {
     return (
@@ -600,11 +604,7 @@ export default function PunchCard() {
     }
   };
 
-  useEffect(() => {
-    if (voucherInlineUrl) {
-      runVoucherDiagnostics('INBOX', voucherInlineUrl);
-    }
-  }, [voucherInlineUrl]);
+  
 
   const handleVoucherMessage = (data: string) => {
     try {
