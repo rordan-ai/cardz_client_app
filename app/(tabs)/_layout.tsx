@@ -113,30 +113,34 @@ export default function Layout() {
               if (!url) return null;
               return (
                 <View style={styles.embedContainer}>
-                  <WebView
-                    source={{ uri: url }}
-                    originWhitelist={['*']}
-                    javaScriptEnabled
-                    domStorageEnabled
-                    allowsInlineMediaPlayback
-                    setSupportMultipleWindows={false}
-                    userAgent="Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36"
-                    injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
-                    injectedJavaScript={ALERT_BRIDGE_JS}
-                    onMessage={(e) => {
-                      // לכל alert שנשלח מתוך הדף – נציג הודעת מערכת במקום דיאלוג
-                      showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
-                    }}
-                    onShouldStartLoadWithRequest={(req) => {
-                      // לאפשר רק ניווט בתוך דומיין canva כדי למנוע דיאלוגי מערכת
-                      try {
-                        const host = new URL(req.url).hostname;
-                        if (host.endsWith('canva.com') || host.endsWith('canva.cn')) return true;
-                      } catch {}
-                      return false;
-                    }}
-                    style={styles.webview}
-                  />
+                  <View style={styles.embedInsetWrap}>
+                    <View style={styles.embedInsetBorder}>
+                      <WebView
+                        source={{ uri: url }}
+                        originWhitelist={['*']}
+                        javaScriptEnabled
+                        domStorageEnabled
+                        allowsInlineMediaPlayback
+                        setSupportMultipleWindows={false}
+                        userAgent="Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36"
+                        injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
+                        injectedJavaScript={ALERT_BRIDGE_JS}
+                        onMessage={(e) => {
+                          // לכל alert שנשלח מתוך הדף – נציג הודעת מערכת במקום דיאלוג
+                          showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
+                        }}
+                        onShouldStartLoadWithRequest={(req) => {
+                          // לאפשר רק ניווט בתוך דומיין canva כדי למנוע דיאלוגי מערכת
+                          try {
+                            const host = new URL(req.url).hostname;
+                            if (host.endsWith('canva.com') || host.endsWith('canva.cn')) return true;
+                          } catch {}
+                          return false;
+                        }}
+                        style={styles.webview}
+                      />
+                    </View>
+                  </View>
                 </View>
               );
             })()}
@@ -273,6 +277,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 12,
     backgroundColor: '#000000',
+  },
+  embedInsetWrap: {
+    flex: 1,
+    padding: 2,
+  },
+  embedInsetBorder: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 6,
+    overflow: 'hidden',
   },
   webview: {
     flex: 1,
