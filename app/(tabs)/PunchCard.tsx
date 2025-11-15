@@ -1329,58 +1329,54 @@ export default function PunchCard() {
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#666' }}>×</Text>
             </TouchableOpacity>
             {voucherInlineUrl ? (
-              <View style={styles.voucherInsetWrapPunch}>
-                <View style={styles.voucherInsetBorderPunch}>
-                  <WebView
-                    ref={voucherWebViewRef}
-                    source={{ uri: voucherInlineUrl }}
-                    originWhitelist={['*']}
-                    javaScriptEnabled
-                    domStorageEnabled
-                    allowsInlineMediaPlayback
-                    setSupportMultipleWindows={false}
-                    injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
-                    injectedJavaScript={ALERT_BRIDGE_JS}
-                    onMessage={(event) => handleVoucherMessage(event.nativeEvent.data)}
-                    onLoadStart={(event) => console.log('[VoucherDiag-INBOX] WebView onLoadStart:', event.nativeEvent.url)}
-                    onLoadEnd={(event) => {
-                      console.log('[VoucherDiag-INBOX] WebView onLoadEnd:', event.nativeEvent.url);
-                      setTimeout(() => {
-                        voucherWebViewRef.current?.injectJavaScript(`
-                          (function(){
-                            try {
-                              const payload = {
-                                type: 'diagnostics',
-                                location: window.location.href,
-                                hash: window.location.hash,
-                                title: document.title,
-                                bodyLength: document.body ? document.body.innerHTML.length : 0
-                              };
-                              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-                            } catch(err) {
-                              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'diagnostics-error', message: err.message }));
-                            }
-                          })();
-                        `);
-                      }, 500);
-                    }}
-                    onError={(event) => console.log('[VoucherDiag-INBOX] WebView onError:', event.nativeEvent)}
-                    onHttpError={(event) => console.log('[VoucherDiag-INBOX] WebView onHttpError:', event.nativeEvent)}
-                    onNavigationStateChange={(navState) =>
-                      console.log('[VoucherDiag-INBOX] navigation:', navState.url, 'loading:', navState.loading)
-                    }
-                    onShouldStartLoadWithRequest={(req) => {
-                      try {
-                        const next = new URL(req.url);
-                        const base = new URL(voucherInlineUrl);
-                        if (next.origin === base.origin) return true;
-                      } catch {}
-                      return false;
-                    }}
-                    style={{ flex: 1, backgroundColor: 'transparent' }}
-                  />
-                </View>
-              </View>
+              <WebView
+                ref={voucherWebViewRef}
+                source={{ uri: voucherInlineUrl }}
+                originWhitelist={['*']}
+                javaScriptEnabled
+                domStorageEnabled
+                allowsInlineMediaPlayback
+                setSupportMultipleWindows={false}
+                injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
+                injectedJavaScript={ALERT_BRIDGE_JS}
+                onMessage={(event) => handleVoucherMessage(event.nativeEvent.data)}
+                onLoadStart={(event) => console.log('[VoucherDiag-INBOX] WebView onLoadStart:', event.nativeEvent.url)}
+                onLoadEnd={(event) => {
+                  console.log('[VoucherDiag-INBOX] WebView onLoadEnd:', event.nativeEvent.url);
+                  setTimeout(() => {
+                    voucherWebViewRef.current?.injectJavaScript(`
+                      (function(){
+                        try {
+                          const payload = {
+                            type: 'diagnostics',
+                            location: window.location.href,
+                            hash: window.location.hash,
+                            title: document.title,
+                            bodyLength: document.body ? document.body.innerHTML.length : 0
+                          };
+                          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+                        } catch(err) {
+                          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'diagnostics-error', message: err.message }));
+                        }
+                      })();
+                    `);
+                  }, 500);
+                }}
+                onError={(event) => console.log('[VoucherDiag-INBOX] WebView onError:', event.nativeEvent)}
+                onHttpError={(event) => console.log('[VoucherDiag-INBOX] WebView onHttpError:', event.nativeEvent)}
+                onNavigationStateChange={(navState) =>
+                  console.log('[VoucherDiag-INBOX] navigation:', navState.url, 'loading:', navState.loading)
+                }
+                onShouldStartLoadWithRequest={(req) => {
+                  try {
+                    const next = new URL(req.url);
+                    const base = new URL(voucherInlineUrl);
+                    if (next.origin === base.origin) return true;
+                  } catch {}
+                  return false;
+                }}
+                style={{ flex: 1, backgroundColor: 'transparent' }}
+              />
             ) : null}
           </View>
         </View>

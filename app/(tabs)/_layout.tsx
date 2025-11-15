@@ -179,68 +179,64 @@ export default function Layout() {
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#666', fontFamily: 'Heebo' }}>×</Text>
             </TouchableOpacity>
             {inlineUrl ? (
-              <View style={styles.voucherInsetWrap}>
-                <View style={styles.voucherInsetBorder}>
-                  <WebView
-                    ref={pushWebViewRef}
-                    source={{ uri: inlineUrl }}
-                    originWhitelist={['*']}
-                    javaScriptEnabled
-                    domStorageEnabled
-                    allowsInlineMediaPlayback
-                    setSupportMultipleWindows={false}
-                    userAgent="Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36"
-                    injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
-                    injectedJavaScript={ALERT_BRIDGE_JS}
-                    onMessage={(e) => {
-                      try {
-                        const data = JSON.parse(e.nativeEvent.data);
-                        if (data.type === 'diagnostics') {
-                          console.log('[VoucherDiag-PUSH] Diagnostics payload:', data);
-                        } else {
-                          showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
+              <WebView
+                ref={pushWebViewRef}
+                source={{ uri: inlineUrl }}
+                originWhitelist={['*']}
+                javaScriptEnabled
+                domStorageEnabled
+                allowsInlineMediaPlayback
+                setSupportMultipleWindows={false}
+                userAgent="Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36"
+                injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
+                injectedJavaScript={ALERT_BRIDGE_JS}
+                onMessage={(e) => {
+                  try {
+                    const data = JSON.parse(e.nativeEvent.data);
+                    if (data.type === 'diagnostics') {
+                      console.log('[VoucherDiag-PUSH] Diagnostics payload:', data);
+                    } else {
+                      showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
+                    }
+                  } catch {
+                    showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
+                  }
+                }}
+                onLoadStart={(event) => console.log('[VoucherDiag-PUSH] WebView onLoadStart:', event.nativeEvent.url)}
+                onLoadEnd={(event) => {
+                  console.log('[VoucherDiag-PUSH] WebView onLoadEnd:', event.nativeEvent.url);
+                  setTimeout(() => {
+                    pushWebViewRef.current?.injectJavaScript(`
+                      (function(){
+                        try {
+                          const payload = {
+                            type: 'diagnostics',
+                            location: window.location.href,
+                            hash: window.location.hash,
+                            title: document.title,
+                            bodyLength: document.body ? document.body.innerHTML.length : 0
+                          };
+                          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+                        } catch(err) {
+                          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'diagnostics-error', message: err.message }));
                         }
-                      } catch {
-                        showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
-                      }
-                    }}
-                    onLoadStart={(event) => console.log('[VoucherDiag-PUSH] WebView onLoadStart:', event.nativeEvent.url)}
-                    onLoadEnd={(event) => {
-                      console.log('[VoucherDiag-PUSH] WebView onLoadEnd:', event.nativeEvent.url);
-                      setTimeout(() => {
-                        pushWebViewRef.current?.injectJavaScript(`
-                          (function(){
-                            try {
-                              const payload = {
-                                type: 'diagnostics',
-                                location: window.location.href,
-                                hash: window.location.hash,
-                                title: document.title,
-                                bodyLength: document.body ? document.body.innerHTML.length : 0
-                              };
-                              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-                            } catch(err) {
-                              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'diagnostics-error', message: err.message }));
-                            }
-                          })();
-                        `);
-                      }, 500);
-                    }}
-                    onError={(event) => console.log('[VoucherDiag-PUSH] WebView onError:', event.nativeEvent)}
-                    onHttpError={(event) => console.log('[VoucherDiag-PUSH] WebView onHttpError:', event.nativeEvent)}
-                    onNavigationStateChange={(navState) => console.log('[VoucherDiag-PUSH] navigation:', navState.url, 'loading:', navState.loading)}
-                    onShouldStartLoadWithRequest={(req) => {
-                      try {
-                        const next = new URL(req.url);
-                        const base = new URL(inlineUrl!);
-                        if (next.origin === base.origin) return true;
-                      } catch {}
-                      return false;
-                    }}
-                    style={styles.webview}
-                  />
-                </View>
-              </View>
+                      })();
+                    `);
+                  }, 500);
+                }}
+                onError={(event) => console.log('[VoucherDiag-PUSH] WebView onError:', event.nativeEvent)}
+                onHttpError={(event) => console.log('[VoucherDiag-PUSH] WebView onHttpError:', event.nativeEvent)}
+                onNavigationStateChange={(navState) => console.log('[VoucherDiag-PUSH] navigation:', navState.url, 'loading:', navState.loading)}
+                onShouldStartLoadWithRequest={(req) => {
+                  try {
+                    const next = new URL(req.url);
+                    const base = new URL(inlineUrl!);
+                    if (next.origin === base.origin) return true;
+                  } catch {}
+                  return false;
+                }}
+                style={styles.webview}
+              />
             ) : null}
           </View>
         </View>
