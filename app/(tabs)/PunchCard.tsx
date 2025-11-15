@@ -3,7 +3,6 @@ import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, FlatList } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
@@ -58,7 +57,6 @@ export default function PunchCard() {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [nameEdit, setNameEdit] = useState<string>('');
   const [birthdayEdit, setBirthdayEdit] = useState<string>('');
-  const [voucherInlineUrl, setVoucherInlineUrl] = useState<string | null>(null);
   const [voucherToast, setVoucherToast] = useState<{ visible: boolean; message: string }>({
     visible: false,
     message: '',
@@ -1020,8 +1018,22 @@ export default function PunchCard() {
                                 return;
                               }
 
-                              // פתיחה פנימית בתוך האפליקציה כדי למנוע הודעות דפדפן
-                              setVoucherInlineUrl(safeUrl);
+                              // פותח את השובר שהוגדר על ידי האדמין
+                              // בודק שניתן לפתוח את הקישור
+                              Linking.canOpenURL(safeUrl).then((supported) => {
+                                if (supported) {
+                                  Linking.openURL(safeUrl).catch(err => {
+                                    console.error('[Voucher Link] Failed to open URL:', err);
+                                    Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור: ' + err.message);
+                                  });
+                                } else {
+                                  console.error('[Voucher Link] URL not supported:', safeUrl);
+                                  Alert.alert('שגיאה', 'הקישור אינו נתמך על ידי המכשיר זה');
+                                }
+                              }).catch(err => {
+                                console.error('[Voucher Link] Error checking URL:', err);
+                                Alert.alert('שגיאה', 'שגיאה בבדיקת הקישור');
+                              });
                             }}
                             style={{
                               flexDirection: 'row',
@@ -1280,41 +1292,6 @@ export default function PunchCard() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* WebView פנימי לצפייה בשובר כדי למנוע הודעות דפדפן */}
-      <Modal visible={!!voucherInlineUrl} transparent animationType="fade" onRequestClose={() => setVoucherInlineUrl(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.webviewCardPunch}>
-            <TouchableOpacity
-              style={styles.webviewClosePunch}
-              onPress={() => setVoucherInlineUrl(null)}
-            >
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#666' }}>×</Text>
-            </TouchableOpacity>
-            {voucherInlineUrl ? (
-              <WebView
-                source={{ uri: voucherInlineUrl }}
-                originWhitelist={['*']}
-                javaScriptEnabled
-                domStorageEnabled
-                allowsInlineMediaPlayback
-                setSupportMultipleWindows={false}
-                injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
-                injectedJavaScript={ALERT_BRIDGE_JS}
-                onMessage={() => showVoucherToast('השובר נשמר לגלריית התמונות בהצלחה')}
-                onShouldStartLoadWithRequest={(req) => {
-                  try {
-                    const next = new URL(req.url);
-                    const base = new URL(voucherInlineUrl);
-                    if (next.origin === base.origin) return true;
-                  } catch {}
-                  return false;
-                }}
-                style={{ flex: 1, backgroundColor: 'transparent' }}
-              />
-            ) : null}
-          </View>
-        </View>
-      </Modal>
 
       {/* Toast פנימי בהצגת שובר */}
       <Modal visible={voucherToast.visible} transparent animationType="fade">

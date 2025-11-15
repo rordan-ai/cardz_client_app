@@ -117,8 +117,8 @@ export default function Layout() {
                         const separator = url.includes('?') ? '&' : '?';
                         url = `${url}${separator}phone=${phone}`;
                       }
-                      // פתיחה פנימית במקום דפדפן חיצוני
-                      setInlineUrl(url);
+                      // חזרה לפתיחה בדפדפן חיצוני כמו בקומיט המקורי
+                      Linking.openURL(url);
                     }
                   }}
                 >

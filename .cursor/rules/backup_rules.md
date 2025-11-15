@@ -30,6 +30,8 @@ Windows 10 + PowerShell
 
 ## תהליך גיבוי מלא - צעד אחר צעד
 
+> 🛟 **חדש:** בכל תהליך גיבוי חובה ליצור *ענף ביטחון עצמאי ומגובה* לפני שנוגעים ב-`restore_checkpoints` או ב-`main`. ענף זה מכיל צילום מלא של כל השינויים (כולל כאלה שלא בוצע להם קומיט בעבר) ומשמש כנקודת חזרה מיידית במקרה שמיזוגי הגיבוי ייכשלו או יוצרו פערים מול הענפים הראשיים.
+
 ### שלב 1: בדיקת מצב נוכחי
 ```bash
 # בדיקת מצב git נוכחי
@@ -41,6 +43,22 @@ git branch -a
 # וידוא שאנו ב-main
 git checkout main
 ```
+
+### שלב 1.5: ענף ביטחון עצמאי (Snapshot מלא לפני כל גיבוי)
+```bash
+# יצירת Snapshot עצמאי לפני שנוגעים ב-restore_checkpoints או main
+# הסנאפשוט חייב לכלול *כל* השינויים המזוהים, גם אם לא בוצע להם קומיט קודם לכן
+git checkout -b safety_snapshot_$(Get-Date -Format 'yyyyMMdd_HHmmss')
+git add -A
+git commit -m "Snapshot עצמאי לפני גיבוי restore_checkpoints" --no-verify
+
+# דחיפה כדי לאפשר שחזור בכל נקודה
+git push origin safety_snapshot_YYYYMMDD_HHMMSS
+
+# נשארים על הענף שנוצר עד לסיום ההעלאה, ואז ממשיכים לשלב הבא
+git checkout main
+```
+💡 עכשיו יש לנו צילום בלתי תלוי שניתן לחזור אליו אם מיזוג restore\_checkpoints ⇆ main ייכשל. אין לדלג על צעד זה, במיוחד כשקיימים כבר קומיטים לא מסונכרנים ב-`restore_checkpoints`.
 
 ### שלב 2: הכנת ענף הגיבוי + ענף בטחון זמני
 ```bash
@@ -79,6 +97,18 @@ git merge safety_backup_YYYYMMDD_HHMMSS -m "גיבוי מלא כולל שינו�
 # 📝 הערה: אם יש גם קומיטים חדשים ב-main שטרם מוזגו, בצע גם:
 # git merge main -m "מיזוג עדכונים נוספים מ-main"
 ```
+
+### שלב 3.5: Snapshot לריסטורפוינט לפני מיזוג ל-main
+```bash
+# אחרי שהשלמת את המיזוג ל-restore_checkpoints וטרם מגע עם main
+# צור ענף ביטחון נוסף שמייצג את מצב הריסטורפוינט המעודכן
+git checkout restore_checkpoints
+git branch restorepoint_snapshot_$(Get-Date -Format 'yyyyMMdd_HHmmss')
+git push origin restorepoint_snapshot_YYYYMMDD_HHMMSS
+
+# רק לאחר שיש Snapshot זהה גם ב-remote, המשך למיזוגים מול main לפי הנהלים
+```
+🔁 שני ענפי הביטחון (הראשון מהעבודה המקומית והשני אחרי עדכון הריסטורפוינט) מבטיחים שאפשר לשחזר גם אם קיימים קומיטים בלתי מעודכנים כבר ב-`restore_checkpoints` או אם נוצר כשל במיזוג עם `main`.
 
 ### ⛔ טעות נפוצה שחייבים להימנע ממנה:
 **אל תדלג על מיזוג ענף הביטחון!**  
