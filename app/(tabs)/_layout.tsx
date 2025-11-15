@@ -1,6 +1,6 @@
 import { Slot } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { DeviceEventEmitter, Modal, Text, View, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { DeviceEventEmitter, Modal, Text, View, TouchableOpacity, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BusinessProvider } from '../../components/BusinessContext';
@@ -27,6 +27,7 @@ export default function Layout() {
   const [notification, setNotification] = useState<{ title: string; body: string; voucherUrl?: string } | null>(null);
   const [inlineUrl, setInlineUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+  const pushWebViewRef = useRef<WebView>(null);
 
   const showTimedToast = (message: string, ms = 3000) => {
     setToast({ visible: true, message });
@@ -56,6 +57,45 @@ export default function Layout() {
     return () => listener.remove();
   }, []);
 
+  const runVoucherDiagnostics = (source: string, targetUrl: string) => {
+    console.log(`[VoucherDiag-${source}] Inline URL:`, targetUrl);
+    try {
+      const parsed = new URL(targetUrl);
+      const pingUrl = `${parsed.origin}/__vite_ping`;
+      fetch(pingUrl)
+        .then(async (res) => {
+          const text = await res.text();
+          console.log(`[VoucherDiag-${source}] __vite_ping status:`, res.status, 'ok:', res.ok);
+          console.log(`[VoucherDiag-${source}] __vite_ping body:`, text.slice(0, 120));
+        })
+        .catch((err) => console.error(`[VoucherDiag-${source}] __vite_ping failed:`, err));
+    } catch (err) {
+      console.error(`[VoucherDiag-${source}] diagnostics error:`, err);
+    }
+  };
+
+  useEffect(() => {
+    if (inlineUrl) {
+      runVoucherDiagnostics('PUSH', inlineUrl);
+    }
+  }, [inlineUrl]);
+
+  const appendPhoneToVoucherUrl = (rawUrl: string) => {
+    let url = rawUrl;
+    const phone = FCMService.getCurrentPhone();
+    if (phone) {
+      const separator = url.includes('?') ? '&' : '?';
+      url = `${url}${separator}phone=${phone}`;
+    }
+    return url;
+  };
+
+  const handleInternalVoucherOpen = () => {
+    if (!notification?.voucherUrl) return;
+    const prepared = appendPhoneToVoucherUrl(notification.voucherUrl);
+    setInlineUrl(prepared);
+  };
+
   return (
     <BusinessProvider>
       <Slot />
@@ -65,7 +105,6 @@ export default function Layout() {
           <View style={styles.modalCard}>
             {/* כותרת עם היילייט עדין מאחור */}
             <View style={styles.titleWrap}>
-              <View style={styles.titleHighlight} />
               <Text style={styles.modalTitle}>{notification?.title}</Text>
             </View>
             {/* הטמעת Canva אם קיים קישור בגוף ההודעה */}
@@ -107,21 +146,7 @@ export default function Layout() {
             {/* שורת כפתורים מפולפלת בסגנון גלולה */}
             <View style={styles.buttonsRow}>
               {notification?.voucherUrl ? (
-                <TouchableOpacity
-                  style={[styles.pillButton, styles.viewPill]}
-                  onPress={() => {
-                    if (notification?.voucherUrl) {
-                      let url = notification.voucherUrl;
-                      const phone = FCMService.getCurrentPhone();
-                      if (phone) {
-                        const separator = url.includes('?') ? '&' : '?';
-                        url = `${url}${separator}phone=${phone}`;
-                      }
-                      // חזרה לפתיחה בדפדפן חיצוני כמו בקומיט המקורי
-                      Linking.openURL(url);
-                    }
-                  }}
-                >
+                <TouchableOpacity style={[styles.pillButton, styles.viewPill]} onPress={handleInternalVoucherOpen}>
                   <Text style={styles.pillText}>צפה בשובר</Text>
                 </TouchableOpacity>
               ) : null}
@@ -154,30 +179,68 @@ export default function Layout() {
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#666', fontFamily: 'Heebo' }}>×</Text>
             </TouchableOpacity>
             {inlineUrl ? (
-              <WebView
-                source={{ uri: inlineUrl }}
-                originWhitelist={['*']}
-                javaScriptEnabled
-                domStorageEnabled
-                allowsInlineMediaPlayback
-                setSupportMultipleWindows={false}
-                userAgent="Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36"
-                injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
-                injectedJavaScript={ALERT_BRIDGE_JS}
-                onMessage={(e) => {
-                  showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
-                }}
-                onShouldStartLoadWithRequest={(req) => {
-                  // לאפשר רק ניווט באותו מקור (origin) כמו ה-URL הראשי של השובר
-                  try {
-                    const next = new URL(req.url);
-                    const base = new URL(inlineUrl!);
-                    if (next.origin === base.origin) return true;
-                  } catch {}
-                  return false;
-                }}
-                style={styles.webview}
-              />
+              <View style={styles.voucherInsetWrap}>
+                <View style={styles.voucherInsetBorder}>
+                  <WebView
+                    ref={pushWebViewRef}
+                    source={{ uri: inlineUrl }}
+                    originWhitelist={['*']}
+                    javaScriptEnabled
+                    domStorageEnabled
+                    allowsInlineMediaPlayback
+                    setSupportMultipleWindows={false}
+                    userAgent="Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36"
+                    injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
+                    injectedJavaScript={ALERT_BRIDGE_JS}
+                    onMessage={(e) => {
+                      try {
+                        const data = JSON.parse(e.nativeEvent.data);
+                        if (data.type === 'diagnostics') {
+                          console.log('[VoucherDiag-PUSH] Diagnostics payload:', data);
+                        } else {
+                          showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
+                        }
+                      } catch {
+                        showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
+                      }
+                    }}
+                    onLoadStart={(event) => console.log('[VoucherDiag-PUSH] WebView onLoadStart:', event.nativeEvent.url)}
+                    onLoadEnd={(event) => {
+                      console.log('[VoucherDiag-PUSH] WebView onLoadEnd:', event.nativeEvent.url);
+                      setTimeout(() => {
+                        pushWebViewRef.current?.injectJavaScript(`
+                          (function(){
+                            try {
+                              const payload = {
+                                type: 'diagnostics',
+                                location: window.location.href,
+                                hash: window.location.hash,
+                                title: document.title,
+                                bodyLength: document.body ? document.body.innerHTML.length : 0
+                              };
+                              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+                            } catch(err) {
+                              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'diagnostics-error', message: err.message }));
+                            }
+                          })();
+                        `);
+                      }, 500);
+                    }}
+                    onError={(event) => console.log('[VoucherDiag-PUSH] WebView onError:', event.nativeEvent)}
+                    onHttpError={(event) => console.log('[VoucherDiag-PUSH] WebView onHttpError:', event.nativeEvent)}
+                    onNavigationStateChange={(navState) => console.log('[VoucherDiag-PUSH] navigation:', navState.url, 'loading:', navState.loading)}
+                    onShouldStartLoadWithRequest={(req) => {
+                      try {
+                        const next = new URL(req.url);
+                        const base = new URL(inlineUrl!);
+                        if (next.origin === base.origin) return true;
+                      } catch {}
+                      return false;
+                    }}
+                    style={styles.webview}
+                  />
+                </View>
+              </View>
             ) : null}
           </View>
         </View>
@@ -207,13 +270,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     position: 'relative',
   },
-  titleHighlight: {
-    position: 'absolute',
-    width: '70%',
-    height: 36,
-    backgroundColor: 'rgba(0,0,0,0.04)',
-    borderRadius: 999,
-  },
   embedContainer: {
     width: '100%',
     aspectRatio: 16 / 9,
@@ -232,6 +288,17 @@ const styles = StyleSheet.create({
     padding: 8,
     width: '92%',
     height: '80%',
+    overflow: 'hidden',
+  },
+  voucherInsetWrap: {
+    flex: 1,
+    padding: 2,
+  },
+  voucherInsetBorder: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 10,
     overflow: 'hidden',
   },
   webviewClose: {

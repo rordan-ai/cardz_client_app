@@ -87,7 +87,7 @@ export default function NewClientForm() {
       
       return result;
     } catch (error) {
-      return { maxPunches: 10, defaultProduct: '12' }; // ברירת מחדל
+      return { maxPunches: 10, defaultProduct: '0001' }; // ברירת מחדל 4 ספרות
     }
   };
 

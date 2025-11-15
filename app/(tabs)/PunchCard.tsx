@@ -1,8 +1,9 @@
 // AsyncStorage no longer used for inbox; messages loaded from Supabase inbox table
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, FlatList } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
@@ -57,10 +58,12 @@ export default function PunchCard() {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [nameEdit, setNameEdit] = useState<string>('');
   const [birthdayEdit, setBirthdayEdit] = useState<string>('');
+  const [voucherInlineUrl, setVoucherInlineUrl] = useState<string | null>(null);
   const [voucherToast, setVoucherToast] = useState<{ visible: boolean; message: string }>({
     visible: false,
     message: '',
   });
+  const voucherWebViewRef = useRef<WebView>(null);
 
   const updateBlacklist = async (channel: 'push' | 'sms', isOptIn: boolean) => {
     try {
@@ -577,6 +580,42 @@ export default function PunchCard() {
     setTimeout(() => setVoucherToast({ visible: false, message: '' }), ms);
   };
 
+  const runVoucherDiagnostics = (source: string, targetUrl: string) => {
+    console.log(`[VoucherDiag-${source}] Inline URL:`, targetUrl);
+    try {
+      const parsed = new URL(targetUrl);
+      const pingUrl = `${parsed.origin}/__vite_ping`;
+      fetch(pingUrl)
+        .then(async (res) => {
+          const text = await res.text();
+          console.log(`[VoucherDiag-${source}] __vite_ping status:`, res.status, 'ok:', res.ok);
+          console.log(`[VoucherDiag-${source}] __vite_ping body:`, text.slice(0, 120));
+        })
+        .catch((err) => console.error(`[VoucherDiag-${source}] __vite_ping failed:`, err));
+    } catch (err) {
+      console.error(`[VoucherDiag-${source}] diagnostics error:`, err);
+    }
+  };
+
+  useEffect(() => {
+    if (voucherInlineUrl) {
+      runVoucherDiagnostics('INBOX', voucherInlineUrl);
+    }
+  }, [voucherInlineUrl]);
+
+  const handleVoucherMessage = (data: string) => {
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed.type === 'diagnostics') {
+        console.log('[VoucherDiag-INBOX] Diagnostics payload:', parsed);
+      } else {
+        showVoucherToast('השובר נשמר לגלריית התמונות בהצלחה');
+      }
+    } catch {
+      showVoucherToast('השובר נשמר לגלריית התמונות בהצלחה');
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {/* תפריט המבורגר */}
@@ -1018,22 +1057,7 @@ export default function PunchCard() {
                                 return;
                               }
 
-                              // פותח את השובר שהוגדר על ידי האדמין
-                              // בודק שניתן לפתוח את הקישור
-                              Linking.canOpenURL(safeUrl).then((supported) => {
-                                if (supported) {
-                                  Linking.openURL(safeUrl).catch(err => {
-                                    console.error('[Voucher Link] Failed to open URL:', err);
-                                    Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור: ' + err.message);
-                                  });
-                                } else {
-                                  console.error('[Voucher Link] URL not supported:', safeUrl);
-                                  Alert.alert('שגיאה', 'הקישור אינו נתמך על ידי המכשיר זה');
-                                }
-                              }).catch(err => {
-                                console.error('[Voucher Link] Error checking URL:', err);
-                                Alert.alert('שגיאה', 'שגיאה בבדיקת הקישור');
-                              });
+                              setVoucherInlineUrl(safeUrl);
                             }}
                             style={{
                               flexDirection: 'row',
@@ -1291,7 +1315,73 @@ export default function PunchCard() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-
+      {/* WebView פנימי לצפייה בשובר */}
+      <Modal visible={!!voucherInlineUrl} transparent animationType="fade" onRequestClose={() => setVoucherInlineUrl(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.webviewCardPunch}>
+            <TouchableOpacity
+              style={styles.webviewClosePunch}
+              onPress={() => setVoucherInlineUrl(null)}
+            >
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#666' }}>×</Text>
+            </TouchableOpacity>
+            {voucherInlineUrl ? (
+              <View style={styles.voucherInsetWrapPunch}>
+                <View style={styles.voucherInsetBorderPunch}>
+                  <WebView
+                    ref={voucherWebViewRef}
+                    source={{ uri: voucherInlineUrl }}
+                    originWhitelist={['*']}
+                    javaScriptEnabled
+                    domStorageEnabled
+                    allowsInlineMediaPlayback
+                    setSupportMultipleWindows={false}
+                    injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
+                    injectedJavaScript={ALERT_BRIDGE_JS}
+                    onMessage={(event) => handleVoucherMessage(event.nativeEvent.data)}
+                    onLoadStart={(event) => console.log('[VoucherDiag-INBOX] WebView onLoadStart:', event.nativeEvent.url)}
+                    onLoadEnd={(event) => {
+                      console.log('[VoucherDiag-INBOX] WebView onLoadEnd:', event.nativeEvent.url);
+                      setTimeout(() => {
+                        voucherWebViewRef.current?.injectJavaScript(`
+                          (function(){
+                            try {
+                              const payload = {
+                                type: 'diagnostics',
+                                location: window.location.href,
+                                hash: window.location.hash,
+                                title: document.title,
+                                bodyLength: document.body ? document.body.innerHTML.length : 0
+                              };
+                              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+                            } catch(err) {
+                              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'diagnostics-error', message: err.message }));
+                            }
+                          })();
+                        `);
+                      }, 500);
+                    }}
+                    onError={(event) => console.log('[VoucherDiag-INBOX] WebView onError:', event.nativeEvent)}
+                    onHttpError={(event) => console.log('[VoucherDiag-INBOX] WebView onHttpError:', event.nativeEvent)}
+                    onNavigationStateChange={(navState) =>
+                      console.log('[VoucherDiag-INBOX] navigation:', navState.url, 'loading:', navState.loading)
+                    }
+                    onShouldStartLoadWithRequest={(req) => {
+                      try {
+                        const next = new URL(req.url);
+                        const base = new URL(voucherInlineUrl);
+                        if (next.origin === base.origin) return true;
+                      } catch {}
+                      return false;
+                    }}
+                    style={{ flex: 1, backgroundColor: 'transparent' }}
+                  />
+                </View>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
 
       {/* Toast פנימי בהצגת שובר */}
       <Modal visible={voucherToast.visible} transparent animationType="fade">
@@ -1742,6 +1832,34 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     textAlign: 'center',
+  },
+  voucherInsetWrapPunch: {
+    flex: 1,
+    padding: 2,
+  },
+  voucherInsetBorderPunch: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  webviewActionsPunch: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+    gap: 12,
+  },
+  webviewExternalButtonPunch: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#4E4E4E',
+    borderRadius: 999,
+  },
+  webviewExternalTextPunch: {
+    color: '#fff',
+    fontFamily: 'Heebo',
+    fontSize: 12,
   },
   messagesScrollView: {
     flex: 1,
