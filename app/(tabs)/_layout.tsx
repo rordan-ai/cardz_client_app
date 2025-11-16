@@ -152,10 +152,12 @@ export default function Layout() {
             <View style={styles.buttonsRow}>
               {notification?.voucherUrl ? (
                 <TouchableOpacity style={[styles.pillButton, styles.viewPill]} onPress={handleInternalVoucherOpen}>
+                  <View style={styles.pillInsetOverlay} pointerEvents="none" />
                   <Text style={styles.pillText}>צפה בשובר</Text>
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity style={[styles.pillButton, styles.closePill]} onPress={() => setNotification(null)}>
+                <View style={styles.pillInsetOverlay} pointerEvents="none" />
                 <Text style={styles.pillText}>סגור</Text>
               </TouchableOpacity>
             </View>
@@ -364,6 +366,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     width: 110,
     alignItems: 'center',
+  },
+  pillInsetOverlay: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    bottom: 2,
+    left: 2,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    borderRadius: 999,
   },
   pillText: {
     color: '#FFFFFF',
