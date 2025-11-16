@@ -289,8 +289,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#E9E9E9',
     borderRadius: 999,
     paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingVertical: 6,
     alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   embedContainer: {
     width: '100%',
@@ -349,6 +351,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 20,
+    lineHeight: 20,
     fontWeight: 'bold',
     marginBottom: 12,
     textAlign: 'center',
