@@ -102,6 +102,8 @@ export default function Layout() {
       <Modal visible={!!notification} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
+            {/* מסגרת פנימית דקה עם inset 2px סביב כל כרטיס הפוש */}
+            <View style={styles.modalCardInsetOverlay} pointerEvents="none" />
             {/* כותרת עם היילייט עדין מאחור */}
             <View style={styles.titleWrap}>
               <Text style={styles.modalTitle}>{notification?.title}</Text>
@@ -261,6 +263,16 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '85%',
     alignItems: 'flex-end',
+  },
+  modalCardInsetOverlay: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    bottom: 2,
+    left: 2,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 10,
   },
   titleWrap: {
     width: '100%',
