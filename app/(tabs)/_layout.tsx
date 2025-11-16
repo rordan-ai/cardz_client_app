@@ -1,8 +1,7 @@
 import { Slot } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { DeviceEventEmitter, Modal, Text, View, TouchableOpacity, StyleSheet } from 'react-native';
+import { DeviceEventEmitter, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BusinessProvider } from '../../components/BusinessContext';
 import FCMService from '../../components/FCMService';
 
@@ -281,6 +280,7 @@ const styles = StyleSheet.create({
   embedInsetWrap: {
     flex: 1,
     padding: 2,
+    backgroundColor: '#FFFFFF',
   },
   embedInsetBorder: {
     flex: 1,
