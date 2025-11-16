@@ -288,8 +288,8 @@ const styles = StyleSheet.create({
   titlePill: {
     backgroundColor: '#E9E9E9',
     borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
@@ -350,8 +350,8 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   modalTitle: {
-    fontSize: 20,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 20,
     fontWeight: 'bold',
     marginBottom: 12,
     textAlign: 'center',
