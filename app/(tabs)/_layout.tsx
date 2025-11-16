@@ -104,9 +104,11 @@ export default function Layout() {
           <View style={styles.modalCard}>
             {/* מסגרת פנימית דקה עם inset 2px סביב כל כרטיס הפוש */}
             <View style={styles.modalCardInsetOverlay} pointerEvents="none" />
-            {/* כותרת עם היילייט עדין מאחור */}
+            {/* כותרת עם רקע אפור מעוגל המתאים עצמו לגודל הטקסט */}
             <View style={styles.titleWrap}>
-              <Text style={styles.modalTitle}>{notification?.title}</Text>
+              <View style={styles.titlePill}>
+                <Text style={styles.modalTitle}>{notification?.title}</Text>
+              </View>
             </View>
             {/* הטמעת Canva אם קיים קישור בגוף ההודעה */}
             {(() => {
@@ -282,6 +284,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
     position: 'relative',
+  },
+  titlePill: {
+    backgroundColor: '#E9E9E9',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    alignSelf: 'center',
   },
   embedContainer: {
     width: '100%',
