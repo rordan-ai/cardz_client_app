@@ -293,6 +293,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
   },
   embedContainer: {
     width: '100%',
@@ -353,7 +354,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 18,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 0,
     textAlign: 'center',
     alignSelf: 'center',
     fontFamily: 'Heebo',

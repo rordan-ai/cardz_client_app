@@ -1022,58 +1022,54 @@ export default function PunchCard() {
                           {sanitizedBody}
                         </Text>
                         {hasVoucher && (
-                          <TouchableOpacity
-                            onPress={(e) => {
-                              e.stopPropagation();
+                          <View style={{ width: '100%', marginTop: 10, alignItems: 'center', justifyContent: 'center' }}>
+                            <TouchableOpacity
+                              onPress={(e) => {
+                                e.stopPropagation();
 
-                              let finalUrl: string | null = null;
+                                let finalUrl: string | null = null;
 
-                              if (msg.voucherUrl) {
-                                finalUrl = msg.voucherUrl;
-                              } else {
-                                const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
-                                if (urlMatch) {
-                                  let rawUrl = urlMatch[0];
-                                  rawUrl = rawUrl.replace(/[)\],.;:!?]+$/, '');
-                                  rawUrl = rawUrl.replace(/['"]+$/, '');
-                                  finalUrl = rawUrl;
+                                if (msg.voucherUrl) {
+                                  finalUrl = msg.voucherUrl;
+                                } else {
+                                  const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
+                                  if (urlMatch) {
+                                    let rawUrl = urlMatch[0];
+                                    rawUrl = rawUrl.replace(/[)\],.;:!?]+$/, '');
+                                    rawUrl = rawUrl.replace(/['"]+$/, '');
+                                    finalUrl = rawUrl;
+                                  }
                                 }
-                              }
 
-                              if (!finalUrl) {
-                                Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
-                                return;
-                              }
-
-                              let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
-
-                              if (phoneStr) {
-                                const separator = safeUrl.includes('?') ? '&' : '?';
-                                safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
-                              }
-
-                              if (!safeUrl || safeUrl.length < 10) {
-                                if (__DEV__) {
-                                  console.warn('[Voucher Link] Invalid URL value detected');
+                                if (!finalUrl) {
+                                  Alert.alert('שגיאה', 'לא נמצא קישור בהודעה');
+                                  return;
                                 }
-                                Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
-                                return;
-                              }
 
-                              setVoucherInlineUrl(safeUrl);
-                            }}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              marginTop: 10,
-                              alignSelf: 'flex-end'
-                            }}
-                          >
-                            <Text style={{ color: '#2196F3', fontSize: 14, marginRight: 5 }}>
-                              קישור לשובר
-                            </Text>
-                            <Text style={{ fontSize: 18 }}>🎁</Text>
-                          </TouchableOpacity>
+                                let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
+
+                                if (phoneStr) {
+                                  const separator = safeUrl.includes('?') ? '&' : '?';
+                                  safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
+                                }
+
+                                if (!safeUrl || safeUrl.length < 10) {
+                                  if (__DEV__) {
+                                    console.warn('[Voucher Link] Invalid URL value detected');
+                                  }
+                                  Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
+                                  return;
+                                }
+
+                                setVoucherInlineUrl(safeUrl);
+                              }}
+                              style={{ alignSelf: 'center', transform: [{ translateX: -28 }] }}
+                            >
+                              <Text style={{ color: '#2196F3', fontSize: 14, textDecorationLine: 'underline', textAlign: 'center' }}>
+                                לצפייה בשובר
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
                         )}
                       </View>
                     </View>
