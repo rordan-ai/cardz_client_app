@@ -351,12 +351,13 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 20,
-    lineHeight: 20,
+    lineHeight: 22,
     fontWeight: 'bold',
     marginBottom: 12,
     textAlign: 'center',
     alignSelf: 'center',
     fontFamily: 'Heebo',
+    transform: [{ translateY: 1 }],
   },
   modalBody: {
     fontSize: 16,
