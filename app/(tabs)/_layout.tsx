@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     alignSelf: 'center',
     fontFamily: 'Heebo',
-    transform: [{ translateY: 1 }],
+    transform: [{ translateY: 2 }],
   },
   modalBody: {
     fontSize: 16,
