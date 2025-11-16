@@ -1,5 +1,30 @@
 # מדריך גיבוי מלא לענף restore_checkpoints
 📋 המדריך כולל:
+
+## ✅ TODO גיבוי אולטימטיבי – חובה לעבור על כל סעיף
+
+- חובה תפעולית: מיד לאחר קריאת המסמך, הסוכן חייב להעתיק/לפרוס את ה‑TODO הזה לסביבת העבודה שלו (כמסמך משימות/טבלה/Issue/Tasklist) ולעבוד ממנו בפועל. אין להסתמך על המסמך בלבד בזמן ביצוע. אי אפשר להמשיך בתהליך מבלי להסיר סעיף מה‑TODO לאחר שהושלם.
+
+- [ ] הכנות: `git fetch origin`, קריאת הנהלים, עצירת/ווידוא שרת פיתוח לא רץ מענף שגוי (ראה “שלב 4.5: בקרת שרת/ענף”).  
+- [ ] מניעה – אבטחה: סריקת סודות בקוד/כלים/מסמכים (JWT, `SUPABASE_*_KEY`, `.env*`, `runtime-config.json`). אם נמצא סוד → פועלים לפי “בעיות אבטחה בגיבויי והמנעות מהן”.  
+- [ ] Snapshot עצמאי: יצירת `safety_snapshot_YYYYMMDD_HHMMSS`, `git add -A`, `git commit`, `git push origin`.  
+- [ ] ענף ביטחון זמני: יצירת `safety_backup_YYYYMMDD_HHMMSS`, `git add -A`, `git commit`, `git push origin`. שמור את השם להמשך.  
+- [ ] עדכון ענף הגיבוי: מעבר ל־`restore_checkpoints`, `git pull origin restore_checkpoints`, בדיקת `git status`.  
+- [ ] מיזוג הגיבוי: `git merge safety_backup_...` ל־`restore_checkpoints`.  
+  - אם יש קונפליקטים → עצירה מיידית: `git merge --abort`, יצירת `restorepoint_snapshot_...` ו־`git push origin` (תיעוד בדוח), לא דוחפים מיזוג שבור.  
+  - אם אין קונפליקטים → ממשיכים.  
+- [ ] Restorepoint snapshot: יצירת `restorepoint_snapshot_YYYYMMDD_HHMMSS` ו־`git push origin`.  
+- [ ] דחיפת הגיבוי: `git push origin restore_checkpoints`.  
+- [ ] בדיקות איכות (ראה “בדיקות איכות ו‑100% גיבוי”):  
+  - `git rev-list --count main` == `git rev-list --count restore_checkpoints`  
+  - `git diff main restore_checkpoints --name-only` → ריק  
+  - `git status --porcelain` → ריק  
+  - `git show-branch origin/restore_checkpoints restore_checkpoints` → זהות  
+  - קבצים מרכזיים קיימים + בדיקות משלימות לפי הנהלים  
+- [ ] דוח גיבוי: עדכון `docs/BACKUPS_REPORTS.md` עם תאריך, ענפים, SHA, הבדלים/קונפליקטים, אבטחה (ראה הדוגמאות).  
+- [ ] בקרת שרת/ענף לאחר גיבוי: חזרה לענף העבודה הרלוונטי (למשל `safety_backup_...`), אתחול `npm run dev`, אימות מסכי UI קריטיים בדפדפן (למשל “פרסום → הודעות פוש”).  
+- [ ] ניקוי: מחיקת ענפי ביטחון זמניים מקומיים לאחר הצלחה סופית (ראה “ניקוי ענפי בטחון זמניים”).  
+
 🔧 סביבת עבודה מדויקת:
 Windows 10 + PowerShell
 נתיב: C:\cardz_curser\cards-admin-web
@@ -9,6 +34,8 @@ Windows 10 + PowerShell
 הכנת ענף הגיבוי
 מיזוג מ-main
 דחיפה ל-origin
+בעיות אבטחה בגיבויי והמנעות מהן (מפורט בהמשך)
+בקרת שרת/ענף לאחר גיבוי: נעילת שרת הפיתוח לענף העבודה ואימות בדפדפן
 🔍 בדיקות איכות מפורטות:
 זהות קומיטים
 השוואת קבצים
@@ -29,6 +56,43 @@ Windows 10 + PowerShell
 - **ענף יעד:** restore_checkpoints
 
 ## תהליך גיבוי מלא - צעד אחר צעד
+
+### **בעיות אבטחה בגיבויי והמנעות מהן**
+> מטרה: למנוע דליפת סודות (Supabase URL/ANON_KEY/SERVICE_ROLE_KEY וכו') לענפי גיבוי/restore ולדוחות, ולהבטיח שהמערכת ממשיכה לפעול לאחר הסרת מפתחות קשיחים.
+
+#### מניעה לפני שמתחילים
+- אין מפתחות אמיתיים בקוד/מסמכים/דוגמאות — משתמשים ב‑PLACEHOLDER בלבד.
+- `.env*` ו‑`public/runtime-config.json` מוחרגים מגיט.
+- סריקת סודות מהירה: חיפוש `eyJhbGciOiJI`, `SUPABASE_*_KEY`, ו‑`supabase.co` בקבצי דוגמא/כלים.
+- Edge Functions קוראות מפתחות רק ממשתני סביבה; SERVICE_ROLE_KEY לעולם לא בצד לקוח.
+- Frontend קורא Supabase URL/ANON רק מ‑ENV/Runtime/LocalStorage — ללא fallback קשיח בקוד.
+
+#### אם נמצא סוד/חשד בזמן הגיבוי
+1) לעצור מיזוג/דחיפה.  
+2) להחליף ערכים אמיתיים ל‑`<PLACEHOLDER>` ולמחוק קבצי tmp רגישים.  
+3) לבצע רוטציית מפתחות ב‑Supabase (ANON + SERVICE_ROLE).  
+4) לוודא `.gitignore` כולל `.env*` ו‑`public/runtime-config.json`.  
+5) לתעד ב‑`docs/BACKUPS_REPORTS.md` את האירוע וה‑SHA.  
+6) להריץ בדיקות תפקוד (ראה סימפטומים להלן).
+
+#### סימפטומים לאחר הסרת מפתחות קשיחים ומה עושים
+- באדמין: “חסר מפתח API” → להשלים `VITE_SUPABASE_URL/ANON_KEY` (ENV/Runtime/LocalStorage) ולרענן.
+- “Invalid supabaseUrl” → להגדיר `https://<ref>.supabase.co`.
+- Edge Functions 500 “misconfigured” → להגדיר `SUPABASE_URL` ו‑`SUPABASE_SERVICE_ROLE_KEY` ב‑Settings.
+
+#### פלייבוקים מהירים
+- Dev:  
+  `localStorage.setItem('SUPABASE_URL','https://<ref>.supabase.co')`  
+  `localStorage.setItem('SUPABASE_ANON_KEY','<ANON_KEY>')`  
+  `location.reload()`
+- Runtime (מוחרג מגיט): `public/runtime-config.json` עם URL/ANON.
+- CI/Prod: הזרקת ENV ל‑Frontend (`VITE_SUPABASE_*`) ול‑Functions (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`).
+
+#### צ’ק‑ליסט מהיר לפני דחיפה
+- [ ] אין סודות בקוד/מסמכים/כלים.  
+- [ ] `.env*` ו‑`public/runtime-config.json` מוחרגים.  
+- [ ] Edge Functions ללא fallback למפתחות.  
+- [ ] Frontend נטען מקונפיג תקין; שליחת פוש מחזירה 200.
 
 > 🛟 **חדש:** בכל תהליך גיבוי חובה ליצור *ענף ביטחון עצמאי ומגובה* לפני שנוגעים ב-`restore_checkpoints` או ב-`main`. ענף זה מכיל צילום מלא של כל השינויים (כולל כאלה שלא בוצע להם קומיט בעבר) ומשמש כנקודת חזרה מיידית במקרה שמיזוגי הגיבוי ייכשלו או יוצרו פערים מול הענפים הראשיים.
 
@@ -119,6 +183,17 @@ git push origin restorepoint_snapshot_YYYYMMDD_HHMMSS
 # דחיפת הגיבוי ל-remote repository
 git push origin restore_checkpoints
 ```
+
+### שלב 4.5: בקרת שרת/ענף לאחר גיבוי (חובה כדי למנוע הצגת UI ישן)
+```bash
+# ודא שאתה חוזר לענף העבודה הפעיל (למשל ענף הביטחון הזמני עם התיקונים):
+git checkout safety_backup_YYYYMMDD_HHMMSS
+
+# הפעל/אתחל מחדש את שרת הפיתוח מהענף הנכון
+npm run dev
+```
+- לפתוח בדפדפן את מסכי ה‑UI הקריטיים (למשל “פרסום → הודעות פוש”) ולוודא שהסידורים האחרונים נטענים.  
+- אם מוצג UI ישן — לבדוק באיזה ענף רץ השרת ולתקן מיידית (לעצור את השרת, `git checkout <branch>`, להפעיל שוב).
 
 ## בדיקות איכות ו-100% גיבוי
 

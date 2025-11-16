@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // AsyncStorage no longer used for inbox; messages loaded from Supabase inbox table
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -5,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { Alert, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, DeviceEventEmitter } from 'react-native';
 import { Barcode } from 'react-native-svg-barcode';
 import { WebView } from 'react-native-webview';
 import { useBusiness } from '../../components/BusinessContext';
@@ -70,6 +71,22 @@ export default function PunchCard() {
       const businessCode = localBusiness?.business_code || customer?.business_code;
       const cphone = customer?.customer_phone || phoneStr;
       if (!businessCode || !cphone) return;
+
+      // עדכון מקומי מיידי (לדלג על הצגה במכשיר בלי תעבורת API נוספת)
+      try {
+        const pushKeyScoped = `push_opt_in_${businessCode}`;
+        const smsKeyScoped = `sms_opt_in_${businessCode}`;
+        if (channel === 'push') {
+          // לשמירה לאחור: גם מפתח כללי וגם פר-עסק
+          await AsyncStorage.setItem('push_opt_in', String(isOptIn));
+          await AsyncStorage.setItem(pushKeyScoped, String(isOptIn));
+          DeviceEventEmitter.emit('preferences_push_opt_in', { optIn: isOptIn });
+        } else if (channel === 'sms') {
+          // לשמירה לאחור: גם מפתח כללי וגם פר-עסק
+          await AsyncStorage.setItem('sms_opt_in', String(isOptIn));
+          await AsyncStorage.setItem(smsKeyScoped, String(isOptIn));
+        }
+      } catch {}
       if (isOptIn) {
         // הסרה מהבלקליסט
         await supabase
@@ -384,6 +401,34 @@ export default function PunchCard() {
     };
     updateBadge();
   }, [unreadMessages]);
+
+  // טעינת העדפות Opt-In באופן מתמשך (ברירת מחדל true, אך שומר ערכים אם קיימים ב-AsyncStorage)
+  useEffect(() => {
+    (async () => {
+      try {
+        const scopedBusiness = localBusiness?.business_code || customer?.business_code || '';
+        const pushKeyScoped = scopedBusiness ? `push_opt_in_${scopedBusiness}` : 'push_opt_in';
+        const smsKeyScoped = scopedBusiness ? `sms_opt_in_${scopedBusiness}` : 'sms_opt_in';
+
+        // נסה קודם מפתח פר-עסק, ואז מפתח כללי (תמיכה לאחור)
+        let pushStored = await AsyncStorage.getItem(pushKeyScoped);
+        if (pushStored === null) {
+          pushStored = await AsyncStorage.getItem('push_opt_in');
+        }
+        if (pushStored !== null) {
+          setPushOptIn(pushStored === 'true');
+        }
+
+        let smsStored = await AsyncStorage.getItem(smsKeyScoped);
+        if (smsStored === null) {
+          smsStored = await AsyncStorage.getItem('sms_opt_in');
+        }
+        if (smsStored !== null) {
+          setSmsOptIn(smsStored === 'true');
+        }
+      } catch {}
+    })();
+  }, [localBusiness?.business_code, customer?.business_code]);
 
   // האזנת Realtime ל-inbox לרענון מיידי של החיווי בלבד (Badge) כשהמודאל סגור
   useEffect(() => {

@@ -10,6 +10,7 @@ class FCMService {
   private customerPhone: string | null = null;
   private currentToken: string | null = null;
   private initializationPromise: Promise<void> | null = null;
+  private pushOptIn: boolean = true;
   
   private constructor() {}
   
@@ -35,6 +36,22 @@ class FCMService {
   private async doInitialize() {
     
     try {
+      // קרא העדפת Opt-In מקומית (ברירת מחדל true)
+      try {
+        const storedPushOptIn = await AsyncStorage.getItem('push_opt_in');
+        if (storedPushOptIn !== null) {
+          this.pushOptIn = storedPushOptIn === 'true';
+        }
+      } catch {}
+
+      // עדכון בזמן ריצה כאשר ההעדפה משתנה
+      try {
+        DeviceEventEmitter.addListener('preferences_push_opt_in', (data: { optIn?: boolean }) => {
+          if (typeof data?.optIn === 'boolean') {
+            this.pushOptIn = data.optIn;
+          }
+        });
+      } catch {}
       // רישום מכשירי iOS לקבלת פושים
       if (Platform.OS === 'ios') {
         try {
@@ -93,6 +110,10 @@ class FCMService {
 
       // האזנה להודעות (foreground)
       messaging().onMessage(async (remoteMessage) => {
+        if (!this.pushOptIn) {
+          // דילוג על הצגת הודעה מקומית כאשר המשתמש בחר לא לקבל פושים
+          return;
+        }
         if (__DEV__) {
           console.log('FCM Message received');
         }
@@ -109,6 +130,9 @@ class FCMService {
 
       // פתיחת קישורי שובר בעת לחיצה על ההתראה כשהאפליקציה ברקע
       messaging().onNotificationOpenedApp(async (remoteMessage) => {
+        if (!this.pushOptIn) {
+          return;
+        }
         const voucherUrl = remoteMessage?.data?.voucher_url;
         if (voucherUrl) {
           try {
@@ -129,6 +153,10 @@ class FCMService {
 
       // פתיחת קישורי שובר כאשר האפליקציה נפתחת מתוך התראה במצב סגור
       const initialNotification = await messaging().getInitialNotification();
+      if (!this.pushOptIn) {
+        // אם המשתמש בחר לא לקבל פושים, לא ננווט אוטומטית מתוך פתיחה מהתראה
+        return;
+      }
       const initialVoucherUrl = initialNotification?.data?.voucher_url;
       if (initialVoucherUrl) {
         try {
