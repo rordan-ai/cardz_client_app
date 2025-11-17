@@ -57,6 +57,8 @@ export default function PunchCard() {
   const [pushOptIn, setPushOptIn] = useState(true);
   const [smsOptIn, setSmsOptIn] = useState(true);
   const [detailsVisible, setDetailsVisible] = useState(false);
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [disconnectVisible, setDisconnectVisible] = useState(false);
   const [nameEdit, setNameEdit] = useState<string>('');
   const [birthdayEdit, setBirthdayEdit] = useState<string>('');
   const [voucherInlineUrl, setVoucherInlineUrl] = useState<string | null>(null);
@@ -65,6 +67,12 @@ export default function PunchCard() {
     message: '',
   });
   const voucherWebViewRef = useRef<WebView>(null);
+  const [activityVisible, setActivityVisible] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityRows, setActivityRows] = useState<Array<{ dateStr: string; actionLabel: string; amount: number }>>([]);
+  const [activityNextCursor, setActivityNextCursor] = useState<string | null>(null);
+  const [activityLoadingMore, setActivityLoadingMore] = useState(false);
+  const activityChannelRef = useRef<any>(null);
 
   const updateBlacklist = async (channel: 'push' | 'sms', isOptIn: boolean) => {
     try {
@@ -632,6 +640,179 @@ export default function PunchCard() {
     setTimeout(() => setVoucherToast({ visible: false, message: '' }), ms);
   };
 
+  const normalizePhone = (p?: string) => {
+    if (!p) return '';
+    const trimmed = p.trim();
+    if (/^05\d{8}$/.test(trimmed)) return `972${trimmed.slice(1)}`;
+    return trimmed.replace(/[^0-9]/g, '');
+  };
+
+  const toLocal05 = (p?: string) => {
+    if (!p) return '';
+    const onlyDigits = p.replace(/[^0-9]/g, '');
+    if (/^9725\d{8}$/.test(onlyDigits)) return `0${onlyDigits.slice(3)}`;
+    return p;
+  };
+
+  const getPhoneVariants = (raw?: string) => {
+    const a = (raw || '').trim();
+    const b = normalizePhone(a);
+    const c = toLocal05(b);
+    const uniq = Array.from(new Set([a, b, c].filter(Boolean)));
+    return uniq;
+  };
+
+  const mapActionToLabelAndAmount = (t?: string): { label: string; amount: number } => {
+    switch ((t || '').toLowerCase()) {
+      case 'punch_added':
+        return { label: 'נוסף ניקוב', amount: 1 };
+      case 'punch_removed':
+        return { label: 'ביטול ניקוב', amount: -1 };
+      case 'punch_used':
+        return { label: 'מימוש ניקוב', amount: -1 };
+      case 'punch_unuse':
+        return { label: 'החזרת ניקוב', amount: 1 };
+      case 'voucher_issued':
+        return { label: 'שובר הונפק', amount: 1 };
+      case 'voucher_used':
+        return { label: 'שובר מומש', amount: -1 };
+      case 'voucher_expired':
+        return { label: 'שובר פג תוקף', amount: -1 };
+      // תאימות לאחור אם יופיעו סוגים ישנים
+      case 'punch':
+      case 'add_punch':
+      case 'stamp':
+      case 'add_stamp':
+        return { label: 'ניקוב כרטיסייה', amount: 1 };
+      case 'renew':
+      case 'renew_card':
+        return { label: 'חידוש כרטיסייה', amount: 1 };
+      case 'cancel_punch':
+        return { label: 'ביטול ניקוב', amount: -1 };
+      case 'voucher_received':
+        return { label: 'קבלת שובר', amount: 1 };
+      case 'voucher_sent':
+        return { label: 'שליחת שובר', amount: 1 };
+      default:
+        return { label: t || 'פעולה', amount: 1 };
+    }
+  };
+
+  const fetchMyActivityFeed = async (pageSize = 100, cursor?: string) => {
+    const businessCode = business?.business_code || customer?.business_code;
+    const raw = customer?.customer_phone || phoneStr || phoneIntl;
+    if (!businessCode || !raw) return { rows: [], next: null as string | null };
+
+    const variants = getPhoneVariants(raw);
+    for (const custPhone of variants) {
+      try {
+        let q = supabase
+          .from('customer_activity_feed')
+          .select('*')
+          .eq('business_code', businessCode)
+          .eq('customer_phone', custPhone)
+          .order('timestamp', { ascending: false })
+          .limit(pageSize);
+
+        if (cursor) {
+          q = q.lt('timestamp', cursor);
+        }
+
+        const { data, error } = await q;
+        if (error) {
+          console.log('[ActivityFeed] query error', { businessCode, custPhone, message: String(error?.message || error) });
+          continue;
+        }
+        const arr = Array.isArray(data) ? data : [];
+        console.log('[ActivityFeed] fetched', { businessCode, custPhone, count: arr.length, cursor: cursor || null });
+        const rows = arr.map((row: any) => {
+          const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
+          const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+          const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+          const qty = typeof row?.amount === 'number' ? row.amount : amount;
+          return { dateStr, actionLabel: label, amount: qty };
+        });
+        const next = (arr.length > 0) ? arr[arr.length - 1].timestamp : null;
+        if (rows.length > 0 || cursor) {
+          return { rows, next };
+        }
+        // אין תוצאות בדף ראשון עם וריאנט זה — ננסה וריאנט נוסף
+      } catch (e: any) {
+        console.log('[ActivityFeed] exception', { businessCode, raw, error: String(e?.message || e) });
+      }
+    }
+    return { rows: [], next: null as string | null };
+  };
+
+  const subscribeMyActivityRealtime = (businessCode: string, rawPhone: string) => {
+    try {
+      const variants = getPhoneVariants(rawPhone);
+      const ch = supabase.channel('client_activity_rt');
+      ch.on('postgres_changes',
+        { event: '*', schema: 'public', table: 'user_activities' },
+        (payload: any) => {
+          const row = payload?.new;
+          if (!row) return;
+          // אם יש עמודת business_code ב-user_activities — לאכוף התאמה; אחרת מתבססים על טלפון בלבד
+          if (row.business_code && row.business_code !== businessCode) return;
+          if (!variants.includes(String(row.customer_id || '').trim())) return;
+          const ts = row?.action_time ? new Date(row.action_time) : new Date();
+          const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+          const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+          setActivityRows((prev) => [{ dateStr, actionLabel: label, amount: typeof amount === 'number' ? amount : 1 }, ...prev]);
+        }
+      );
+      ch.subscribe();
+      activityChannelRef.current = ch;
+    } catch {}
+  };
+
+  const cleanupActivitySubscription = () => {
+    try {
+      if (activityChannelRef.current) {
+        supabase.removeChannel(activityChannelRef.current);
+      }
+    } catch {}
+    activityChannelRef.current = null;
+  };
+
+  const openMyActivity = async () => {
+    try {
+      setMenuVisible(false);
+      setActivityLoading(true);
+      setActivityRows([]);
+      setActivityNextCursor(null);
+
+      const businessCode = business?.business_code || customer?.business_code;
+      const { rows, next } = await fetchMyActivityFeed(100);
+      setActivityRows(rows);
+      setActivityNextCursor(next);
+      setActivityVisible(true);
+
+      const custPhone = customer?.customer_phone || phoneStr || phoneIntl;
+      if (businessCode && custPhone) {
+        cleanupActivitySubscription();
+        subscribeMyActivityRealtime(businessCode, custPhone);
+      }
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
+  const loadMoreActivity = async () => {
+    if (activityLoadingMore || !activityNextCursor) return;
+    setActivityLoadingMore(true);
+    try {
+      const { rows, next } = await fetchMyActivityFeed(100, activityNextCursor);
+      setActivityRows((prev) => [...prev, ...rows]);
+      setActivityNextCursor(next);
+    } finally {
+      setActivityLoadingMore(false);
+    }
+  };
+
   const runVoucherDiagnostics = (source: string, targetUrl: string) => {
     console.log(`[VoucherDiag-${source}] Inline URL:`, targetUrl);
     try {
@@ -929,7 +1110,7 @@ export default function PunchCard() {
                 <Text style={styles.menuItemText}>ההעדפות שלי</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
+              <TouchableOpacity style={styles.menuItem} onPress={openMyActivity}>
                 <Text style={styles.menuItemText}>הפעילות שלי</Text>
               </TouchableOpacity>
 
@@ -945,6 +1126,10 @@ export default function PunchCard() {
                 <Text style={styles.menuItemText}>מדיניות פרטיות</Text>
               </TouchableOpacity>
 
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setDeleteVisible(true); }}>
+                <Text style={styles.menuItemText}>מחיקת משתמש</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
                 <Text style={styles.menuItemText}>צור קשר</Text>
               </TouchableOpacity>
@@ -954,6 +1139,233 @@ export default function PunchCard() {
           </View>
                  </TouchableWithoutFeedback>
        </Modal>
+
+      {/* מודאל מחיקת משתמש */}
+      <Modal 
+        visible={deleteVisible}
+        transparent 
+        animationType="slide"
+        onRequestClose={() => setDeleteVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setDeleteVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={{ backgroundColor: 'white', borderRadius: 16, padding: 20, width: '85%' }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 12, fontFamily: 'Rubik' }}>
+                  מחיקת משתמש
+                </Text>
+                <Text style={{ fontSize: 14, textAlign: 'center', color: '#333', marginBottom: 16, fontFamily: 'Rubik' }}>
+                  האם בטוח/ה שאת/ה רוצה למחוק עצמך מהשירות?
+                </Text>
+                <View style={{ gap: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setDeleteVisible(false);
+                      setMenuVisible(false);
+                    }}
+                    style={{ 
+                      flexDirection: 'row-reverse',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      borderWidth: 1,
+                      borderColor: '#E0E0E0',
+                      backgroundColor: '#f8f8f8',
+                      borderRadius: 10,
+                      paddingVertical: 12,
+                      paddingHorizontal: 14
+                    }}
+                  >
+                    <Text style={{ flex: 1, textAlign: 'right', fontSize: 15, color: '#333', fontFamily: 'Rubik' }}>
+                      לחצתי בטעות-חזור לכרטיסייה
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    onPress={() => {
+                      // מעבר לאישור נוסף
+                      setDeleteVisible(false);
+                      setDisconnectVisible(true);
+                    }}
+                    style={{ 
+                      flexDirection: 'row-reverse',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      borderWidth: 1,
+                      borderColor: '#E0E0E0',
+                      backgroundColor: '#f8f8f8',
+                      borderRadius: 10,
+                      paddingVertical: 12,
+                      paddingHorizontal: 14
+                    }}
+                  >
+                    <Text style={{ flex: 1, textAlign: 'right', fontSize: 15, color: '#333', fontFamily: 'Rubik' }}>
+                      מחקו אותי אני לא מעוניינ/ת להשתמש באפליקציה יותר
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ fontSize: 12, textAlign: 'center', color: '#777', marginTop: 12, fontFamily: 'Rubik' }}>
+                  מחיקת המשתמש שלך אינה מסירה את האפליקציה עצמה - נדרשת הסרה בנפרד
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 16 }}>
+                  <TouchableOpacity 
+                    onPress={() => setDeleteVisible(false)}
+                    style={{ backgroundColor: '#E0E0E0', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 }}
+                  >
+                    <Text style={{ fontFamily: 'Rubik' }}>סגור</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* מודאל אישור התנתקות סופי */}
+      <Modal 
+        visible={disconnectVisible}
+        transparent 
+        animationType="slide"
+        onRequestClose={() => setDisconnectVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setDisconnectVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={{ backgroundColor: 'white', borderRadius: 16, padding: 20, width: '85%' }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 12, fontFamily: 'Rubik' }}>
+                  אישור התנתקות
+                </Text>
+                <Text style={{ fontSize: 14, textAlign: 'center', color: '#333', marginBottom: 16, fontFamily: 'Rubik' }}>
+                  האם בטוח שאתה רוצה להתנתק? יתכן ויש לך הטבות לא מנוצלות בבתי העסק שימחקו עם התנתקותך
+                </Text>
+                <View style={{ gap: 10, marginTop: 4, width: '100%', alignSelf: 'center' }}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      // חזרה לכרטיסייה - סגירת מודאלים
+                      setDisconnectVisible(false);
+                      setDeleteVisible(false);
+                      setMenuVisible(false);
+                    }}
+                    style={{ 
+                      backgroundColor: '#216265', 
+                      paddingVertical: 12, 
+                      paddingHorizontal: 16, 
+                      borderRadius: 20,
+                      width: '100%',
+                      alignSelf: 'center'
+                    }}
+                  >
+                    <Text style={{ color: 'white', textAlign: 'center', fontFamily: 'Rubik' }}>התחרטתי, אשאר</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      // פונקציונליות ההתנתקות תטופל בהמשך
+                      setDisconnectVisible(false);
+                    }}
+                    style={{ 
+                      backgroundColor: '#8B0000', 
+                      paddingVertical: 12, 
+                      paddingHorizontal: 16, 
+                      borderRadius: 20,
+                      width: '100%',
+                      alignSelf: 'center'
+                    }}
+                  >
+                    <Text style={{ color: 'white', textAlign: 'center', fontFamily: 'Rubik' }}>כן ולא לחפור לי יותר</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+       {/* מודאל "הפעילות שלי" */}
+      <Modal 
+        visible={activityVisible} 
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => { cleanupActivitySubscription(); setActivityVisible(false); }}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableWithoutFeedback onPress={() => { cleanupActivitySubscription(); setActivityVisible(false); }}>
+            <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
+          </TouchableWithoutFeedback>
+
+          <LinearGradient
+            colors={['#1a1a2e', '#16213e']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              width: '92%',
+              maxWidth: 900,
+              maxHeight: '82%',
+              borderRadius: 12,
+              overflow: 'hidden',
+              shadowColor: '#000',
+              shadowOpacity: 0.3,
+              shadowRadius: 10,
+              elevation: 8
+            }}
+          >
+            <View style={{ backgroundColor: '#1e293b', paddingVertical: 18, paddingHorizontal: 20 }}>
+              <Text style={{ color: '#fff', fontSize: 20, fontWeight: '600', textAlign: 'center' }}>הפעילות שלי</Text>
+              <TouchableOpacity
+                onPress={() => { cleanupActivitySubscription(); setActivityVisible(false); }}
+                style={{ position: 'absolute', top: 10, right: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ backgroundColor: '#2d3748' }}>
+              {/* כותרות טבלה */}
+              <View style={{ flexDirection: 'row', backgroundColor: '#4a5568' }}>
+                <Text style={{ flex: 2, paddingVertical: 14, textAlign: 'center', color: '#e2e8f0', fontWeight: '600' }}>תאריך</Text>
+                <Text style={{ flex: 5, paddingVertical: 14, textAlign: 'center', color: '#e2e8f0', fontWeight: '600' }}>סוג פעולה</Text>
+                <Text style={{ flex: 3, paddingVertical: 14, textAlign: 'center', color: '#e2e8f0', fontWeight: '600' }}>כמות</Text>
+              </View>
+
+              {/* שורות */}
+              {activityLoading ? (
+                <View style={{ paddingVertical: 24 }}>
+                  <Text style={{ color: '#e2e8f0', textAlign: 'center' }}>טוען…</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={activityRows}
+                  keyExtractor={(_, idx) => `act-${idx}`}
+                  contentContainerStyle={{ paddingBottom: 18 }}
+                  style={{ maxHeight: '72%' }}
+                  renderItem={({ item, index }) => (
+                    <View style={{
+                      flexDirection: 'row',
+                      backgroundColor: index % 2 === 0 ? '#4a5568' : '#2d3748'
+                    }}>
+                      <Text style={{ flex: 2, paddingVertical: 12, textAlign: 'center', color: '#90cdf4', fontWeight: '500' }}>{item.dateStr}</Text>
+                      <Text style={{ flex: 5, paddingVertical: 12, textAlign: 'right', paddingHorizontal: 12, color: '#e2e8f0', fontWeight: '500' }}>{item.actionLabel}</Text>
+                      <Text style={{ flex: 3, paddingVertical: 12, textAlign: 'center', color: item.amount < 0 ? '#dc2626' : '#059669', fontWeight: '600' }}>{item.amount}</Text>
+                    </View>
+                  )}
+                  ListEmptyComponent={<Text style={{ color: '#e2e8f0', textAlign: 'center', paddingVertical: 22 }}>אין פעולות להצגה</Text>}
+                />
+              )}
+              {!!activityNextCursor && !activityLoading && (
+                <View style={{ paddingVertical: 12 }}>
+                  <TouchableOpacity
+                    onPress={loadMoreActivity}
+                    disabled={activityLoadingMore}
+                    style={{ alignSelf: 'center', paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#4a5568', borderRadius: 8 }}
+                  >
+                    <Text style={{ color: '#e2e8f0', fontWeight: '600' }}>
+                      {activityLoadingMore ? 'טוען…' : 'הצג עוד'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </LinearGradient>
+        </View>
+      </Modal>
 
        {/* מודאל תיבת דואר - גרסה מתוקנת */}
       <Modal 
