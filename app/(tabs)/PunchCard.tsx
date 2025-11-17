@@ -857,10 +857,12 @@ export default function PunchCard() {
         setDisconnectVisible(false);
         return;
       }
-      const { data, error } = await supabase.functions.invoke('customer-self-delete', {
-        body: { business_code: businessCode, customer_phone: custPhone },
+      // קריאה לפונקציית RPC ב-SQL (לא Edge)
+      const { data, error } = await supabase.rpc('customer_self_delete', {
+        business_code: businessCode,
+        customer_phone: custPhone,
       });
-      if (error) {
+      if (error || (data && (data as any)?.error)) {
         // לא נציג alert; נסגור וניתן חוויה שקטה
         setDeletingSelf(false);
         setDisconnectVisible(false);
