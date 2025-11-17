@@ -59,6 +59,7 @@ export default function PunchCard() {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [disconnectVisible, setDisconnectVisible] = useState(false);
+  const [deletingSelf, setDeletingSelf] = useState(false);
   const [nameEdit, setNameEdit] = useState<string>('');
   const [birthdayEdit, setBirthdayEdit] = useState<string>('');
   const [voucherInlineUrl, setVoucherInlineUrl] = useState<string | null>(null);
@@ -845,6 +846,47 @@ export default function PunchCard() {
     }
   };
 
+  const handleSelfDeleteConfirm = async () => {
+    if (deletingSelf) return;
+    try {
+      setDeletingSelf(true);
+      const businessCode = localBusiness?.business_code || customer?.business_code || business?.business_code || '';
+      const custPhone = customer?.customer_phone || phoneStr || '';
+      if (!businessCode || !custPhone) {
+        setDeletingSelf(false);
+        setDisconnectVisible(false);
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke('customer-self-delete', {
+        body: { business_code: businessCode, customer_phone: custPhone },
+      });
+      if (error) {
+        // לא נציג alert; נסגור וניתן חוויה שקטה
+        setDeletingSelf(false);
+        setDisconnectVisible(false);
+        return;
+      }
+      // ניקוי מצב מקומי בסיסי
+      try {
+        await AsyncStorage.removeItem('push_opt_in');
+        await AsyncStorage.removeItem('sms_opt_in');
+        if (businessCode) {
+          await AsyncStorage.removeItem(`push_opt_in_${businessCode}`);
+          await AsyncStorage.removeItem(`sms_opt_in_${businessCode}`);
+        }
+      } catch {}
+      setDeletingSelf(false);
+      setDisconnectVisible(false);
+      setDeleteVisible(false);
+      setMenuVisible(false);
+      // חזרה למסך הכניסה/מסך ראשי
+      router.push('/customers-login');
+    } catch (_) {
+      setDeletingSelf(false);
+      setDisconnectVisible(false);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {/* תפריט המבורגר */}
@@ -1257,10 +1299,7 @@ export default function PunchCard() {
                     <Text style={{ color: 'white', textAlign: 'center', fontFamily: 'Rubik' }}>התחרטתי, אשאר</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
-                    onPress={() => {
-                      // פונקציונליות ההתנתקות תטופל בהמשך
-                      setDisconnectVisible(false);
-                    }}
+                    onPress={handleSelfDeleteConfirm}
                     style={{ 
                       backgroundColor: '#8B0000', 
                       paddingVertical: 12, 
@@ -1270,7 +1309,9 @@ export default function PunchCard() {
                       alignSelf: 'center'
                     }}
                   >
-                    <Text style={{ color: 'white', textAlign: 'center', fontFamily: 'Rubik' }}>כן ולא לחפור לי יותר</Text>
+                    <Text style={{ color: 'white', textAlign: 'center', fontFamily: 'Rubik' }}>
+                      {deletingSelf ? 'מבצע…' : 'כן ולא לחפור לי יותר'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
