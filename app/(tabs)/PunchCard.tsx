@@ -911,7 +911,10 @@ export default function PunchCard() {
       setDeleteVisible(false);
       setMenuVisible(false);
       // הודעת אפליקציה לפני יציאה - ללא זמן אוטומטי (תישאר עד סגירה ידנית)
-      setVoucherToast({ visible: true, message: 'אנו מצטערים שאתה עוזב ומקווים שאי פעם אולי תחזור. לידיעתך פרטיך ימחקו סופית מהמערכת לאחר 30 ימים' });
+      setVoucherToast({ 
+        visible: true, 
+        message: 'אנו מצטערים שאתה עוזב ומקווים שאי פעם אולי תחזור. לידיעתך פרטיך ימחקו סופית מהמערכת לאחר 30 ימים. תשומת לבך שנותקת רק מעסק זה. אם יש לך בתי עסק אחרים שהינך רוצה להתנתק - בצע מחיקה בכל אחד מהם. כמו כן כדי להתנתק מכל בתי העסק באפליקציה במידה ולא חשוב לך מחיקת נתוניך בכל בית עסק עליך להסירה לחלוטין מחנות האפליקציות.'
+      });
       // חזרה למסך הכניסה/מסך ראשי רק אחרי סגירת ההודעה
     } catch (_) {
       setDeletingSelf(false);
@@ -1912,7 +1915,7 @@ export default function PunchCard() {
       <Modal visible={voucherToast.visible} transparent animationType="fade">
         <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
           <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}>
-            <View style={[styles.toastCardPunch, { position: 'relative', paddingRight: 32 }]}>
+            <View style={[styles.toastCardPunch, { position: 'relative', paddingRight: 32, backgroundColor: '#FFFFFF' }]}>
               <TouchableOpacity 
                 onPress={() => {
                   setVoucherToast({ visible: false, message: '' });
@@ -1920,9 +1923,21 @@ export default function PunchCard() {
                 }}
                 style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
               >
-                <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', lineHeight: 20 }}>×</Text>
+                <Text style={{ color: '#000000', fontSize: 20, fontWeight: 'bold', lineHeight: 20 }}>×</Text>
               </TouchableOpacity>
-              <Text style={styles.toastTextPunch}>{voucherToast.message}</Text>
+              <Text style={[styles.toastTextPunch, { color: '#000000' }]}>
+                {voucherToast.message.split('30 ימים. ').map((part, index) => {
+                  if (index === 1) {
+                    // החלק השני - הטקסט המודגש (אחרי "30 ימים. ")
+                    return (
+                      <Text key={index} style={{ fontWeight: 'bold' }}>
+                        {part}
+                      </Text>
+                    );
+                  }
+                  return <Text key={index}>{part}{index === 0 ? '30 ימים. ' : ''}</Text>;
+                })}
+              </Text>
             </View>
           </View>
         </View>
