@@ -862,8 +862,9 @@ export default function PunchCard() {
         business_code: businessCode,
         customer_phone: custPhone,
       });
-      if (error || (data && (data as any)?.error)) {
-        // לא נציג alert; נסגור וניתן חוויה שקטה
+      if (error || !data || (data as any)?.success === false || ((data as any)?.updated ?? 0) < 1) {
+        // כישלון – טוסט תכליתי כדי להבין בשטח
+        showVoucherToast('לא הצלחנו למחוק. אנא נסה שוב או פנה לתמיכה.', 3000);
         setDeletingSelf(false);
         setDisconnectVisible(false);
         return;
@@ -881,8 +882,12 @@ export default function PunchCard() {
       setDisconnectVisible(false);
       setDeleteVisible(false);
       setMenuVisible(false);
-      // חזרה למסך הכניסה/מסך ראשי
-      router.push('/customers-login');
+      // הודעת אפליקציה לפני יציאה
+      showVoucherToast('אנו מצטערים שאתה עוזב ומקווים שאי פעם אולי תחזור. לידיעתך פרטיך ימחקו סופית מהמערכת לאחר 30 ימים', 3500);
+      // חזרה למסך הכניסה/מסך ראשי לאחר רגע קצר
+      setTimeout(() => {
+        router.push('/customers-login');
+      }, 1200);
     } catch (_) {
       setDeletingSelf(false);
       setDisconnectVisible(false);
