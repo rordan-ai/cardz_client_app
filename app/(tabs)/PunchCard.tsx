@@ -910,12 +910,9 @@ export default function PunchCard() {
       setDisconnectVisible(false);
       setDeleteVisible(false);
       setMenuVisible(false);
-      // הודעת אפליקציה לפני יציאה
-      showVoucherToast('אנו מצטערים שאתה עוזב ומקווים שאי פעם אולי תחזור. לידיעתך פרטיך ימחקו סופית מהמערכת לאחר 30 ימים', 3500);
-      // חזרה למסך הכניסה/מסך ראשי לאחר רגע קצר
-      setTimeout(() => {
-        router.push('/customers-login');
-      }, 1200);
+      // הודעת אפליקציה לפני יציאה - ללא זמן אוטומטי (תישאר עד סגירה ידנית)
+      setVoucherToast({ visible: true, message: 'אנו מצטערים שאתה עוזב ומקווים שאי פעם אולי תחזור. לידיעתך פרטיך ימחקו סופית מהמערכת לאחר 30 ימים' });
+      // חזרה למסך הכניסה/מסך ראשי רק אחרי סגירת ההודעה
     } catch (_) {
       setDeletingSelf(false);
       setDisconnectVisible(false);
@@ -1913,9 +1910,18 @@ export default function PunchCard() {
 
       {/* Toast פנימי בהצגת שובר */}
       <Modal visible={voucherToast.visible} transparent animationType="fade">
-        <View style={[styles.modalOverlay, { justifyContent: 'flex-end' }]}>
-          <View style={{ width: '100%', alignItems: 'center', marginBottom: 40 }}>
-            <View style={styles.toastCardPunch}>
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
+          <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={[styles.toastCardPunch, { position: 'relative', paddingRight: 32 }]}>
+              <TouchableOpacity 
+                onPress={() => {
+                  setVoucherToast({ visible: false, message: '' });
+                  router.push('/customers-login');
+                }}
+                style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', lineHeight: 20 }}>×</Text>
+              </TouchableOpacity>
               <Text style={styles.toastTextPunch}>{voucherToast.message}</Text>
             </View>
           </View>
