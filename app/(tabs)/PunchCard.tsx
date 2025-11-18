@@ -173,6 +173,7 @@ export default function PunchCard() {
         .select('*')
         .eq('customer_phone', phoneStr)
         .eq('business_code', businessCode)
+        .is('deleted_at', null) // מניעת כניסה של לקוח שנמחק (soft delete)
         .limit(1);
       if (customerError) {
         setErrorMessage('לא נמצאה כרטיסייה מתאימה למספר זה. ודא שהזנת את המספר הנכון או שנרשמת לעסק.');
@@ -181,6 +182,12 @@ export default function PunchCard() {
       }
       if (!customers || customers.length === 0) {
         setErrorMessage('לא נמצאה כרטיסייה מתאימה למספר זה. ודא שהזנת את המספר הנכון או שנרשמת לעסק.');
+        setLoading(false);
+        return;
+      }
+      // בדיקה נוספת - אם deleted_at לא null (למקרה שה-RLS לא עובד)
+      if (customers[0]?.deleted_at) {
+        setErrorMessage('החשבון נמחק ואינו פעיל יותר.');
         setLoading(false);
         return;
       }
@@ -852,18 +859,39 @@ export default function PunchCard() {
       setDeletingSelf(true);
       const businessCode = localBusiness?.business_code || customer?.business_code || business?.business_code || '';
       const custPhone = customer?.customer_phone || phoneStr || '';
+      
+      // לוגים לאבחון
+      console.log('[SELF_DELETE] Starting deletion:', { businessCode, custPhone, customer: customer?.business_code, localBusiness: localBusiness?.business_code, business: business?.business_code });
+      
       if (!businessCode || !custPhone) {
+        console.error('[SELF_DELETE] Missing params:', { businessCode, custPhone });
         setDeletingSelf(false);
         setDisconnectVisible(false);
         return;
       }
+      
+      // בדיקה אם הלקוח קיים לפני המחיקה
+      const { data: checkData, error: checkError } = await supabase
+        .from('customers')
+        .select('business_code, customer_phone, deleted_at, name')
+        .eq('business_code', businessCode)
+        .eq('customer_phone', custPhone)
+        .maybeSingle();
+      
+      console.log('[SELF_DELETE] Customer check before delete:', { checkData, checkError, exists: !!checkData, alreadyDeleted: checkData?.deleted_at ? true : false });
+      
       // קריאה לפונקציית RPC ב-SQL (לא Edge)
       const { data, error } = await supabase.rpc('customer_self_delete', {
-        business_code: businessCode,
-        customer_phone: custPhone,
+        p_business_code: businessCode,
+        p_customer_phone: custPhone,
       });
+      
+      console.log('[SELF_DELETE] RPC result:', { data, error, success: (data as any)?.success, updated: (data as any)?.updated });
+      
       if (error || !data || (data as any)?.success === false || ((data as any)?.updated ?? 0) < 1) {
         // כישלון – טוסט תכליתי כדי להבין בשטח
+        const errorMsg = error?.message || (data as any)?.error || 'Unknown error';
+        console.error('[SELF_DELETE] Deletion failed:', { error, data, errorMsg });
         showVoucherToast('לא הצלחנו למחוק. אנא נסה שוב או פנה לתמיכה.', 3000);
         setDeletingSelf(false);
         setDisconnectVisible(false);

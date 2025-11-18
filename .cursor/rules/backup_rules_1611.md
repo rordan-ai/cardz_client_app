@@ -27,7 +27,7 @@
 
 🔧 סביבת עבודה מדויקת:
 Windows 10 + PowerShell
-נתיב: C:\cardz_curser\cards-admin-web
+נתיב: C:\cardz_curser\cards_projet
 ענפים: main → restore_checkpoints
 📝 תהליך מלא צעד אחר צעד:
 בדיקות התחלתיות
