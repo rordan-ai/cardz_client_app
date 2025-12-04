@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -231,32 +232,18 @@ export default function CustomersLogin() {
               shadowOffset: { width: 0, height: 4 },
             }}
           >
-            {/* אייקון וואטסאפ */}
+            {/* צור קשר - וואטסאפ למספר קבוע */}
             <TouchableOpacity 
               onPress={() => {
-                if (__DEV__) { console.log('Whatsapp pressed'); }
+                if (__DEV__) { console.log('Contact pressed'); }
                 closeMenu();
-                handleWhatsappChat();
+                Linking.openURL('https://wa.me/972552482442');
               }}
               style={{ paddingVertical: 8, paddingHorizontal: 4 }}
             >
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 18 }}>
                 <Image source={WhatsappIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
-                <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>צ'וטט איתנו</Text>
-              </View>
-            </TouchableOpacity>
-            {/* אייקון טלפון */}
-            <TouchableOpacity 
-              onPress={() => {
-                if (__DEV__) { console.log('Phone pressed'); }
-                closeMenu();
-                handlePhoneCall();
-              }}
-              style={{ paddingVertical: 8, paddingHorizontal: 4 }}
-            >
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 18 }}>
-                <Image source={PhoneIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
-                <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>צלצל אלינו</Text>
+                <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>צור קשר</Text>
               </View>
             </TouchableOpacity>
             {/* אייקון חץ */}
@@ -281,9 +268,23 @@ export default function CustomersLogin() {
               }}
               style={{ paddingVertical: 8, paddingHorizontal: 4 }}
             >
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 18 }}>
                 <Image source={LotteryIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
                 <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>הגרלות והפתעות</Text>
+              </View>
+            </TouchableOpacity>
+            {/* הצהרת נגישות */}
+            <TouchableOpacity 
+              onPress={() => {
+                if (__DEV__) { console.log('Accessibility pressed'); }
+                closeMenu();
+                Linking.openURL('https://yula-digital.com/accessibility');
+              }}
+              style={{ paddingVertical: 8, paddingHorizontal: 4 }}
+            >
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
+                <Ionicons name="accessibility" size={28} color={brandColor} style={{ marginLeft: 12 }} />
+                <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>הצהרת נגישות</Text>
               </View>
             </TouchableOpacity>
           </Animated.View>

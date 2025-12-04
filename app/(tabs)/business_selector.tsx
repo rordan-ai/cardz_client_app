@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useBusiness } from '../../components/BusinessContext';
 import { supabase } from '../../components/supabaseClient';
+import TutorialSlideshow from '../../components/TutorialSlideshow';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 1024 && height >= 768;
@@ -25,6 +26,7 @@ export default function BusinessSelector() {
   const [businesses, setBusinesses] = useState<{ name: string, id: string, logo?: string }[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [tutorialVisible, setTutorialVisible] = useState(false);
   const [searchBusiness, setSearchBusiness] = useState('');
   const { setBusinessCode } = useBusiness();
   const router = useRouter();
@@ -48,7 +50,21 @@ export default function BusinessSelector() {
 
   const handleMenuOption = (option: string) => {
     setMenuVisible(false);
-
+    
+    switch (option) {
+      case 'contact':
+        Linking.openURL('https://wa.me/972552482442');
+        break;
+      case 'accessibility':
+        Linking.openURL('https://yula-digital.com/accessibility');
+        break;
+      case 'privacy_policy':
+        Linking.openURL('https://yula-digital.com/privacy');
+        break;
+      case 'tutorial_video':
+        setTutorialVisible(true);
+        break;
+    }
   };
 
   return (
@@ -88,23 +104,9 @@ export default function BusinessSelector() {
             <View style={[styles.menuContent, isTablet && styles.tabletMenuContent]}>
               <TouchableOpacity 
                 style={styles.menuItem}
-                onPress={() => handleMenuOption('business_login')}
-              >
-                <Text style={styles.menuItemText}>כניסת בעלי עסקים</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.menuItem}
                 onPress={() => handleMenuOption('tutorial_video')}
               >
-                <Text style={styles.menuItemText}>סרטון הסבר</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.menuItem}
-                onPress={() => handleMenuOption('contact')}
-              >
-                <Text style={styles.menuItemText}>צור קשר</Text>
+                <Text style={styles.menuItemText}>הדגמה והסבר</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -112,6 +114,20 @@ export default function BusinessSelector() {
                 onPress={() => handleMenuOption('privacy_policy')}
               >
                 <Text style={styles.menuItemText}>מדיניות פרטיות</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuOption('accessibility')}
+              >
+                <Text style={styles.menuItemText}>הצהרת נגישות</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuOption('contact')}
+              >
+                <Text style={styles.menuItemText}>צור קשר</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -176,6 +192,12 @@ export default function BusinessSelector() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {/* מצגת הדגמה */}
+      <TutorialSlideshow 
+        visible={tutorialVisible} 
+        onClose={() => setTutorialVisible(false)} 
+      />
     </View>
   );
 }
