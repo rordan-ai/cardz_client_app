@@ -279,7 +279,7 @@ export default function CustomersLogin() {
         {/* שם העסק */}
         <Text style={styles(brandColor).businessName} accessibilityRole="header">{business?.name || ''}</Text>
         {/* טקסט כותרת */}
-        <Text style={styles(brandColor).mainTitle} accessibilityRole="header" accessibilityLevel={2}>הכרטיסייה שלי</Text>
+        <Text style={styles(brandColor).mainTitle} accessibilityRole="header">הכרטיסייה שלי</Text>
         {/* טלפון + הרשמה + תמונה */}
         <View style={{ width: windowWidth * 0.8, alignSelf: 'center', marginTop: 48 }}>
           {/* שדה טלפון + כפתור */}
