@@ -1502,10 +1502,13 @@ export default function PunchCard() {
                 <Text style={styles.menuItemText}>מחיקת משתמש</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); Linking.openURL('https://wa.me/972552482442'); }}>
                 <Text style={styles.menuItemText}>צור קשר</Text>
               </TouchableOpacity>
               
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); Linking.openURL('https://yula-digital.com/accessibility'); }}>
+                <Text style={styles.menuItemText}>הצהרת נגישות</Text>
+              </TouchableOpacity>
 
             </View>
           </View>
