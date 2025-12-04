@@ -129,14 +129,26 @@ export default function Layout() {
                         injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
                         injectedJavaScript={ALERT_BRIDGE_JS}
                         onMessage={(e) => {
-                          // לכל alert שנשלח מתוך הדף – נציג הודעת מערכת במקום דיאלוג
-                          showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
+                          // טיפול בהודעות מה-WebView
+                          try {
+                            const data = JSON.parse(e.nativeEvent.data);
+                            // הודעות bridge (alert/confirm/prompt) - להציג רק אם זה alert על שמירה
+                            if (data.type === 'alert' && data.message?.includes('שמור')) {
+                              showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
+                            }
+                            // סוגים אחרים (confirm, prompt) - לא להציג toast
+                          } catch {
+                            // אם זו לא הודעת JSON - להתעלם
+                          }
                         }}
                         onShouldStartLoadWithRequest={(req) => {
                           // לאפשר רק ניווט בתוך דומיין canva כדי למנוע דיאלוגי מערכת
                           try {
-                            const host = new URL(req.url).hostname;
-                            if (host.endsWith('canva.com') || host.endsWith('canva.cn')) return true;
+                            const host = new URL(req.url).hostname.toLowerCase();
+                            // בדיקה מאובטחת: רק canva.com/canva.cn או subdomain לגיטימי שלהם
+                            const isCanva = host === 'canva.com' || host === 'canva.cn' ||
+                                           host.endsWith('.canva.com') || host.endsWith('.canva.cn');
+                            if (isCanva) return true;
                           } catch {}
                           return false;
                         }}
