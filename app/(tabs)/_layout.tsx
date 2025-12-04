@@ -84,7 +84,7 @@ export default function Layout() {
     const phone = FCMService.getCurrentPhone();
     if (phone) {
       const separator = url.includes('?') ? '&' : '?';
-      url = `${url}${separator}phone=${phone}`;
+      url = `${url}${separator}phone=${encodeURIComponent(phone)}`;
     }
     return url;
   };

@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, DeviceEventEmitter } from 'react-native';
+import { Alert, DeviceEventEmitter, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Barcode } from 'react-native-svg-barcode';
 import { WebView } from 'react-native-webview';
 import { useBusiness } from '../../components/BusinessContext';
@@ -381,11 +381,12 @@ export default function PunchCard() {
     const loadUnreadCount = async () => {
       if (localBusiness && phoneStr) {
         try {
+          const phoneVariants = [phoneStr, phoneIntl].filter(Boolean);
           const { count } = await supabase
             .from('inbox')
             .select('*', { count: 'exact', head: true })
             .eq('business_code', localBusiness.business_code)
-            .in('customer_phone', [phoneStr, phoneIntl])
+            .in('customer_phone', phoneVariants.length > 0 ? phoneVariants : ['__NO_MATCH__'])
             .eq('status', 'unread');
           
           if (count !== null) {
@@ -470,11 +471,12 @@ export default function PunchCard() {
 
           (async () => {
             try {
+              const phoneVariants = [phoneStr, phoneIntl].filter(Boolean);
               const { count } = await supabase
                 .from('inbox')
                 .select('*', { count: 'exact', head: true })
                 .eq('business_code', businessCode)
-                .in('customer_phone', [phoneStr, phoneIntl])
+                .in('customer_phone', phoneVariants.length > 0 ? phoneVariants : ['__NO_MATCH__'])
                 .eq('status', 'unread');
 
               if (count !== null) {
@@ -654,16 +656,19 @@ export default function PunchCard() {
 
   const normalizePhone = (p?: string) => {
     if (!p) return '';
-    const trimmed = p.trim();
-    if (/^05\d{8}$/.test(trimmed)) return `972${trimmed.slice(1)}`;
-    return trimmed.replace(/[^0-9]/g, '');
+    // קודם ננקה את כל התווים שאינם ספרות
+    const digitsOnly = p.replace(/[^0-9]/g, '');
+    if (!digitsOnly) return '';
+    // בדיקה אם זה טלפון ישראלי בפורמט 05xxxxxxxx
+    if (/^05\d{8}$/.test(digitsOnly)) return `972${digitsOnly.slice(1)}`;
+    return digitsOnly;
   };
 
   const toLocal05 = (p?: string) => {
     if (!p) return '';
     const onlyDigits = p.replace(/[^0-9]/g, '');
     if (/^9725\d{8}$/.test(onlyDigits)) return `0${onlyDigits.slice(3)}`;
-    return p;
+    return onlyDigits || p;
   };
 
   const getPhoneVariants = (raw?: string) => {
@@ -711,6 +716,8 @@ export default function PunchCard() {
   };
 
   const fetchMyActivityFeed = async (pageSize = 100, cursor?: string) => {
+    // חילוץ timestamp מה-cursor (פורמט: "timestamp|index" או "timestamp" ישן)
+    const cursorTimestamp = cursor?.includes('|') ? cursor.split('|')[0] : cursor;
     const businessCode = business?.business_code || customer?.business_code;
     const raw = customer?.customer_phone || phoneStr || phoneIntl;
     if (!businessCode || !raw) {
@@ -733,8 +740,8 @@ export default function PunchCard() {
           .order('timestamp', { ascending: false })
           .limit(pageSize);
 
-        if (cursor) {
-          q = q.lt('timestamp', cursor);
+        if (cursorTimestamp) {
+          q = q.lte('timestamp', cursorTimestamp);
         }
 
         const { data, error } = await q;
@@ -771,8 +778,8 @@ export default function PunchCard() {
           .order('action_time', { ascending: false })
           .limit(pageSize);
 
-        if (cursor) {
-          q = q.lt('action_time', cursor);
+        if (cursorTimestamp) {
+          q = q.lte('action_time', cursorTimestamp);
         }
 
         const { data, error } = await q;
@@ -823,8 +830,8 @@ export default function PunchCard() {
           .order('timestamp', { ascending: false })
           .limit(pageSize * 2); // לוקח יותר כדי לסנן אחר כך
 
-        if (cursor) {
-          q = q.lt('timestamp', cursor);
+        if (cursorTimestamp) {
+          q = q.lte('timestamp', cursorTimestamp);
         }
 
         const { data, error } = await q;
@@ -899,24 +906,46 @@ export default function PunchCard() {
       }
     }
 
-    // מיון לפי timestamp וסינון כפילויות
+    // מיון לפי timestamp וסינון כפילויות - עם ID ייחודי
     console.log('[ActivityFeed] Total rows before deduplication:', allRows.length);
+    
+    // הוספת ID ייחודי לכל שורה לפני מיון
+    const rowsWithId = allRows.map((row, idx) => ({
+      ...row,
+      uniqueId: `${row.timestamp}_${row.actionLabel}_${idx}`
+    }));
+    
     const uniqueRows = Array.from(
-      new Map(allRows.map(row => [row.timestamp + row.actionLabel, row])).values()
+      new Map(rowsWithId.map(row => [row.timestamp + row.actionLabel, row])).values()
     ).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     console.log('[ActivityFeed] Total rows after deduplication:', uniqueRows.length);
     const limitedRows = uniqueRows.slice(0, pageSize);
-    const next = limitedRows.length > 0 && uniqueRows.length >= pageSize ? limitedRows[limitedRows.length - 1].timestamp : null;
+    
+    // cursor משולב: timestamp + index לטיפול ברשומות עם אותו timestamp
+    const lastRow = limitedRows[limitedRows.length - 1];
+    const lastIndex = uniqueRows.findIndex(r => r.uniqueId === lastRow?.uniqueId);
+    // בדיקה אם יש עוד רשומות מעבר למה שהוצג
+    const next = limitedRows.length > 0 && uniqueRows.length > limitedRows.length 
+      ? `${lastRow.timestamp}|${lastIndex}` 
+      : null;
 
     console.log('[ActivityFeed] Final result:', { rowsCount: limitedRows.length, hasNext: !!next });
-    return { rows: limitedRows.map(({ timestamp, ...rest }) => rest), next };
+    return { rows: limitedRows.map(({ timestamp, uniqueId, ...rest }) => rest), next };
   };
 
   const subscribeMyActivityRealtime = (businessCode: string, rawPhone: string) => {
     try {
+      // ביטול subscription קודם אם קיים
+      if (activityChannelRef.current) {
+        activityChannelRef.current.unsubscribe();
+        activityChannelRef.current = null;
+      }
+      
       const variants = getPhoneVariants(rawPhone);
-      const ch = supabase.channel('client_activity_rt');
+      const phoneId = rawPhone.replace(/[^0-9]/g, '').slice(-4) || 'unknown';
+      const channelName = `client_activity_rt_${businessCode}_${phoneId}`;
+      const ch = supabase.channel(channelName);
       
       // 1. Realtime subscription ל-user_activities (קיים)
       ch.on('postgres_changes',
@@ -1016,7 +1045,7 @@ export default function PunchCard() {
   const cleanupActivitySubscription = () => {
     try {
       if (activityChannelRef.current) {
-        supabase.removeChannel(activityChannelRef.current);
+        activityChannelRef.current.unsubscribe();
       }
     } catch {}
     activityChannelRef.current = null;
@@ -1122,12 +1151,27 @@ export default function PunchCard() {
         p_customer_phone: custPhone,
       });
       
-      console.log('[SELF_DELETE] RPC result:', { data, error, success: (data as any)?.success, updated: (data as any)?.updated });
+      console.log('[SELF_DELETE] RPC result:', { data, error, dataType: typeof data });
       
-      if (error || !data || (data as any)?.success === false || ((data as any)?.updated ?? 0) < 1) {
-        // כישלון – טוסט תכליתי כדי להבין בשטח
-        const errorMsg = error?.message || (data as any)?.error || 'Unknown error';
-        console.error('[SELF_DELETE] Deletion failed:', { error, data, errorMsg });
+      // בדיקת שגיאה מהRPC
+      if (error) {
+        console.error('[SELF_DELETE] RPC error:', error);
+        showVoucherToast('לא הצלחנו למחוק. אנא נסה שוב או פנה לתמיכה.', 3000);
+        setDeletingSelf(false);
+        setDisconnectVisible(false);
+        return;
+      }
+      
+      // בדיקת תוצאה - תומך בכמה פורמטים אפשריים
+      const result = data as any;
+      const isSuccess = result === true || 
+                        result?.success === true || 
+                        (typeof result?.updated === 'number' && result.updated > 0) ||
+                        (typeof result === 'number' && result > 0);
+      
+      if (!isSuccess && result?.success === false) {
+        const errorMsg = result?.error || 'Unknown error';
+        console.error('[SELF_DELETE] Deletion failed:', { data, errorMsg });
         showVoucherToast('לא הצלחנו למחוק. אנא נסה שוב או פנה לתמיכה.', 3000);
         setDeletingSelf(false);
         setDisconnectVisible(false);
@@ -1186,11 +1230,12 @@ export default function PunchCard() {
             setInboxLoading(true);
             
             try {
+              const phoneVariants = [phoneStr, phoneIntl].filter(Boolean);
               const { data, error } = await supabase
                 .from('inbox')
                 .select('id, title, message, status, created_at, data')
                 .eq('business_code', localBusiness.business_code)
-                .in('customer_phone', [phoneStr, phoneIntl])
+                .in('customer_phone', phoneVariants.length > 0 ? phoneVariants : ['__NO_MATCH__'])
                 .order('created_at', { ascending: false });
               if (error) {
                 if (__DEV__) {
@@ -1202,7 +1247,7 @@ export default function PunchCard() {
                   title: row.title || 'הודעה',
                   body: row.message || '',
                   timestamp: new Date(row.created_at).getTime(),
-                  read: row.status !== 'unread',
+                  read: row.status === 'read',
                   voucherUrl: row.data?.voucher_url || null,
                 }));
                 setNotifications(mapped);
@@ -1645,7 +1690,7 @@ export default function PunchCard() {
               ) : (
                 <FlatList
                   data={activityRows}
-                  keyExtractor={(_, idx) => `act-${idx}`}
+                  keyExtractor={(item, idx) => `act-${item.dateStr}-${item.actionLabel}-${idx}`}
                   contentContainerStyle={{ paddingBottom: 18 }}
                   style={{ maxHeight: '72%' }}
                   renderItem={({ item, index }) => (
@@ -1801,11 +1846,12 @@ export default function PunchCard() {
                                 if (msg.voucherUrl) {
                                   finalUrl = msg.voucherUrl;
                                 } else {
-                                  const urlMatch = msg.body.match(/(https?:\/\/[^\s]+)/);
+                                  // Regex משופר - חילוץ עד לתו מפריד או סוף מחרוזת
+                                  const urlMatch = msg.body.match(/(https?:\/\/[a-zA-Z0-9][-a-zA-Z0-9.]*[a-zA-Z0-9](?:\/[^\s<>"')\]]*)?)/);
                                   if (urlMatch) {
                                     let rawUrl = urlMatch[0];
-                                    rawUrl = rawUrl.replace(/[)\],.;:!?]+$/, '');
-                                    rawUrl = rawUrl.replace(/['"]+$/, '');
+                                    // ניקוי תווי פיסוק מהסוף
+                                    rawUrl = rawUrl.replace(/[)\],.;:!?'"]+$/, '');
                                     finalUrl = rawUrl;
                                   }
                                 }
@@ -1815,19 +1861,32 @@ export default function PunchCard() {
                                   return;
                                 }
 
+                                // בדיקת URL תקין עם domain validation
+                                let parsedUrl: URL | null = null;
+                                try {
+                                  parsedUrl = new URL(finalUrl);
+                                } catch {
+                                  Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
+                                  return;
+                                }
+
+                                // בדיקת protocol
+                                if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+                                  Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
+                                  return;
+                                }
+
+                                // בדיקת domain תקין (לפחות תו אחד לפני נקודה)
+                                if (!parsedUrl.hostname || !parsedUrl.hostname.includes('.') || parsedUrl.hostname.length < 4) {
+                                  Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
+                                  return;
+                                }
+
                                 let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
 
                                 if (phoneStr) {
                                   const separator = safeUrl.includes('?') ? '&' : '?';
-                                  safeUrl = `${safeUrl}${separator}phone=${phoneStr}`;
-                                }
-
-                                if (!safeUrl || safeUrl.length < 10) {
-                                  if (__DEV__) {
-                                    console.warn('[Voucher Link] Invalid URL value detected');
-                                  }
-                                  Alert.alert('שגיאה', 'הקישור לשובר אינו תקין');
-                                  return;
+                                  safeUrl = `${safeUrl}${separator}phone=${encodeURIComponent(phoneStr)}`;
                                 }
 
                                 setVoucherInlineUrl(safeUrl);
