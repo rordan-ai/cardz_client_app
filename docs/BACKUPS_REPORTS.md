@@ -1,6 +1,27 @@
 # דו״ח גיבוי - restore_checkpoints
 
-תאריך/שעה: 2025-11-16
+## גיבוי אחרון: 2025-12-04 19:00
+**הערה:** תפריט המבורגר ומצגת הדגמה
+
+### סיכום
+- ✅ SHA local = remote: `68587272c4cae47aceca23d95a953b60728ddc65`
+- ✅ Working directory נקי
+- ✅ קומיטים: main=36, restore_checkpoints=90
+
+### קבצים שנוספו/עודכנו:
+- `components/TutorialSlideshow.tsx` - רכיב מצגת הדגמה חדש (201 שורות)
+- `app/(tabs)/business_selector.tsx` - עדכון תפריט המבורגר
+- `app/(tabs)/customers-login.tsx` - עדכון תפריט המבורגר
+- `app/(tabs)/PunchCard.tsx` - עדכון תפריט המבורגר
+- `assets/images/tutorial/` - 12 תמונות מצגת (13MB)
+
+### ענפי ביטחון:
+- `safety_snapshot_20251204_190000`
+- `safety_backup_20251204_190000`
+
+---
+
+## גיבוי קודם: 2025-11-16
 
 סיכום
 - זהות מלאה בין מקומי לרחוק לענף `restore_checkpoints`:
