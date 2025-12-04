@@ -16,34 +16,57 @@ export default function ThankYou() {
   const logoSize = 170;
 
   return (
-    <View style={[styles.container, { transform: [{ scale: 0.85 }] }]}>
-      {/* לוגו */}
-      <View style={styles.logoContainer}>
-        {business?.logo ? (
-          <Image 
-            key={`logo-${business.business_code}-${business.logo}`}
-            source={{ uri: business.logo }} 
-            style={[styles.logo, { width: logoSize, height: logoSize, transform: [{ scale: 0.68 }] }]} 
-            resizeMode="contain" 
-          />
+    <View style={styles.wrapper}>
+      <View style={[styles.container, { transform: [{ scale: 0.85 }] }]}>
+        {/* לוגו */}
+        <View style={styles.logoContainer}>
+          {business?.logo ? (
+            <Image 
+              key={`logo-${business.business_code}-${business.logo}`}
+              source={{ uri: business.logo }} 
+              style={[styles.logo, { width: logoSize, height: logoSize, transform: [{ scale: 0.68 }] }]} 
+              resizeMode="contain" 
+            />
+          ) : null}
+        </View>
+        {/* שם העסק */}
+        {business?.name ? (
+          <Text style={styles.businessName}>{business.name}</Text>
         ) : null}
+        {/* כותרות */}
+        <Text style={styles.title}>ברוכ/ה הבא/ה</Text>
+        <Text style={styles.title}>יצרת כרטיסייה חדשה בתוכנית הכרטיסיות של כארדז</Text>
+        {/* טקסט הסבר */}
+        <Text style={styles.desc}>
+          הצטרפותך נרשמה במערכת הדיגיטלית בהצלחה!{"\n"}
+          לצפייה בכרטיסייה שלך הקש/י את מספר הנייד שלך במסך הכניסה.{"\n"}
+          הכרטיסייה כוללת סימן ברקוד לניקוב דיגיטלי מהיר ועוד כמה הפתעות. מה שנשאר זה להינות.
+        </Text>
+        {/* קו */}
+        <View style={styles.line} />
+        {/* מקום ריק לאנימציה - הועבר לפני האנימציה כדי לא לכסות */}
+        <View style={{ flex: 1 }} />
+        {/* כפתור X לסגירה */}
+        <View style={{ position: 'absolute', top: 2, left: 18, zIndex: 20 }}>
+          <Text
+            onPress={() => router.push('/customers-login')}
+            style={{ fontSize: 28, fontWeight: 'bold', color: '#888', padding: 4 }}
+          >
+            ×
+          </Text>
+        </View>
+
+        {/* כפתור שנה עסק */}
+        <View style={{ position: 'absolute', top: 2, right: 18, zIndex: 20 }}>
+          <Text
+            onPress={() => router.push('/(tabs)/business_selector')}
+            style={{ fontSize: 12, fontWeight: 'bold', color: '#1E51E9', padding: 4 }}
+          >
+            שנה עסק
+          </Text>
+        </View>
       </View>
-      {/* שם העסק */}
-      {business?.name ? (
-        <Text style={styles.businessName}>{business.name}</Text>
-      ) : null}
-      {/* כותרות */}
-      <Text style={styles.title}>ברוכ/ה הבא/ה</Text>
-      <Text style={styles.title}>יצרת כרטיסייה חדשה בתוכנית הכרטיסיות של כארדז</Text>
-      {/* טקסט הסבר */}
-      <Text style={styles.desc}>
-        הצטרפותך נרשמה במערכת הדיגיטלית בהצלחה!{"\n"}
-        לצפייה בכרטיסייה שלך הקש/י את מספר הנייד שלך במסך הכניסה.{"\n"}
-        הכרטיסייה כוללת סימן ברקוד לניקוב דיגיטלי מהיר ועוד כמה הפתעות. מה שנשאר זה להינות.
-      </Text>
-      {/* קו */}
-      <View style={styles.line} />
-      {/* אנימציה חדשה במרכז העמוד */}
+      {/* אנימציה מחוץ ל-container עם scale כדי לא להיות מושפעת */}
       <View style={styles.lottieCenter}>
         <LottieView
           ref={lottieRef}
@@ -62,32 +85,17 @@ export default function ThankYou() {
           }}
         />
       </View>
-      {/* מקום ריק לאנימציה */}
-      <View style={{ flex: 1 }} />
-      {/* כפתור X לסגירה */}
-      <View style={{ position: 'absolute', top: 2, left: 18, zIndex: 20 }}>
-        <Text
-          onPress={() => router.push('/customers-login')}
-          style={{ fontSize: 28, fontWeight: 'bold', color: '#888', padding: 4 }}
-        >
-          ×
-        </Text>
-      </View>
-
-      {/* כפתור שנה עסק */}
-      <View style={{ position: 'absolute', top: 2, right: 18, zIndex: 20 }}>
-        <Text
-          onPress={() => router.push('/(tabs)/business_selector')}
-          style={{ fontSize: 12, fontWeight: 'bold', color: '#1E51E9', padding: 4 }}
-        >
-          שנה עסק
-        </Text>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
   container: {
     width: 402,
     height: 874,
@@ -151,7 +159,7 @@ const styles = StyleSheet.create({
     transform: [{ translateX: -165 }, { translateY: -165 }],
     width: 330,
     height: 330,
-    zIndex: 20,
+    zIndex: 30,
     pointerEvents: 'none',
   },
   lottie: {

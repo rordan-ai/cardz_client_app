@@ -514,12 +514,16 @@ export default function PunchCard() {
         <Text style={{ fontSize: 18, color: '#D32F2F', marginBottom: 16, textAlign: 'center', fontFamily: 'Rubik' }}>{errorMessage}</Text>
         <Text style={{ color: '#888', marginBottom: 24, textAlign: 'center' }}>
           נסה שוב ו
+          <View style={{ display: 'inline', position: 'relative' }}>
           <Text
-            style={{ color: '#1E51E9', textDecorationLine: 'underline' }}
+              style={{ color: '#1E51E9' }}
             onPress={() => router.push('/customers-login')}
           >
             חזור לדף הכניסה
           </Text>
+            <View style={{ position: 'absolute', bottom: -2, left: 0, right: 0, height: 1, backgroundColor: '#1E51E9' }} />
+            <View style={{ position: 'absolute', bottom: -4, left: 0, right: 0, height: 1, backgroundColor: '#1E51E9' }} />
+          </View>
         </Text>
       </View>
     );
@@ -709,9 +713,16 @@ export default function PunchCard() {
   const fetchMyActivityFeed = async (pageSize = 100, cursor?: string) => {
     const businessCode = business?.business_code || customer?.business_code;
     const raw = customer?.customer_phone || phoneStr || phoneIntl;
-    if (!businessCode || !raw) return { rows: [], next: null as string | null };
+    if (!businessCode || !raw) {
+      console.log('[ActivityFeed] Missing businessCode or phone', { businessCode, raw });
+      return { rows: [], next: null as string | null };
+    }
 
     const variants = getPhoneVariants(raw);
+    console.log('[ActivityFeed] Starting fetch', { businessCode, raw, variants });
+    const allRows: Array<{ dateStr: string; actionLabel: string; amount: number; timestamp: string }> = [];
+    
+    // 1. קריאה מ-customer_activity_feed (קיים)
     for (const custPhone of variants) {
       try {
         let q = supabase
@@ -728,35 +739,186 @@ export default function PunchCard() {
 
         const { data, error } = await q;
         if (error) {
-          console.log('[ActivityFeed] query error', { businessCode, custPhone, message: String(error?.message || error) });
+          console.log('[ActivityFeed] customer_activity_feed query error', { businessCode, custPhone, message: String(error?.message || error), errorCode: error.code });
           continue;
         }
         const arr = Array.isArray(data) ? data : [];
-        console.log('[ActivityFeed] fetched', { businessCode, custPhone, count: arr.length, cursor: cursor || null });
+        console.log('[ActivityFeed] fetched from customer_activity_feed', { businessCode, custPhone, count: arr.length, cursor: cursor || null });
+        if (arr.length > 0) {
+          console.log('[ActivityFeed] customer_activity_feed sample:', arr.slice(0, 2).map((r: any) => ({ action_type: r.action_type, timestamp: r.timestamp })));
+        }
         const rows = arr.map((row: any) => {
           const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
           const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
             + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
           const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
           const qty = typeof row?.amount === 'number' ? row.amount : amount;
-          return { dateStr, actionLabel: label, amount: qty };
+          return { dateStr, actionLabel: label, amount: qty, timestamp: row?.timestamp || ts.toISOString() };
         });
-        const next = (arr.length > 0) ? arr[arr.length - 1].timestamp : null;
-        if (rows.length > 0 || cursor) {
-          return { rows, next };
-        }
-        // אין תוצאות בדף ראשון עם וריאנט זה — ננסה וריאנט נוסף
+        allRows.push(...rows);
       } catch (e: any) {
-        console.log('[ActivityFeed] exception', { businessCode, raw, error: String(e?.message || e) });
+        console.log('[ActivityFeed] customer_activity_feed exception', { businessCode, raw, error: String(e?.message || e) });
       }
     }
-    return { rows: [], next: null as string | null };
+    
+    // 1.5. קריאה מ-user_activities (אם customer_activity_feed לא כולל הכל)
+    for (const custPhone of variants) {
+      try {
+        let q = supabase
+          .from('user_activities')
+          .select('*')
+          .eq('customer_id', custPhone)
+          .order('action_time', { ascending: false })
+          .limit(pageSize);
+
+        if (cursor) {
+          q = q.lt('action_time', cursor);
+        }
+
+        const { data, error } = await q;
+        if (error) {
+          console.log('[ActivityFeed] user_activities query error', { businessCode, custPhone, message: String(error?.message || error) });
+          continue;
+        }
+        const arr = Array.isArray(data) ? data : [];
+        console.log('[ActivityFeed] fetched from user_activities', { businessCode, custPhone, count: arr.length });
+        if (arr.length > 0) {
+          console.log('[ActivityFeed] user_activities sample:', arr.slice(0, 2).map((r: any) => ({ action_type: r.action_type, action_time: r.action_time })));
+        }
+        const rows = arr.map((row: any) => {
+          const ts = row?.action_time ? new Date(row.action_time) : new Date();
+          const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+          const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+          const qty = typeof row?.amount === 'number' ? row.amount : amount;
+          return { dateStr, actionLabel: label, amount: qty, timestamp: row?.action_time || ts.toISOString() };
+        });
+        allRows.push(...rows);
+      } catch (e: any) {
+        console.log('[ActivityFeed] user_activities exception', { businessCode, raw, error: String(e?.message || e) });
+      }
+    }
+
+    // 2. קריאה מ-activity_logs (פעילויות אדמין) - תיקון כירורגי משופר
+    for (const custPhone of variants) {
+      try {
+        // חיפוש כל הכרטיסיות של הלקוח בעסק
+        const { data: cardsData, error: cardsError } = await supabase
+          .from('PunchCards')
+          .select('card_number, customer_phone')
+          .eq('business_code', businessCode)
+          .eq('customer_phone', custPhone);
+
+        const cardNumbers = cardsData && !cardsError ? cardsData.map(c => c.card_number) : [];
+        
+        // קריאת activity_logs - בדיקה בכל האפשרויות:
+        // 1. target_entity = card_number
+        // 2. target_entity = customer_phone
+        // 3. action_details מכיל card_number או customer_phone
+        let q = supabase
+          .from('activity_logs')
+          .select('*')
+          .eq('business_code', businessCode)
+          .eq('user_type', 'business_user')
+          .order('timestamp', { ascending: false })
+          .limit(pageSize * 2); // לוקח יותר כדי לסנן אחר כך
+
+        if (cursor) {
+          q = q.lt('timestamp', cursor);
+        }
+
+        const { data, error } = await q;
+        if (error) {
+          console.log('[ActivityFeed] activity_logs query error', { businessCode, custPhone, message: String(error?.message || error) });
+          continue;
+        }
+        const arr = Array.isArray(data) ? data : [];
+        console.log('[ActivityFeed] fetched from activity_logs (raw)', { businessCode, custPhone, count: arr.length, cursor: cursor || null });
+        
+        // לוג מפורט של כל הרשומות (רק אם יש רשומות)
+        if (arr.length > 0) {
+          console.log('[ActivityFeed] sample activity_logs entries:', arr.slice(0, 3).map((r: any) => ({
+            id: r.id,
+            action_type: r.action_type,
+            target_entity: r.target_entity,
+            action_details: r.action_details,
+            user_type: r.user_type,
+            timestamp: r.timestamp
+          })));
+        } else {
+          console.log('[ActivityFeed] WARNING: No activity_logs found for business_user in business_code:', businessCode);
+        }
+        
+        // סינון פעילויות ששייכות ללקוח הנוכחי
+        const filteredRows = arr.filter((row: any) => {
+          // בדיקה 1: target_entity = card_number
+          if (row.target_entity && cardNumbers.includes(row.target_entity)) {
+            console.log('[ActivityFeed] matched by target_entity=card_number', { target_entity: row.target_entity, action_type: row.action_type });
+            return true;
+          }
+          
+          // בדיקה 2: target_entity = customer_phone
+          if (row.target_entity && variants.includes(row.target_entity)) {
+            console.log('[ActivityFeed] matched by target_entity=customer_phone', { target_entity: row.target_entity, action_type: row.action_type });
+            return true;
+          }
+          
+          // בדיקה 3: action_details מכיל card_number או customer_phone
+          if (row.action_details && typeof row.action_details === 'object') {
+            const details = row.action_details;
+            const detailsCardNumber = details.card_number || details.cardNumber;
+            const detailsCustomerPhone = details.customer_phone || details.customerPhone || details.phone;
+            
+            if (detailsCardNumber && cardNumbers.includes(String(detailsCardNumber))) {
+              console.log('[ActivityFeed] matched by action_details.card_number', { card_number: detailsCardNumber, action_type: row.action_type });
+              return true;
+            }
+            
+            if (detailsCustomerPhone && variants.includes(String(detailsCustomerPhone))) {
+              console.log('[ActivityFeed] matched by action_details.customer_phone', { customer_phone: detailsCustomerPhone, action_type: row.action_type });
+              return true;
+            }
+          }
+          
+          return false;
+        });
+        
+        console.log('[ActivityFeed] filtered activity_logs', { businessCode, custPhone, rawCount: arr.length, filteredCount: filteredRows.length });
+        
+        const rows = filteredRows.map((row: any) => {
+          const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
+          const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+          const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+          const qty = typeof row?.amount === 'number' ? row.amount : amount;
+          return { dateStr, actionLabel: label, amount: qty, timestamp: row?.timestamp || ts.toISOString() };
+        });
+        allRows.push(...rows);
+      } catch (e: any) {
+        console.log('[ActivityFeed] activity_logs exception', { businessCode, raw, error: String(e?.message || e) });
+      }
+    }
+
+    // מיון לפי timestamp וסינון כפילויות
+    console.log('[ActivityFeed] Total rows before deduplication:', allRows.length);
+    const uniqueRows = Array.from(
+      new Map(allRows.map(row => [row.timestamp + row.actionLabel, row])).values()
+    ).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    console.log('[ActivityFeed] Total rows after deduplication:', uniqueRows.length);
+    const limitedRows = uniqueRows.slice(0, pageSize);
+    const next = limitedRows.length > 0 && uniqueRows.length >= pageSize ? limitedRows[limitedRows.length - 1].timestamp : null;
+
+    console.log('[ActivityFeed] Final result:', { rowsCount: limitedRows.length, hasNext: !!next });
+    return { rows: limitedRows.map(({ timestamp, ...rest }) => rest), next };
   };
 
   const subscribeMyActivityRealtime = (businessCode: string, rawPhone: string) => {
     try {
       const variants = getPhoneVariants(rawPhone);
       const ch = supabase.channel('client_activity_rt');
+      
+      // 1. Realtime subscription ל-user_activities (קיים)
       ch.on('postgres_changes',
         { event: '*', schema: 'public', table: 'user_activities' },
         (payload: any) => {
@@ -772,6 +934,80 @@ export default function PunchCard() {
           setActivityRows((prev) => [{ dateStr, actionLabel: label, amount: typeof amount === 'number' ? amount : 1 }, ...prev]);
         }
       );
+
+      // 2. Realtime subscription ל-activity_logs (פעילויות אדמין) - תיקון כירורגי משופר
+      ch.on('postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'activity_logs',
+          filter: `business_code=eq.${businessCode}`
+        },
+        async (payload: any) => {
+          const row = payload?.new;
+          if (!row || row.user_type !== 'business_user') return;
+          
+          try {
+            let isMatch = false;
+            
+            // בדיקה 1: target_entity = customer_phone
+            if (row.target_entity && variants.includes(row.target_entity)) {
+              console.log('[ActivityFeed] Realtime matched by target_entity=customer_phone', { target_entity: row.target_entity, action_type: row.action_type });
+              isMatch = true;
+            }
+            
+            // בדיקה 2: target_entity = card_number
+            if (!isMatch && row.target_entity) {
+              const { data: cardData } = await supabase
+                .from('PunchCards')
+                .select('customer_phone')
+                .eq('card_number', row.target_entity)
+                .eq('business_code', businessCode)
+                .single();
+              
+              if (cardData && variants.includes(cardData.customer_phone)) {
+                console.log('[ActivityFeed] Realtime matched by target_entity=card_number', { target_entity: row.target_entity, action_type: row.action_type });
+                isMatch = true;
+              }
+            }
+            
+            // בדיקה 3: action_details מכיל customer_phone או card_number
+            if (!isMatch && row.action_details && typeof row.action_details === 'object') {
+              const details = row.action_details;
+              const detailsCustomerPhone = details.customer_phone || details.customerPhone || details.phone;
+              const detailsCardNumber = details.card_number || details.cardNumber;
+              
+              if (detailsCustomerPhone && variants.includes(String(detailsCustomerPhone))) {
+                console.log('[ActivityFeed] Realtime matched by action_details.customer_phone', { customer_phone: detailsCustomerPhone, action_type: row.action_type });
+                isMatch = true;
+              } else if (detailsCardNumber) {
+                const { data: cardData } = await supabase
+                  .from('PunchCards')
+                  .select('customer_phone')
+                  .eq('card_number', String(detailsCardNumber))
+                  .eq('business_code', businessCode)
+                  .single();
+                
+                if (cardData && variants.includes(cardData.customer_phone)) {
+                  console.log('[ActivityFeed] Realtime matched by action_details.card_number', { card_number: detailsCardNumber, action_type: row.action_type });
+                  isMatch = true;
+                }
+              }
+            }
+            
+            if (!isMatch) return;
+            
+            const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
+            const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+            const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+            setActivityRows((prev) => [{ dateStr, actionLabel: label, amount: typeof amount === 'number' ? amount : 1 }, ...prev]);
+          } catch (e) {
+            console.log('[ActivityFeed] Realtime activity_logs error', e);
+          }
+        }
+      );
+      
       ch.subscribe();
       activityChannelRef.current = ch;
     } catch {}
@@ -910,12 +1146,12 @@ export default function PunchCard() {
       setDisconnectVisible(false);
       setDeleteVisible(false);
       setMenuVisible(false);
-      // הודעת אפליקציה לפני יציאה
-      showVoucherToast('אנו מצטערים שאתה עוזב ומקווים שאי פעם אולי תחזור. לידיעתך פרטיך ימחקו סופית מהמערכת לאחר 30 ימים', 3500);
-      // חזרה למסך הכניסה/מסך ראשי לאחר רגע קצר
-      setTimeout(() => {
-        router.push('/customers-login');
-      }, 1200);
+      // הודעת אפליקציה לפני יציאה - ללא זמן אוטומטי (תישאר עד סגירה ידנית)
+      setVoucherToast({ 
+        visible: true, 
+        message: 'אנו מצטערים שאתה עוזב ומקווים שאי פעם אולי תחזור. לידיעתך פרטיך ימחקו סופית מהמערכת לאחר 30 ימים. תשומת לבך שנותקת רק מעסק זה. אם יש לך בתי עסק אחרים שהינך רוצה להתנתק - בצע מחיקה בכל אחד מהם. כמו כן כדי להתנתק מכל בתי העסק באפליקציה במידה ולא חשוב לך מחיקת נתוניך בכל בית עסק עליך להסירה לחלוטין מחנות האפליקציות.'
+      });
+      // חזרה למסך הכניסה/מסך ראשי רק אחרי סגירת ההודעה
     } catch (_) {
       setDeletingSelf(false);
       setDisconnectVisible(false);
@@ -1101,15 +1337,15 @@ export default function PunchCard() {
                         onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
                         onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
                       />
-                      {/* חור ניקוב מעל הכוס - גדול ב-50% */}
+                      {/* חור ניקוב מעל הכוס - מוקטן ל-80% מהגודל הקודם */}
                       <Image
                         source={{ uri: 'https://noqfwkxzmvpkorcaymcb.supabase.co/storage/v1/object/public/icons/punched_icones/punch_overlay.png' }}
                         style={[styles.icon, { 
                           position: 'absolute', 
-                          top: -13.75, 
-                          left: -13.75, 
-                          width: 82.5, 
-                          height: 82.5, 
+                          top: -5.5, 
+                          left: -5.5, 
+                          width: 66, 
+                          height: 66, 
                           opacity: isIconLoading ? 0 : 1 
                         }]}
                         resizeMode="contain"
@@ -1598,9 +1834,13 @@ export default function PunchCard() {
                               }}
                               style={{ alignSelf: 'center', transform: [{ translateX: -28 }] }}
                             >
-                              <Text style={{ color: '#2196F3', fontSize: 14, textDecorationLine: 'underline', textAlign: 'center' }}>
+                              <View style={{ alignItems: 'center' }}>
+                                <Text style={{ color: '#2196F3', fontSize: 14, textAlign: 'center' }}>
                                 לצפייה בשובר
                               </Text>
+                                <View style={{ position: 'absolute', bottom: -2, left: 0, right: 0, height: 1, backgroundColor: '#2196F3' }} />
+                                <View style={{ position: 'absolute', bottom: -4, left: 0, right: 0, height: 1, backgroundColor: '#2196F3' }} />
+                              </View>
                             </TouchableOpacity>
                           </View>
                         )}
@@ -1705,9 +1945,13 @@ export default function PunchCard() {
                         });
                       }}
                     >
-                      <Text style={[styles.inviteMethodText, { color: cardTextColor }]}>
+                      <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={[styles.inviteMethodText, { color: cardTextColor, textDecorationLine: 'none' }]}>
                         הזמן בווטסאפ
                       </Text>
+                        <View style={{ position: 'absolute', bottom: -2, left: 0, right: 0, height: 1, backgroundColor: cardTextColor }} />
+                        <View style={{ position: 'absolute', bottom: -4, left: 0, right: 0, height: 1, backgroundColor: cardTextColor }} />
+                      </View>
                       <Image 
                         source={require('../../assets/icons/1.png')}
                         style={styles.inviteMethodIcon}
@@ -1729,9 +1973,13 @@ export default function PunchCard() {
                         });
                       }}
                     >
-                      <Text style={[styles.inviteMethodText, { color: cardTextColor }]}>
+                      <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={[styles.inviteMethodText, { color: cardTextColor, textDecorationLine: 'none' }]}>
                         הזמן במייל
                       </Text>
+                        <View style={{ position: 'absolute', bottom: -2, left: 0, right: 0, height: 1, backgroundColor: cardTextColor }} />
+                        <View style={{ position: 'absolute', bottom: -4, left: 0, right: 0, height: 1, backgroundColor: cardTextColor }} />
+                      </View>
                       <Image 
                         source={require('../../assets/icons/2.png')}
                         style={styles.inviteMethodIcon}
@@ -1755,9 +2003,13 @@ export default function PunchCard() {
                         });
                       }}
                     >
-                      <Text style={[styles.inviteMethodText, { color: cardTextColor }]}>
+                      <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={[styles.inviteMethodText, { color: cardTextColor, textDecorationLine: 'none' }]}>
                         הזמן בפייסבוק
                       </Text>
+                        <View style={{ position: 'absolute', bottom: -2, left: 0, right: 0, height: 1, backgroundColor: cardTextColor }} />
+                        <View style={{ position: 'absolute', bottom: -4, left: 0, right: 0, height: 1, backgroundColor: cardTextColor }} />
+                      </View>
                       <Image 
                         source={require('../../assets/icons/3.png')}
                         style={styles.inviteMethodIcon}
@@ -1777,9 +2029,13 @@ export default function PunchCard() {
                         });
                       }}
                     >
-                      <Text style={[styles.inviteMethodText, { color: cardTextColor }]}>
+                      <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={[styles.inviteMethodText, { color: cardTextColor, textDecorationLine: 'none' }]}>
                         הזמן{'\n'}באינסטגרם
                       </Text>
+                        <View style={{ position: 'absolute', bottom: -2, left: 0, right: 0, height: 1, backgroundColor: cardTextColor }} />
+                        <View style={{ position: 'absolute', bottom: -4, left: 0, right: 0, height: 1, backgroundColor: cardTextColor }} />
+                      </View>
                       <Image 
                         source={require('../../assets/icons/4.png')}
                         style={styles.inviteMethodIcon}
@@ -1913,10 +2169,31 @@ export default function PunchCard() {
 
       {/* Toast פנימי בהצגת שובר */}
       <Modal visible={voucherToast.visible} transparent animationType="fade">
-        <View style={[styles.modalOverlay, { justifyContent: 'flex-end' }]}>
-          <View style={{ width: '100%', alignItems: 'center', marginBottom: 40 }}>
-            <View style={styles.toastCardPunch}>
-              <Text style={styles.toastTextPunch}>{voucherToast.message}</Text>
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
+          <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={[styles.toastCardPunch, { position: 'relative', paddingRight: 32, backgroundColor: '#FFFFFF' }]}>
+              <TouchableOpacity 
+                onPress={() => {
+                  setVoucherToast({ visible: false, message: '' });
+                  router.push('/customers-login');
+                }}
+                style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: '#000000', fontSize: 20, fontWeight: 'bold', lineHeight: 20 }}>×</Text>
+              </TouchableOpacity>
+              <Text style={[styles.toastTextPunch, { color: '#000000' }]}>
+                {voucherToast.message.split('30 ימים. ').map((part, index) => {
+                  if (index === 1) {
+                    // החלק השני - הטקסט המודגש (אחרי "30 ימים. ")
+                    return (
+                      <Text key={index} style={{ fontWeight: 'bold' }}>
+                        {part}
+                      </Text>
+                    );
+                  }
+                  return <Text key={index}>{part}{index === 0 ? '30 ימים. ' : ''}</Text>;
+                })}
+              </Text>
             </View>
           </View>
         </View>
@@ -2613,9 +2890,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     fontFamily: 'Rubik',
-    textDecorationLine: 'underline',
     textAlign: 'center',
-    flex: 1,
   },
   referralCodeContainer: {
     alignItems: 'center',
