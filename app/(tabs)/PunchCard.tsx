@@ -12,7 +12,9 @@ import { WebView } from 'react-native-webview';
 import { useBusiness } from '../../components/BusinessContext';
 import FCMService from '../../components/FCMService';
 import { getCurrentLogoScale } from '../../components/LogoUtils';
+import MarketingPopup from '../../components/MarketingPopup';
 import { supabase } from '../../components/supabaseClient';
+import { useMarketingPopups } from '../../hooks/useMarketingPopups';
 
 const { width, height } = Dimensions.get('window');
 
@@ -155,6 +157,17 @@ export default function PunchCard() {
     return businessNumber + phoneLast4 + randomDigits;
   };
 
+  // פופאפים שיווקיים - trigger: after_punch (בכניסה לכרטיסייה)
+  const { 
+    currentPopup: punchPopup, 
+    showPopup: showPunchPopup, 
+    closePopup: closePunchPopup 
+  } = useMarketingPopups({
+    businessCode: localBusiness?.business_code || customer?.business_code || '',
+    customerPhone: phoneStr,
+    trigger: 'after_punch',
+    enabled: !!localBusiness?.business_code || !!customer?.business_code,
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -2396,6 +2409,13 @@ export default function PunchCard() {
           </View>
         </View>
       </Modal>
+
+      {/* פופאפ שיווקי - after_punch */}
+      <MarketingPopup
+        visible={showPunchPopup}
+        popup={punchPopup}
+        onClose={closePunchPopup}
+      />
 
     </ScrollView>
   );

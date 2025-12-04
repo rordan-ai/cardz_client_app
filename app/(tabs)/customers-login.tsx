@@ -4,6 +4,8 @@ import LottieView from 'lottie-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useBusiness } from '../../components/BusinessContext';
+import MarketingPopup from '../../components/MarketingPopup';
+import { useMarketingPopups } from '../../hooks/useMarketingPopups';
 const LotteryIcon = require('../../assets/images/LOTTARY.png');
 const ShareIcon = require('../../assets/images/SHARE.png');
 const PhoneIcon = require('../../assets/images/PHONE.png');
@@ -25,6 +27,13 @@ export default function CustomersLogin() {
   const slideAnim = useRef(new Animated.Value(-200)).current;
 
   const brandColor = business?.login_brand_color || '#9747FF';
+
+  // פופאפים שיווקיים - trigger: entry (בכניסה לאפליקציה)
+  const { currentPopup, showPopup, closePopup } = useMarketingPopups({
+    businessCode: business?.business_code || '',
+    trigger: 'entry',
+    enabled: !!business?.business_code && !loading,
+  });
 
   // Debug נתוני עסק
   useEffect(() => {
@@ -385,6 +394,13 @@ export default function CustomersLogin() {
           </View>
         </View>
       </View>
+
+      {/* פופאפ שיווקי - entry */}
+      <MarketingPopup
+        visible={showPopup}
+        popup={currentPopup}
+        onClose={closePopup}
+      />
     </View>
   );
 }
