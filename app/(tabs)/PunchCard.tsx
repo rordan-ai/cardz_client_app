@@ -54,6 +54,11 @@ export default function PunchCard() {
     voucherUrl?: string;
   }>>([]);
   const [referralVisible, setReferralVisible] = useState(false);
+  const [referralData, setReferralData] = useState<{
+    inviterBenefit: string | null;
+    invitedBenefit: string | null;
+    isConfigured: boolean;
+  }>({ inviterBenefit: null, invitedBenefit: null, isConfigured: false });
   const [cardSelectionVisible, setCardSelectionVisible] = useState(false);
   const [preferencesVisible, setPreferencesVisible] = useState(false);
   const [pushOptIn, setPushOptIn] = useState(true);
@@ -71,6 +76,9 @@ export default function PunchCard() {
   });
   const voucherWebViewRef = useRef<WebView>(null);
   const [activityVisible, setActivityVisible] = useState(false);
+  const [accessibilityVisible, setAccessibilityVisible] = useState(false);
+  const [privacyVisible, setPrivacyVisible] = useState(false);
+  const [aboutVisible, setAboutVisible] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityRows, setActivityRows] = useState<Array<{ dateStr: string; actionLabel: string; amount: number }>>([]);
   const [activityNextCursor, setActivityNextCursor] = useState<string | null>(null);
@@ -418,6 +426,58 @@ export default function PunchCard() {
     loadUnreadCount();
   }, [localBusiness?.business_code, phoneStr]);
 
+  // טעינת נתוני חבר מזמין חבר
+  useEffect(() => {
+    const fetchReferralData = async () => {
+      if (!localBusiness?.business_code) return;
+      
+      try {
+        // שלב 1: בדיקת הגדרות הפיצ'ר בטבלת referral_settings
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('referral_settings')
+          .select('enabled')
+          .eq('business_code', localBusiness.business_code)
+          .single();
+        
+        // אם אין רשומה או הפיצ'ר כבוי - לא מוגדר
+        if (settingsError || !settingsData || !settingsData.enabled) {
+          setReferralData({ inviterBenefit: null, invitedBenefit: null, isConfigured: false });
+          return;
+        }
+        
+        // שלב 2: הפיצ'ר פעיל - טעינת השוברים
+        const { data, error } = await supabase
+          .from('voucher_types')
+          .select('*')
+          .eq('business_code', localBusiness.business_code)
+          .eq('is_system', true)
+          .in('system_type', ['referral_inviter', 'referral_invited']);
+        
+        if (error) {
+          if (__DEV__) console.error('[Referral] Error fetching vouchers:', error);
+          setReferralData({ inviterBenefit: null, invitedBenefit: null, isConfigured: false });
+          return;
+        }
+        
+        const inviterVoucher = data?.find((v: { system_type: string }) => v.system_type === 'referral_inviter');
+        const invitedVoucher = data?.find((v: { system_type: string }) => v.system_type === 'referral_invited');
+        
+        // שליפת הטקסט מתוך ה-value JSON
+        const inviterBenefit = inviterVoucher?.value?.text || null;
+        const invitedBenefit = invitedVoucher?.value?.text || null;
+        
+        const isConfigured = !!(inviterBenefit && invitedBenefit);
+        
+        setReferralData({ inviterBenefit, invitedBenefit, isConfigured });
+      } catch (e) {
+        if (__DEV__) console.error('[Referral] Exception:', e);
+        setReferralData({ inviterBenefit: null, invitedBenefit: null, isConfigured: false });
+      }
+    };
+    
+    fetchReferralData();
+  }, [localBusiness?.business_code]);
+
   // עדכון Badge באייקון האפליקציה באמצעות expo-notifications
   useEffect(() => {
     const updateBadge = async () => {
@@ -527,8 +587,8 @@ export default function PunchCard() {
 
   if (errorMessage) {
     return (
-      <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center' }]}> 
-        <Text style={{ fontSize: 18, color: '#D32F2F', marginBottom: 16, textAlign: 'center', fontFamily: 'Rubik' }}>{errorMessage}</Text>
+      <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center' }]} accessible={true} accessibilityRole="alert"> 
+        <Text style={{ fontSize: 18, color: '#D32F2F', marginBottom: 16, textAlign: 'center', fontFamily: 'Rubik' }} accessibilityLiveRegion="assertive">{errorMessage}</Text>
         <Text style={{ color: '#888', marginBottom: 24, textAlign: 'center' }}>
           נסה שוב ו
           <Text
@@ -1222,6 +1282,9 @@ export default function PunchCard() {
       <TouchableOpacity 
         style={[styles.hamburgerContainer, styles.topIconOffsetClean]}
         onPress={() => setMenuVisible(true)}
+        accessibilityLabel="אפשרויות נוספות"
+        accessibilityRole="button"
+        accessibilityHint="לחץ לפתיחת תפריט עם אפשרויות נוספות כמו העדפות, פעילות ומחיקת משתמש"
       >
         <View style={{ alignItems: 'center' }}>
           <View style={styles.hamburgerButton}>
@@ -1236,6 +1299,9 @@ export default function PunchCard() {
       {/* אייקון הודעות דואר */}
       <TouchableOpacity 
         style={[styles.mailIconContainer, styles.topIconOffsetClean]}
+        accessibilityLabel={`הדואר שלי${unreadMessages > 0 ? `, ${unreadMessages} הודעות שלא נקראו` : ''}`}
+        accessibilityRole="button"
+        accessibilityHint="לחץ לצפייה בהודעות שהתקבלו מהעסק"
         onPress={async () => {
           setMailVisible(true);
           
@@ -1301,6 +1367,9 @@ export default function PunchCard() {
       <TouchableOpacity 
         style={[styles.communityIconContainer, styles.topIconOffsetClean]}
         onPress={() => setReferralVisible(true)}
+        accessibilityLabel="הזמן חבר"
+        accessibilityRole="button"
+        accessibilityHint="לחץ לשיתוף הכרטיסייה עם חבר בוואטסאפ"
       >
         <View style={{ alignItems: 'center' }}>
           <Image 
@@ -1351,12 +1420,12 @@ export default function PunchCard() {
             )}
             {/* שם העסק מתחת ללוגו */}
             {business?.name && (
-              <Text style={[styles.businessName, { color: cardTextColor }]}>{business.name}</Text>
+              <Text style={[styles.businessName, { color: cardTextColor }]} accessibilityRole="header">{business.name}</Text>
             )}
           </View>
         </View>
                  {/* שם הלקוח */}
-         <Text style={[styles.customerName, { color: cardTextColor }]}>{customer?.name || ''}</Text>
+         <Text style={[styles.customerName, { color: cardTextColor }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
       </View>
       {/* כל התוכן מתחת לשם הלקוח - מוזח 10% למטה */}
       <View style={styles.bottomContentOffset}>
@@ -1429,9 +1498,9 @@ export default function PunchCard() {
       {/* 4 הטקסטים התחתונים - מוזחים 7% למעלה */}
       <View style={styles.bottomTextsUpOffset}>
         {/* ניקובים */}
-        <Text style={[styles.punchCount, { color: cardTextColor }]}>ניקובים: {usedPunches}/{totalPunches}</Text>
+        <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
         {/* טקסט מתחת לאייקונים */}
-        <Text style={[styles.benefitText, { color: cardTextColor }]}>
+        <Text style={[styles.benefitText, { color: cardTextColor }]} accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefit}`}>
           נותרו {unpunched} ניקובים לקבלת {benefit}
         </Text>
         {/* סטטוס תשלום מראש */}
@@ -1474,39 +1543,39 @@ export default function PunchCard() {
                
               <Text style={[styles.menuTitle, { color: cardTextColor }]}>תפריט</Text>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setDetailsVisible(true); setNameEdit(customer?.name || ''); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setDetailsVisible(true); setNameEdit(customer?.name || ''); }} accessibilityLabel="הפרטים שלי" accessibilityRole="button" accessibilityHint="לחץ לצפייה ועריכת הפרטים האישיים">
                 <Text style={styles.menuItemText}>הפרטים שלי</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setPreferencesVisible(true); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setPreferencesVisible(true); }} accessibilityLabel="ההעדפות שלי" accessibilityRole="button" accessibilityHint="לחץ לניהול העדפות קבלת הודעות">
                 <Text style={styles.menuItemText}>ההעדפות שלי</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={openMyActivity}>
+              <TouchableOpacity style={styles.menuItem} onPress={openMyActivity} accessibilityLabel="הפעילות שלי" accessibilityRole="button" accessibilityHint="לחץ לצפייה בהיסטוריית הפעילות שלך">
                 <Text style={styles.menuItemText}>הפעילות שלי</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); showVoucherToast('בקרוב'); }} accessibilityLabel="שלח שובר מתנה עם ברכה" accessibilityRole="button" accessibilityHint="לחץ לשליחת שובר מתנה לחבר">
                 <Text style={[styles.menuItemText, { textAlign: 'center' }]}>שלח שובר מתנה עם{"\n"}ברכה</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setAboutVisible(true); }} accessibilityLabel="אודותנו" accessibilityRole="button" accessibilityHint="לחץ לצפייה במידע על החברה">
                 <Text style={styles.menuItemText}>אודותנו</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setPrivacyVisible(true); }} accessibilityLabel="מדיניות פרטיות" accessibilityRole="button" accessibilityHint="לחץ לצפייה במדיניות הפרטיות">
                 <Text style={styles.menuItemText}>מדיניות פרטיות</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setDeleteVisible(true); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setDeleteVisible(true); }} accessibilityLabel="מחיקת משתמש" accessibilityRole="button" accessibilityHint="לחץ לבקשת מחיקת החשבון שלך">
                 <Text style={styles.menuItemText}>מחיקת משתמש</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); Linking.openURL('https://wa.me/972552482442'); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); Linking.openURL('https://wa.me/972552482442'); }} accessibilityLabel="צור קשר בוואטסאפ" accessibilityRole="button" accessibilityHint="לחץ לפתיחת שיחת וואטסאפ עם התמיכה">
                 <Text style={styles.menuItemText}>צור קשר</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); Linking.openURL('https://yula-digital.com/accessibility'); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setAccessibilityVisible(true); }} accessibilityLabel="הצהרת נגישות" accessibilityRole="button" accessibilityHint="לחץ לצפייה בהצהרת הנגישות של האפליקציה">
                 <Text style={styles.menuItemText}>הצהרת נגישות</Text>
               </TouchableOpacity>
 
@@ -1955,52 +2024,58 @@ export default function PunchCard() {
                   </TouchableOpacity>
                 </View>
 
-                {/* קוד ההפניה */}
-                <View style={styles.referralCodeContainer}>
-                  <Text style={styles.referralCodeLabel}>קופון ההזמנה:</Text>
-                  <TouchableOpacity 
-                    style={styles.referralCodeBox}
-                    onPress={async () => {
-                                             try {
-                         const referralCode = customer && localBusiness 
-                           ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
-                           : punchCard?.card_number || '';
-                         await Clipboard.setStringAsync(referralCode);
-                         Alert.alert('הקופון הועתק!', `קופון ההזמנה ${referralCode} הועתק ללוח`);
-                      } catch (error: unknown) {
-                        // שגיאה בהעתקה - handled silently
-                        Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${(error as Error).message || error}`);
-                      }
-                    }}
-                  >
-                    <Text style={[styles.referralCodeText, { color: cardTextColor }]}>
-                      {customer && localBusiness 
-                        ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
-                        : punchCard?.card_number || ''}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.copyButton, { backgroundColor: cardTextColor }]}
-                    onPress={async () => {
-                                             try {
-                         const referralCode = customer && localBusiness 
-                           ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
-                           : punchCard?.card_number || '';
-                         await Clipboard.setStringAsync(referralCode);
-                         Alert.alert('הקופון הועתק!', `קופון ההזמנה ${referralCode} הועתק ללוח`);
-                      } catch (error: unknown) {
-                        // שגיאה בהעתקה - handled silently
-                        Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${(error as Error).message || error}`);
-                      }
-                    }}
-                  >
-                    <Text style={styles.copyButtonText}>העתק מספר קופון הזמנה</Text>
-                  </TouchableOpacity>
-                </View>
+                {/* קוד ההפניה - מוסתר אם הפיצ'ר לא פעיל */}
+                {referralData.isConfigured && (
+                  <View style={styles.referralCodeContainer}>
+                    <Text style={styles.referralCodeLabel}>קופון ההזמנה:</Text>
+                    <TouchableOpacity 
+                      style={styles.referralCodeBox}
+                      onPress={async () => {
+                                               try {
+                           const referralCode = customer && localBusiness 
+                             ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
+                             : punchCard?.card_number || '';
+                           await Clipboard.setStringAsync(referralCode);
+                           Alert.alert('הקופון הועתק!', `קופון ההזמנה ${referralCode} הועתק ללוח`);
+                        } catch (error: unknown) {
+                          // שגיאה בהעתקה - handled silently
+                          Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${(error as Error).message || error}`);
+                        }
+                      }}
+                    >
+                      <Text style={[styles.referralCodeText, { color: cardTextColor }]}>
+                        {customer && localBusiness 
+                          ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
+                          : punchCard?.card_number || ''}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.copyButton, { backgroundColor: cardTextColor }]}
+                      onPress={async () => {
+                                               try {
+                           const referralCode = customer && localBusiness 
+                             ? generateReferralCode(localBusiness.business_code, customer.customer_phone)
+                             : punchCard?.card_number || '';
+                           await Clipboard.setStringAsync(referralCode);
+                           Alert.alert('הקופון הועתק!', `קופון ההזמנה ${referralCode} הועתק ללוח`);
+                        } catch (error: unknown) {
+                          // שגיאה בהעתקה - handled silently
+                          Alert.alert('שגיאה', `לא ניתן להעתיק את הקופון: ${(error as Error).message || error}`);
+                        }
+                      }}
+                    >
+                      <Text style={styles.copyButtonText}>העתק מספר קופון הזמנה</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 {/* הודעה ראשית */}
-                <Text style={styles.referralMainText}>
-                  באפשרותך להזמין חבר/ה לכרטיסיית {business?.name}. על כל חבר שהזמנת ומימש הזמנתו אצלנו, תקבל ניקוב אחד חינם כמו גם החבר/ה שהזמנת. ניתן לשנות את הטקסטים בהודעה (לאישי או אחר) אך לא את הקישור המכיל את קופון ההזמנה.
+                <Text style={[styles.referralMainText, !referralData.isConfigured && { fontSize: 16, fontWeight: 'bold', marginVertical: 20 }]}>
+                  {referralData.isConfigured ? (
+                    `באפשרותך להזמין חבר/ה לכרטיסיית ${business?.name}. על כל חבר שהזמנת ומימש הזמנתו אצלנו, תקבל ${referralData.inviterBenefit}. גם החבר/ה שהזמנת יקבל ${referralData.invitedBenefit}. ניתן לשנות את הטקסטים בהודעה (לאישי או אחר) אך לא את הקישור המכיל את קופון ההזמנה.`
+                  ) : (
+                    'העסק טרם הגדיר תוכנית - מציעים לפנות אליו ולשאול'
+                  )}
                 </Text>
 
                 {/* אמצעי ההזמנה */}
@@ -2257,18 +2332,21 @@ export default function PunchCard() {
               >
                 <Text style={{ color: '#000000', fontSize: 20, fontWeight: 'bold', lineHeight: 20 }}>×</Text>
               </TouchableOpacity>
-              <Text style={[styles.toastTextPunch, { color: '#000000' }]}>
-                {voucherToast.message.split('30 ימים. ').map((part, index) => {
-                  if (index === 1) {
-                    // החלק השני - הטקסט המודגש (אחרי "30 ימים. ")
-                    return (
-                      <Text key={index} style={{ fontWeight: 'bold' }}>
-                        {part}
-                      </Text>
-                    );
-                  }
-                  return <Text key={index}>{part}{index === 0 ? '30 ימים. ' : ''}</Text>;
-                })}
+              <Text style={[styles.toastTextPunch, { color: '#000000', fontWeight: voucherToast.message === 'בקרוב' ? 'bold' : 'normal' }]}>
+                {voucherToast.message.includes('30 ימים') ? (
+                  voucherToast.message.split('30 ימים. ').map((part, index) => {
+                    if (index === 1) {
+                      return (
+                        <Text key={index} style={{ fontWeight: 'bold' }}>
+                          {part}
+                        </Text>
+                      );
+                    }
+                    return <Text key={index}>{part}{index === 0 ? '30 ימים. ' : ''}</Text>;
+                  })
+                ) : (
+                  voucherToast.message
+                )}
               </Text>
             </View>
           </View>
@@ -2420,9 +2498,370 @@ export default function PunchCard() {
         onClose={closePunchPopup}
       />
 
+      {/* מודאל הצהרת נגישות */}
+      <Modal
+        visible={accessibilityVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAccessibilityVisible(false)}
+      >
+        <View style={accessibilityStyles.overlay}>
+          <View style={accessibilityStyles.container}>
+            <TouchableOpacity 
+              style={accessibilityStyles.closeButton}
+              onPress={() => setAccessibilityVisible(false)}
+              accessibilityLabel="סגור הצהרת נגישות"
+              accessibilityRole="button"
+            >
+              <Text style={accessibilityStyles.closeText}>✕</Text>
+            </TouchableOpacity>
+            
+            <ScrollView style={accessibilityStyles.scrollView} showsVerticalScrollIndicator={true}>
+              <Text style={accessibilityStyles.mainTitle}>הצהרת נגישות</Text>
+              <Text style={accessibilityStyles.subtitle}>אפליקציית כראדז לכרטיסיות דיגיטליות</Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>כללי ורקע משפטי</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                אפליקציית כראדז לכרטיסיות דיגיטליות (להלן: "האפליקציה") שואפת לאפשר לכלל המשתמשים, לרבות אנשים עם מוגבלות, שימוש נגיש, שוויוני, מכבד ונוח בשירותיה.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                האפליקציה מונחית ברוחה על ידי חוק שוויון זכויות לאנשים עם מוגבלות ותקנות הנגישות, והיישום נעשה לפי תקן ישראלי ת״י 5568 המבוסס על הנחיות WCAG 2.0 ברמת AA, אשר חלות כיום גם על אפליקציות המספקות שירות לציבור.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                מאחר שטרם פורסם תקן ישראלי טכנולוגי ייעודי ומלא לאפליקציות מובייל, היישום בפועל נשען על שילוב עקרונות WCAG 2.0 AA עם הנחיות הנגישות הרשמיות של Android (גוגל) ו‑iOS (אפל), ועל ניצול מלא ככל הניתן של כלי הנגישות המובנים במכשירים.
+              </Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>עקרונות יישום באפליקציה</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                בהיעדר תקן נפרד לאפליקציות, האפליקציה פועלת בהתאם לעקרונות WCAG 2.0 AA, תוך התאמה ליכולות הנגישות שמספקות מערכות ההפעלה ולמגבלות הפלטפורמה.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                בדיקות נגישות מתבצעות באמצעות כלי הבדיקה של גוגל ואפל (כגון Accessibility Scanner באנדרואיד ו‑Accessibility Inspector ב‑Xcode), לצד בדיקות ידניות עם VoiceOver ו‑TalkBack, כדי לאתר חסמי נגישות ולשפרם בהדרגה.
+              </Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>התאמה ליכולות הנגישות באנדרואיד ו‑iOS</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                האפליקציה מותאמת לשימוש יחד עם כלי הנגישות המובנים במכשירים המבוססים על Android ו‑iOS, ככל שהמשתמש מפעילם במסגרת הגדרות הנגישות של המכשיר, ובכלל זה:
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>• תמיכה בקוראי מסך VoiceOver (iOS) ו‑TalkBack (Android), כולל הגדרת שמות ותיאורים נגישים לרכיבים אינטראקטיביים.</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• התאמה לתכונות מערכת כלליות כגון הגדלת טקסט, הגדרות תצוגה וניגודיות, מצב כהה, הפחתת תנועה ומאפייני נגישות חזותית נוספים.</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                בנוסף, נעשית השתדלות לאפשר שימוש באמצעי קלט ואביזרי עזר הנתמכים על ידי מערכת ההפעלה, בכפוף ליכולות הטכנולוגיות של הפלטפורמה.
+              </Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>התאמות נגישות עיקריות שבוצעו</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• הגדרת תוויות ותיאורי גישה נגישים לרכיבי ממשק עיקריים.</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• סדר ניווט לוגי ועקבי במעבר פוקוס בין רכיבים שונים במסך.</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• הקפדה על ניגודיות מספקת בין טקסט לרקע.</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• תמיכה בהגדלת טקסט/תצוגה לפי הגדרות הנגישות במכשיר.</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                מגבלות קיימות או חדשות שיתגלו בבדיקות נוספות יתועדו ויטופלו בגרסאות עתידיות של האפליקציה.
+              </Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>היקף התאמה ומגבלות</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                מאמצים רבים מושקעים כדי שהאפליקציה תעמוד ברוח התקן והחוק, אולם ייתכן שעדיין קיימים מסכים, תהליכים או רכיבים שאינם נגישים באופן מלא.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                כמו כן, ייתכנו הגבלות בנגישות לגבי תכנים או שירותים של צדדים שלישיים, המשולבים באפליקציה ואשר אינם בשליטה מלאה של מפעילי האפליקציה.
+              </Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>דרכי יצירת קשר לפניות נגישות</Text>
+              <Text style={accessibilityStyles.paragraph}>במידה ונתקלת בקושי נגישות, ניתן לפנות אלינו:</Text>
+              <TouchableOpacity 
+                onPress={() => Linking.openURL('mailto:support@punchcards.digital')}
+                accessibilityLabel="שלח דואר אלקטרוני לתמיכה"
+                accessibilityRole="link"
+                accessibilityHint="לחץ לפתיחת אפליקציית המייל ושליחת הודעה לתמיכה"
+              >
+                <Text style={accessibilityStyles.contactItemClickable}>📧 דואר אלקטרוני: support@punchcards.digital</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => Linking.openURL('https://wa.me/972552482442')}
+                accessibilityLabel="שלח הודעת וואטסאפ לתמיכה"
+                accessibilityRole="link"
+                accessibilityHint="לחץ לפתיחת וואטסאפ ושליחת הודעה לתמיכה"
+              >
+                <Text style={accessibilityStyles.contactItemClickable}>💬 ווטסאפ (הודעות): ‎+972‑55‑248‑2442</Text>
+              </TouchableOpacity>
+              <Text style={accessibilityStyles.paragraph}>לצורך טיפול יעיל בפנייתך, חשוב שהפניה תכלול:</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• תיאור קצר של הבעיה.</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• מיקום המסך שבו נתקלת בקושי.</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• צילום מסך (אם ניתן).</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• פרטי המכשיר ומערכת ההפעלה וגרסת האפליקציה.</Text>
+              <Text style={accessibilityStyles.paragraph}>פניות נגישות מקבלות עדיפות בטיפול.</Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>עדכון ההצהרה</Text>
+              <Text style={accessibilityStyles.paragraph}>הצהרת נגישות זו עודכנה לאחרונה בתאריך: 4 בדצמבר 2025.</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                האפליקציה והצהרה זו עשויות להתעדכן מעת לעת, בהתאם לשינויים טכנולוגיים, עדכוני מערכות הפעלה, שינויים בעמדת הרגולטור בישראל, או שיפורי נגישות שייושמו באפליקציה.
+              </Text>
+              <View style={{ height: 100 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* מודאל מדיניות פרטיות */}
+      <Modal
+        visible={privacyVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPrivacyVisible(false)}
+      >
+        <View style={accessibilityStyles.overlay}>
+          <View style={accessibilityStyles.container}>
+            <TouchableOpacity 
+              style={accessibilityStyles.closeButton}
+              onPress={() => setPrivacyVisible(false)}
+              accessibilityLabel="סגור מדיניות פרטיות"
+              accessibilityRole="button"
+            >
+              <Text style={accessibilityStyles.closeText}>✕</Text>
+            </TouchableOpacity>
+            
+            <ScrollView style={accessibilityStyles.scrollView} showsVerticalScrollIndicator={true}>
+              <Text style={accessibilityStyles.mainTitle}>מדיניות פרטיות</Text>
+              <Text style={accessibilityStyles.subtitle}>Cardz - כרטיסיות ניקוב דיגיטליות</Text>
+
+              <Text style={accessibilityStyles.paragraph}>
+                אפליקציית Cardz היא מערכת לניהול כרטיסיות ניקוב דיגיטליות, המשמשת עסקים לצורך הפעלת מועדון לקוחות, מתן הטבות, ניהול ניקובים ושליחת התראות (פוש).
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                השירות ניתן ללקוח על ידי העסק ממנו קיבלת את הכרטיסייה, ולא על ידי Cardz עצמה. Cardz מספקת פלטפורמה טכנולוגית בלבד.
+              </Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>1. איזה מידע אנחנו אוספים?</Text>
+              <Text style={accessibilityStyles.paragraph}>אנו אוספים אך ורק מידע בסיסי הדרוש לתפעול הכרטיסייה:</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• שם מלא</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• מספר טלפון</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• כתובת מייל (אם הוזנה)</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• יום הולדת (אופציונלי)</Text>
+              
+              <Text style={accessibilityStyles.paragraph}>מידע תפעולי:</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• תאריך ניקוב / ביטול ניקוב / חידוש כרטיסייה</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• תאריכי מימוש הטבות</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• שליחת/קבלת שוברי מתנה</Text>
+              
+              <Text style={accessibilityStyles.paragraph}>איננו אוספים: פרטי אשראי, פרטי תשלום, כתובות, היסטוריית גלישה.</Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>2. שימוש במידע</Text>
+              <Text style={accessibilityStyles.paragraph}>המידע משמש אך ורק לצורך:</Text>
+              <Text style={accessibilityStyles.bulletPoint}>✔ תפעול הכרטיסייה</Text>
+              <Text style={accessibilityStyles.bulletPoint}>✔ הצגת כמות ניקובים והטבות</Text>
+              <Text style={accessibilityStyles.bulletPoint}>✔ שליחת התראות פוש</Text>
+              <Text style={accessibilityStyles.bulletPoint}>✔ תמיכה וניהול חשבון</Text>
+              <Text style={accessibilityStyles.paragraph}>לא נעשה שימוש מסחרי, שיווקי חיצוני או מכירת מידע.</Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>3. גישה למידע</Text>
+              <Text style={accessibilityStyles.paragraph}>לנתונים שלך יכולים לגשת:</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• בעל העסק (האדמין) – לניהול הכרטיסייה</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• Cardz – לתמיכה בתקלות בלבד</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• ספקי אחסון מאובטחים (Supabase, Firebase)</Text>
+              <Text style={accessibilityStyles.paragraph}>אין העברת מידע לגורמי פרסום.</Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>4. אחסון ואבטחת מידע</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                המידע נשמר ב־Supabase תחת הצפנה מלאה. גיבויים נשמרים ב־Google Drive של בעל העסק.
+              </Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>5. משך שמירת המידע</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• מידע נשמר עד 6 חודשים בלבד</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• כרטיסיות לא פעילות נמחקות לחלוטין</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• בקשת מחיקה מבוצעת תוך 48 שעות</Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>6. זכויותיך</Text>
+              <Text style={accessibilityStyles.paragraph}>עיון במידע: ניתן לצפות בפרטים בתפריט "פרטי משתמש".</Text>
+              <Text style={accessibilityStyles.paragraph}>מחיקת מידע: ניתן להגיש בקשה דרך תפריט המשתמש. כל הנתונים יימחקו בתוך 48 שעות.</Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>7. קטינים</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                השירות מאפשר שימוש לקטינים. האחריות על התאמת השירות לגיל הלקוח מוטלת על בעל העסק.
+              </Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>8. קוקיז ומעקב</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                האפליקציה אינה משתמשת בקוקיז, פיקסלים או מנגנוני מעקב. נעשה שימוש ב־Google Analytics אנונימי בלבד.
+              </Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>9. הגבלת אחריות</Text>
+              <Text style={accessibilityStyles.paragraph}>Cardz אינה אחראית ל:</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• טיב המוצרים או השירותים של העסק</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• תוכן ההודעות, השוברים וההטבות</Text>
+              <Text style={accessibilityStyles.bulletPoint}>• טעויות ניקוב או זיכוי</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                Cardz מספקת פלטפורמה טכנולוגית בלבד, וכל אחריות הקשורה ביחסי הלקוח–העסק חלה על העסק בלבד.
+              </Text>
+
+              <Text style={accessibilityStyles.sectionTitle}>10. פרטי קשר</Text>
+              <Text style={accessibilityStyles.paragraph}>פניות בנושא פרטיות:</Text>
+              <TouchableOpacity 
+                onPress={() => Linking.openURL('mailto:support@punchcards.digital')}
+                accessibilityLabel="שלח דואר אלקטרוני בנושא פרטיות"
+                accessibilityRole="link"
+              >
+                <Text style={accessibilityStyles.contactItemClickable}>📧 support@punchcards.digital</Text>
+              </TouchableOpacity>
+
+              <Text style={[accessibilityStyles.paragraph, { marginTop: 20, opacity: 0.7 }]}>
+                עדכון אחרון: דצמבר 2025 | גרסה ללקוחות לפי תיקון 13
+              </Text>
+
+              <View style={{ height: 100 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* מודאל אודותינו */}
+      <Modal
+        visible={aboutVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAboutVisible(false)}
+      >
+        <View style={accessibilityStyles.overlay}>
+          <View style={accessibilityStyles.container}>
+            <TouchableOpacity 
+              style={accessibilityStyles.closeButton}
+              onPress={() => setAboutVisible(false)}
+              accessibilityLabel="סגור אודותינו"
+              accessibilityRole="button"
+            >
+              <Text style={accessibilityStyles.closeText}>✕</Text>
+            </TouchableOpacity>
+            
+            <ScrollView style={accessibilityStyles.scrollView} showsVerticalScrollIndicator={true}>
+              <Text style={accessibilityStyles.mainTitle}>אודותינו</Text>
+              <Text style={accessibilityStyles.subtitle}>יולה דיגיטל</Text>
+
+              <Text style={[accessibilityStyles.paragraph, { fontSize: 18, lineHeight: 28, marginTop: 20 }]}>
+                אנחנו חברה משפחתית אמיתית, אב ושתי בנותיו.
+              </Text>
+              <Text style={[accessibilityStyles.paragraph, { fontSize: 18, lineHeight: 28 }]}>
+                אנו עוזרים לעסקים גם בהתייעלות וגם במכירות עד להכפלת הפעילות באמצעות קידום דיגיטלי מתקדם, אפליקציות, אוטומציות עסקיות חכמות בעזרת בינה מלאכותית ועם עשרות לקוחות מרוצים ותוצאות מוכחות.
+              </Text>
+
+              <Text style={[accessibilityStyles.sectionTitle, { marginTop: 30 }]}>ליצירת קשר</Text>
+              <TouchableOpacity 
+                onPress={() => Linking.openURL('https://wa.me/972552482442')}
+                accessibilityLabel="שלח הודעת וואטסאפ"
+                accessibilityRole="link"
+              >
+                <Text style={[accessibilityStyles.contactItemClickable, { fontSize: 20 }]}>💬 בוואטסאפ: 055-248-2442</Text>
+              </TouchableOpacity>
+
+              <View style={{ height: 100 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
+
+// סגנונות מודאל הצהרת נגישות
+const accessibilityStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  container: {
+    width: '94%',
+    height: '90%',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    zIndex: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 30,
+  },
+  mainTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontFamily: 'Rubik',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#aaa',
+    textAlign: 'center',
+    marginBottom: 28,
+    fontFamily: 'Rubik',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'right',
+    marginTop: 20,
+    marginBottom: 12,
+    fontFamily: 'Rubik',
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+    paddingBottom: 8,
+  },
+  paragraph: {
+    fontSize: 14,
+    color: '#e0e0e0',
+    textAlign: 'right',
+    lineHeight: 24,
+    marginBottom: 12,
+    fontFamily: 'Rubik',
+  },
+  bulletPoint: {
+    fontSize: 14,
+    color: '#e0e0e0',
+    textAlign: 'right',
+    lineHeight: 24,
+    marginBottom: 8,
+    paddingRight: 8,
+    fontFamily: 'Rubik',
+  },
+  contactItem: {
+    fontSize: 14,
+    color: '#7cb3ff',
+    textAlign: 'right',
+    lineHeight: 24,
+    marginBottom: 8,
+    fontFamily: 'Rubik',
+  },
+  contactItemClickable: {
+    fontSize: 18,
+    color: '#7cb3ff',
+    textAlign: 'right',
+    lineHeight: 28,
+    marginBottom: 12,
+    fontFamily: 'Rubik',
+    textDecorationLine: 'underline',
+    paddingVertical: 8,
+  },
+});
 
 const styles = StyleSheet.create({
   container: {

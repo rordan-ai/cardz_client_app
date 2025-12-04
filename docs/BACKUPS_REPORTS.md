@@ -1,6 +1,47 @@
 # דו״ח גיבוי - restore_checkpoints
 
-תאריך/שעה: 2025-01-18 14:27:00
+## גיבוי אחרון: 2025-12-04 22:00
+**הערה:** תפריטים, פופאפים, מדיניות פרטיות, חבר מזמין חבר, תמונת כניסה חדשה
+
+### סיכום
+- ✅ גיבוי מלא בוצע
+- ✅ Working directory נקי
+
+### קבצים שנוספו/עודכנו:
+- `app/(tabs)/PunchCard.tsx` - מודאל פרטיות, מודאל אודותינו, חבר מזמין חבר דינמי
+- `app/(tabs)/business_selector.tsx` - מודאל פרטיות, תמונת כניסה חדשה, כיול שטחי מגע
+- `app/(tabs)/customers-login.tsx` - תפריט המבורגר עם שם עסק דינמי
+- `assets/images/new_entry.png` - תמונת כניסה חדשה
+- `docs/מדיניות פרטיות – Cardz.md` - מסמך מדיניות פרטיות
+
+### ענפי ביטחון:
+- `safety_snapshot_20251204_220000`
+- `safety_backup_20251204_220100`
+
+---
+
+## גיבוי קודם: 2025-12-04 19:00
+**הערה:** תפריט המבורגר ומצגת הדגמה
+
+### סיכום
+- ✅ SHA local = remote: `68587272c4cae47aceca23d95a953b60728ddc65`
+- ✅ Working directory נקי
+- ✅ קומיטים: main=36, restore_checkpoints=90
+
+### קבצים שנוספו/עודכנו:
+- `components/TutorialSlideshow.tsx` - רכיב מצגת הדגמה חדש (201 שורות)
+- `app/(tabs)/business_selector.tsx` - עדכון תפריט המבורגר
+- `app/(tabs)/customers-login.tsx` - עדכון תפריט המבורגר
+- `app/(tabs)/PunchCard.tsx` - עדכון תפריט המבורגר
+- `assets/images/tutorial/` - 12 תמונות מצגת (13MB)
+
+### ענפי ביטחון:
+- `safety_snapshot_20251204_190000`
+- `safety_backup_20251204_190000`
+
+---
+
+## גיבוי קודם: 2025-01-18 14:27:00
 
 סיכום
 - זהות מלאה בין מקומי לרחוק לענף `restore_checkpoints`:
@@ -10,7 +51,6 @@
 - ספירת קומיטים:
   - main: 36
   - restore_checkpoints: 76
-- הבדלי קבצים main ↔ restore_checkpoints: קיימים (מצופה, עקב עדכוני גיבוי ושינויים שנוספו). ראו diff name-only בפיקוח, כולל קבצי קוד ו‑docs.
 
 ענפי ביטחון שנוצרו:
 - safety_snapshot_20250118_142522: Snapshot עצמאי לפני גיבוי
@@ -18,23 +58,7 @@
 - restorepoint_snapshot_20250118_142700: Snapshot נקודת שחזור
 
 שינויים מרכזיים שנכללו בגיבוי:
-- תיקון מחיקה עצמית של לקוח: תיקון שמות פרמטרים ב-RPC (p_business_code, p_customer_phone)
-- תיקון הוספת לקוח חדש: הוספת RLS Policies ל-INSERT ו-UPDATE
+- תיקון מחיקה עצמית של לקוח: תיקון שמות פרמטרים ב-RPC
+- תיקון הוספת לקוח חדש: הוספת RLS Policies
 - הוספת לוגים לאבחון במחיקה עצמית
-- קבצי SQL: fix_customer_self_delete.sql, add_customers_rls_soft_delete.sql, fix_customers_rls_insert_update.sql
-- מסמך הוראות: FIX_CUSTOMER_SELF_DELETE_INSTRUCTIONS.md
-
-בדיקות איכות (מספריות)
-- ספירת שורות בקבצים קריטיים לאחר הגיבוי:
-  - app/(tabs)/_layout.tsx: 420 שורות
-  - app/(tabs)/PunchCard.tsx: 2663 שורות (עודכן עם לוגים ותיקונים)
-  - components/FCMService.ts: 395 שורות
-- תוצאות תואמות לצפי לאחר היישומים והגיבוי (אין חוסר/קטיעה של קבצים).
-
-הצהרה
-- אימות זהות מקומית‑רחוקה לענף `restore_checkpoints` הושלם בהצלחה.
-- בוצעו בדיקות איכות מספריות (ספירת קומיטים, diff name-only, ספירת שורות בקבצים קריטיים) והכל תקין.
-- כל השינויים הלא מוקדשים נשמרו בגיבוי.
-- הערה: לאחר תיקון הוספת לקוח חדש ומחיקה עצמית של לקוח
-
 

@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useBusiness } from '../../components/BusinessContext';
 import MarketingPopup from '../../components/MarketingPopup';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
@@ -25,6 +25,7 @@ export default function CustomersLogin() {
   const [imageKey, setImageKey] = useState(0);
   const { business, loading, refresh: refreshBusiness } = useBusiness();
   const [menuVisible, setMenuVisible] = useState(false);
+  const [accessibilityModalVisible, setAccessibilityModalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-200)).current;
 
   const brandColor = business?.login_brand_color || '#9747FF';
@@ -200,9 +201,15 @@ export default function CustomersLogin() {
   }
 
   return (
-    <View style={styles(brandColor).container}>
+    <View style={styles(brandColor).container} accessible={false} importantForAccessibility="yes">
       {/* אייקון המבורגר ממורכז בראש הדף */}
-      <TouchableOpacity onPress={openMenu} style={{ alignSelf: 'center', marginTop: 0, marginBottom: 4 }}>
+      <TouchableOpacity 
+        onPress={openMenu} 
+        style={{ alignSelf: 'center', marginTop: 0, marginBottom: 4 }}
+        accessibilityLabel="פתח תפריט ראשי"
+        accessibilityRole="button"
+        accessibilityHint="לחץ לפתיחת תפריט עם אפשרויות נוספות"
+      >
         <Image source={HamburgerIcon} style={{ width: 36, height: 36, tintColor: brandColor }} />
       </TouchableOpacity>
       {/* תפריט פופאובר */}
@@ -232,59 +239,21 @@ export default function CustomersLogin() {
               shadowOffset: { width: 0, height: 4 },
             }}
           >
-            {/* צור קשר - וואטסאפ למספר קבוע */}
+            {/* צור קשר עם העסק */}
             <TouchableOpacity 
               onPress={() => {
-                if (__DEV__) { console.log('Contact pressed'); }
+                if (__DEV__) { console.log('Contact business pressed'); }
                 closeMenu();
-                Linking.openURL('https://wa.me/972552482442');
+                handleWhatsappChat();
               }}
               style={{ paddingVertical: 8, paddingHorizontal: 4 }}
-            >
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 18 }}>
-                <Image source={WhatsappIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
-                <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>צור קשר</Text>
-              </View>
-            </TouchableOpacity>
-            {/* אייקון חץ */}
-            <TouchableOpacity 
-              onPress={() => {
-                if (__DEV__) { console.log('Share pressed'); }
-                closeMenu();
-                handleShareWhatsapp();
-              }}
-              style={{ paddingVertical: 8, paddingHorizontal: 4 }}
-            >
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 18 }}>
-                <Image source={ShareIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
-                <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>שתפ/י חבר/ה</Text>
-              </View>
-            </TouchableOpacity>
-            {/* אייקון הגרלות */}
-            <TouchableOpacity 
-              onPress={() => {
-                if (__DEV__) { console.log('Lottery pressed'); }
-                closeMenu();
-              }}
-              style={{ paddingVertical: 8, paddingHorizontal: 4 }}
-            >
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 18 }}>
-                <Image source={LotteryIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
-                <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>הגרלות והפתעות</Text>
-              </View>
-            </TouchableOpacity>
-            {/* הצהרת נגישות */}
-            <TouchableOpacity 
-              onPress={() => {
-                if (__DEV__) { console.log('Accessibility pressed'); }
-                closeMenu();
-                Linking.openURL('https://yula-digital.com/accessibility');
-              }}
-              style={{ paddingVertical: 8, paddingHorizontal: 4 }}
+              accessibilityLabel={`צור קשר עם ${business?.name || 'העסק'} בוואטסאפ`}
+              accessibilityRole="button"
+              accessibilityHint="לחץ לפתיחת שיחת וואטסאפ עם העסק"
             >
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
-                <Ionicons name="accessibility" size={28} color={brandColor} style={{ marginLeft: 12 }} />
-                <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>הצהרת נגישות</Text>
+                <Image source={WhatsappIcon} style={{ width: 28, height: 28, marginLeft: 12, tintColor: brandColor }} />
+                <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>צור קשר עם {business?.name || 'העסק'}</Text>
               </View>
             </TouchableOpacity>
           </Animated.View>
@@ -308,9 +277,9 @@ export default function CustomersLogin() {
               {/* שאר התוכן יורד למטה */}
       <View style={{ width: '100%', marginTop: 4, alignItems: 'center' }}>
         {/* שם העסק */}
-        <Text style={styles(brandColor).businessName}>{business?.name || ''}</Text>
+        <Text style={styles(brandColor).businessName} accessibilityRole="header">{business?.name || ''}</Text>
         {/* טקסט כותרת */}
-        <Text style={styles(brandColor).mainTitle}>הכרטיסייה שלי</Text>
+        <Text style={styles(brandColor).mainTitle} accessibilityRole="header" accessibilityLevel={2}>הכרטיסייה שלי</Text>
         {/* טלפון + הרשמה + תמונה */}
         <View style={{ width: windowWidth * 0.8, alignSelf: 'center', marginTop: 48 }}>
           {/* שדה טלפון + כפתור */}
@@ -327,22 +296,29 @@ export default function CustomersLogin() {
                 value={phone}
                 onChangeText={setPhone}
                 maxLength={10}
+                accessibilityLabel="שדה הזנת מספר טלפון"
+                accessibilityHint="הזן מספר טלפון נייד בן 10 ספרות לצפייה בכרטיסייה"
               />
             </View>
             <TouchableOpacity
               style={[styles(brandColor).clickBtn, { backgroundColor: brandColor }]}
               onPress={handleLogin}
-              accessibilityLabel="הקלק לכניסה"
+              accessibilityLabel="כניסה לכרטיסייה"
+              accessibilityRole="button"
+              accessibilityHint="לחץ לצפייה בכרטיסייה שלך לאחר הזנת מספר טלפון"
             >
               <Image source={ClickIcon} style={[styles(brandColor).clickIcon, { tintColor: '#fff' }]} />
             </TouchableOpacity>
           </View>
-          {error ? <Text style={styles(brandColor).errorText}>{error}</Text> : null}
+          {error ? <Text style={styles(brandColor).errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{error}</Text> : null}
           {/* הרשמה */}
           <View style={styles(brandColor).registerRow}>
             <TouchableOpacity
               style={styles(brandColor).registerBtn}
               onPress={() => router.push('/(tabs)/newclient_form')}
+              accessibilityLabel="הרשמה לכרטיסייה חדשה"
+              accessibilityRole="button"
+              accessibilityHint="לחץ להרשמה וקבלת כרטיסייה חדשה"
             >
               <Text style={[styles(brandColor).registerText, { color: brandColor }]}>הרשמ/י לקבלת כרטיסייה</Text>
             </TouchableOpacity>
@@ -402,6 +378,158 @@ export default function CustomersLogin() {
         popup={currentPopup}
         onClose={closePopup}
       />
+
+      {/* מודאל הצהרת נגישות */}
+      <Modal
+        visible={accessibilityModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAccessibilityModalVisible(false)}
+      >
+        <View style={accessibilityStyles.overlay}>
+          <View style={accessibilityStyles.container}>
+            {/* כפתור סגירה */}
+            <TouchableOpacity 
+              style={accessibilityStyles.closeButton}
+              onPress={() => setAccessibilityModalVisible(false)}
+              accessibilityLabel="סגור הצהרת נגישות"
+              accessibilityRole="button"
+            >
+              <Text style={accessibilityStyles.closeText}>✕</Text>
+            </TouchableOpacity>
+            
+            <ScrollView 
+              style={accessibilityStyles.scrollView}
+              showsVerticalScrollIndicator={true}
+            >
+              {/* כותרת ראשית */}
+              <Text style={accessibilityStyles.mainTitle}>הצהרת נגישות</Text>
+              <Text style={accessibilityStyles.subtitle}>אפליקציית כראדז לכרטיסיות דיגיטליות</Text>
+
+              {/* כללי ורקע משפטי */}
+              <Text style={accessibilityStyles.sectionTitle}>כללי ורקע משפטי</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                אפליקציית כראדז לכרטיסיות דיגיטליות (להלן: "האפליקציה") שואפת לאפשר לכלל המשתמשים, לרבות אנשים עם מוגבלות, שימוש נגיש, שוויוני, מכבד ונוח בשירותיה.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                האפליקציה מונחית ברוחה על ידי חוק שוויון זכויות לאנשים עם מוגבלות ותקנות הנגישות, והיישום נעשה לפי תקן ישראלי ת״י 5568 המבוסס על הנחיות WCAG 2.0 ברמת AA, אשר חלות כיום גם על אפליקציות המספקות שירות לציבור.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                מאחר שטרם פורסם תקן ישראלי טכנולוגי ייעודי ומלא לאפליקציות מובייל, היישום בפועל נשען על שילוב עקרונות WCAG 2.0 AA עם הנחיות הנגישות הרשמיות של Android (גוגל) ו‑iOS (אפל), ועל ניצול מלא ככל הניתן של כלי הנגישות המובנים במכשירים.
+              </Text>
+
+              {/* עקרונות יישום באפליקציה */}
+              <Text style={accessibilityStyles.sectionTitle}>עקרונות יישום באפליקציה</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                בהיעדר תקן נפרד לאפליקציות, האפליקציה פועלת בהתאם לעקרונות WCAG 2.0 AA, תוך התאמה ליכולות הנגישות שמספקות מערכות ההפעלה ולמגבלות הפלטפורמה.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                בדיקות נגישות מתבצעות באמצעות כלי הבדיקה של גוגל ואפל (כגון Accessibility Scanner באנדרואיד ו‑Accessibility Inspector ב‑Xcode), לצד בדיקות ידניות עם VoiceOver ו‑TalkBack, כדי לאתר חסמי נגישות ולשפרם בהדרגה.
+              </Text>
+
+              {/* התאמה ליכולות הנגישות */}
+              <Text style={accessibilityStyles.sectionTitle}>התאמה ליכולות הנגישות באנדרואיד ו‑iOS</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                האפליקציה מותאמת לשימוש יחד עם כלי הנגישות המובנים במכשירים המבוססים על Android ו‑iOS, ככל שהמשתמש מפעילם במסגרת הגדרות הנגישות של המכשיר, ובכלל זה:
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>
+                • תמיכה בקוראי מסך VoiceOver (iOS) ו‑TalkBack (Android), כולל הגדרת שמות ותיאורים נגישים לרכיבים אינטראקטיביים (כפתורים, שדות, אייקונים וקישורים) כדי שהמידע הקולי יהיה מובן ולא טכני.
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>
+                • התאמה לתכונות מערכת כלליות כגון הגדלת טקסט, הגדרות תצוגה וניגודיות, מצב כהה, הפחתת תנועה (Reduce Motion) ומאפייני נגישות חזותית נוספים, ככל שנתמכים על ידי מערכת ההפעלה והמכשיר.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                בנוסף, נעשית השתדלות לאפשר שימוש באמצעי קלט ואביזרי עזר הנתמכים על ידי מערכת ההפעלה (כגון מחוות מגע נגישות, מתגים – Switch Control – ואמצעי קלט חלופיים), בכפוף ליכולות הטכנולוגיות של הפלטפורמה.
+              </Text>
+
+              {/* התאמות נגישות עיקריות */}
+              <Text style={accessibilityStyles.sectionTitle}>התאמות נגישות עיקריות שבוצעו</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                בין היתר, בוצעו או מצויות בהטמעה התאמות מסוג:
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>
+                • הגדרת תוויות (labels) ותיאורי גישה נגישים לרכיבי ממשק עיקריים, כדי לאפשר ניווט והבנת תוכן באמצעות קוראי מסך.
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>
+                • סדר ניווט לוגי ועקבי במעבר פוקוס (focus) בין רכיבים שונים במסך, כדי למנוע דילוגים לא צפויים.
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>
+                • הקפדה ככל האפשר על ניגודיות מספקת בין טקסט לרקע, בהתאם להנחיות WCAG 2.0 ברמת AA, בכפוף לעיצוב הממשק.
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>
+                • תמיכה בהגדלת טקסט/תצוגה לפי הגדרות הנגישות במכשיר, תוך שאיפה לשמירה על ממשק שמיש וקריא גם בהגדלות משמעותיות.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                מגבלות קיימות או חדשות שיתגלו בבדיקות נוספות יתועדו ויטופלו, ככל שהדבר אפשרי מבחינה טכנולוגית ועסקית, בגרסאות עתידיות של האפליקציה.
+              </Text>
+
+              {/* היקף התאמה ומגבלות */}
+              <Text style={accessibilityStyles.sectionTitle}>היקף התאמה ומגבלות</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                מאמצים רבים מושקעים כדי שהאפליקציה תעמוד ברוח התקן והחוק, אולם ייתכן שעדיין קיימים מסכים, תהליכים או רכיבים שאינם נגישים באופן מלא, או שדורשים שיפור.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                כמו כן, ייתכנו הגבלות בנגישות לגבי תכנים או שירותים של צדדים שלישיים, המשולבים באפליקציה ואשר אינם בשליטה מלאה של מפעילי האפליקציה.
+              </Text>
+
+              {/* דרכי יצירת קשר */}
+              <Text style={accessibilityStyles.sectionTitle}>דרכי יצירת קשר לפניות נגישות</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                במידה ונתקלת בקושי נגישות באפליקציית כראדז, ניתן לפנות אלינו באמצעים הבאים:
+              </Text>
+              <TouchableOpacity 
+                onPress={() => Linking.openURL('mailto:support@punchcards.digital')}
+                accessibilityLabel="שלח דואר אלקטרוני לתמיכה"
+                accessibilityRole="link"
+                accessibilityHint="לחץ לפתיחת אפליקציית המייל ושליחת הודעה לתמיכה"
+              >
+                <Text style={accessibilityStyles.contactItemClickable}>
+                  📧 דואר אלקטרוני: support@punchcards.digital
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => Linking.openURL('https://wa.me/972552482442')}
+                accessibilityLabel="שלח הודעת וואטסאפ לתמיכה"
+                accessibilityRole="link"
+                accessibilityHint="לחץ לפתיחת וואטסאפ ושליחת הודעה לתמיכה"
+              >
+                <Text style={accessibilityStyles.contactItemClickable}>
+                  💬 ווטסאפ (הודעות): ‎+972‑55‑248‑2442
+                </Text>
+              </TouchableOpacity>
+              <Text style={accessibilityStyles.paragraph}>
+                לצורך טיפול יעיל בפנייתך, חשוב שהפניה תכלול:
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>
+                • תיאור קצר של הבעיה.
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>
+                • מיקום המסך שבו נתקלת בקושי (שם מסך/תהליך או תיאור ברור).
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>
+                • צילום מסך (אם ניתן).
+              </Text>
+              <Text style={accessibilityStyles.bulletPoint}>
+                • פרטי המכשיר ומערכת ההפעלה (Android/iOS + גרסה), וגרסת האפליקציה.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                פניות נגישות מקבלות עדיפות בטיפול, ותיבדקנה לצורך בחינת תיקון בגרסאות עתידיות של האפליקציה, ככל שהדבר אפשרי.
+              </Text>
+
+              {/* עדכון ההצהרה */}
+              <Text style={accessibilityStyles.sectionTitle}>עדכון ההצהרה</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                הצהרת נגישות זו עודכנה לאחרונה בתאריך: 4 בדצמבר 2025.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                האפליקציה והצהרה זו עשויות להתעדכן מעת לעת, בהתאם לשינויים טכנולוגיים, עדכוני מערכות הפעלה, שינויים בעמדת הרגולטור בישראל, או שיפורי נגישות שייושמו באפליקציה.
+              </Text>
+
+              <View style={{ height: 100 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -602,5 +730,107 @@ const styles = (brandColor: string) => StyleSheet.create({
     fontSize: 14,
     marginBottom: 8,
     fontFamily: 'Rubik',
+  },
+});
+
+// סגנונות מודאל הצהרת נגישות
+const accessibilityStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  container: {
+    width: '94%',
+    height: '90%',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    zIndex: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 30,
+  },
+  mainTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontFamily: 'Rubik',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#aaa',
+    textAlign: 'center',
+    marginBottom: 28,
+    fontFamily: 'Rubik',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'right',
+    marginTop: 20,
+    marginBottom: 12,
+    fontFamily: 'Rubik',
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+    paddingBottom: 8,
+  },
+  paragraph: {
+    fontSize: 14,
+    color: '#e0e0e0',
+    textAlign: 'right',
+    lineHeight: 24,
+    marginBottom: 12,
+    fontFamily: 'Rubik',
+  },
+  bulletPoint: {
+    fontSize: 14,
+    color: '#e0e0e0',
+    textAlign: 'right',
+    lineHeight: 24,
+    marginBottom: 8,
+    paddingRight: 8,
+    fontFamily: 'Rubik',
+  },
+  contactItem: {
+    fontSize: 14,
+    color: '#7cb3ff',
+    textAlign: 'right',
+    lineHeight: 24,
+    marginBottom: 8,
+    fontFamily: 'Rubik',
+  },
+  contactItemClickable: {
+    fontSize: 18,
+    color: '#7cb3ff',
+    textAlign: 'right',
+    lineHeight: 28,
+    marginBottom: 12,
+    fontFamily: 'Rubik',
+    textDecorationLine: 'underline',
+    paddingVertical: 8,
   },
 }); 
