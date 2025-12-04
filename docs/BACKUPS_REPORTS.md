@@ -4,8 +4,14 @@
 **הערה:** תפריטים, פופאפים, מדיניות פרטיות, חבר מזמין חבר, תמונת כניסה חדשה
 
 ### סיכום
-- ✅ גיבוי מלא בוצע
+- ✅ SHA local = remote: `c3a3fb9038af7960cdc6a81bacd0671178ab81ae`
 - ✅ Working directory נקי
+- ✅ קומיטים: main=36, restore_checkpoints=94
+
+### בדיקות איכות (ספירת שורות):
+- `app/(tabs)/PunchCard.tsx`: 3,565 שורות
+- `app/(tabs)/business_selector.tsx`: 733 שורות
+- `app/(tabs)/customers-login.tsx`: 835 שורות
 
 ### קבצים שנוספו/עודכנו:
 - `app/(tabs)/PunchCard.tsx` - מודאל פרטיות, מודאל אודותינו, חבר מזמין חבר דינמי
