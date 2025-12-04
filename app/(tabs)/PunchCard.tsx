@@ -352,6 +352,8 @@ export default function PunchCard() {
     return () => {
       punchCardChannel.unsubscribe();
       businessChannel.unsubscribe();
+      // ניקוי activity subscription אם קיים
+      cleanupActivitySubscription();
     };
   }, [phoneStr, customer?.business_code]);
   // --- REALTIME END ---
@@ -516,16 +518,12 @@ export default function PunchCard() {
         <Text style={{ fontSize: 18, color: '#D32F2F', marginBottom: 16, textAlign: 'center', fontFamily: 'Rubik' }}>{errorMessage}</Text>
         <Text style={{ color: '#888', marginBottom: 24, textAlign: 'center' }}>
           נסה שוב ו
-          <View style={{ display: 'inline', position: 'relative' }}>
           <Text
-              style={{ color: '#1E51E9' }}
+            style={{ color: '#1E51E9', textDecorationLine: 'underline' }}
             onPress={() => router.push('/customers-login')}
           >
             חזור לדף הכניסה
           </Text>
-            <View style={{ position: 'absolute', bottom: -2, left: 0, right: 0, height: 1, backgroundColor: '#1E51E9' }} />
-            <View style={{ position: 'absolute', bottom: -4, left: 0, right: 0, height: 1, backgroundColor: '#1E51E9' }} />
-          </View>
         </Text>
       </View>
     );
@@ -667,8 +665,11 @@ export default function PunchCard() {
   const toLocal05 = (p?: string) => {
     if (!p) return '';
     const onlyDigits = p.replace(/[^0-9]/g, '');
+    // המרה לפורמט 05 אם זה טלפון בינלאומי ישראלי
     if (/^9725\d{8}$/.test(onlyDigits)) return `0${onlyDigits.slice(3)}`;
-    return onlyDigits || p;
+    // אם לא תואם pattern - מחזיר את הספרות בלבד, או המקורי אם אין ספרות
+    if (!onlyDigits) return p;
+    return onlyDigits;
   };
 
   const getPhoneVariants = (raw?: string) => {
@@ -716,8 +717,8 @@ export default function PunchCard() {
   };
 
   const fetchMyActivityFeed = async (pageSize = 100, cursor?: string) => {
-    // חילוץ timestamp מה-cursor (פורמט: "timestamp|index" או "timestamp" ישן)
-    const cursorTimestamp = cursor?.includes('|') ? cursor.split('|')[0] : cursor;
+    // cursor הוא timestamp בלבד
+    const cursorTimestamp = cursor;
     const businessCode = business?.business_code || customer?.business_code;
     const raw = customer?.customer_phone || phoneStr || phoneIntl;
     if (!businessCode || !raw) {
@@ -741,7 +742,7 @@ export default function PunchCard() {
           .limit(pageSize);
 
         if (cursorTimestamp) {
-          q = q.lte('timestamp', cursorTimestamp);
+          q = q.lt('timestamp', cursorTimestamp);
         }
 
         const { data, error } = await q;
@@ -779,7 +780,7 @@ export default function PunchCard() {
           .limit(pageSize);
 
         if (cursorTimestamp) {
-          q = q.lte('action_time', cursorTimestamp);
+          q = q.lt('action_time', cursorTimestamp);
         }
 
         const { data, error } = await q;
@@ -831,7 +832,7 @@ export default function PunchCard() {
           .limit(pageSize * 2); // לוקח יותר כדי לסנן אחר כך
 
         if (cursorTimestamp) {
-          q = q.lte('timestamp', cursorTimestamp);
+          q = q.lt('timestamp', cursorTimestamp);
         }
 
         const { data, error } = await q;
@@ -922,12 +923,11 @@ export default function PunchCard() {
     console.log('[ActivityFeed] Total rows after deduplication:', uniqueRows.length);
     const limitedRows = uniqueRows.slice(0, pageSize);
     
-    // cursor משולב: timestamp + index לטיפול ברשומות עם אותו timestamp
+    // cursor פשוט: timestamp בלבד (dedup מטופל בצד קליינט)
     const lastRow = limitedRows[limitedRows.length - 1];
-    const lastIndex = uniqueRows.findIndex(r => r.uniqueId === lastRow?.uniqueId);
     // בדיקה אם יש עוד רשומות מעבר למה שהוצג
     const next = limitedRows.length > 0 && uniqueRows.length > limitedRows.length 
-      ? `${lastRow.timestamp}|${lastIndex}` 
+      ? lastRow.timestamp 
       : null;
 
     console.log('[ActivityFeed] Final result:', { rowsCount: limitedRows.length, hasNext: !!next });
@@ -1169,9 +1169,10 @@ export default function PunchCard() {
                         (typeof result?.updated === 'number' && result.updated > 0) ||
                         (typeof result === 'number' && result > 0);
       
-      if (!isSuccess && result?.success === false) {
-        const errorMsg = result?.error || 'Unknown error';
-        console.error('[SELF_DELETE] Deletion failed:', { data, errorMsg });
+      // אם לא הצליח - הצג שגיאה
+      if (!isSuccess) {
+        const errorMsg = result?.error || 'לא התקבל אישור למחיקה';
+        console.error('[SELF_DELETE] Deletion failed:', { data, errorMsg, isSuccess });
         showVoucherToast('לא הצלחנו למחוק. אנא נסה שוב או פנה לתמיכה.', 3000);
         setDeletingSelf(false);
         setDisconnectVisible(false);
