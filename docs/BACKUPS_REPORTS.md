@@ -4,9 +4,18 @@
 **הערה:** זיהוי ביומטרי, מיון לפי מיקום GPS, הגדרות EAS Build
 
 ### סיכום
-- ✅ SHA local = remote: `1f0ebc3`
-- ✅ Working directory נקי
-- ✅ קומיטים: main=36, restore_checkpoints=98
+- ✅ SHA local = remote: `bae9d2e6490111bcf6419492e3059a49fb7da3f9`
+- ✅ Diff: ריק (אין הבדלים בין local ל-remote)
+- ✅ Working directory: נקי (git status --porcelain → ריק)
+- ✅ קומיטים: main=36, restore_checkpoints=99
+
+### בדיקות איכות (ספירת שורות):
+| קובץ | שורות | השוואה לגיבוי קודם |
+|------|--------|-------------------|
+| `app/(tabs)/PunchCard.tsx` | 3,565 | ללא שינוי |
+| `app/(tabs)/business_selector.tsx` | 1,034 | +301 (GPS) |
+| `app/(tabs)/customers-login.tsx` | 1,060 | +225 (ביומטרי) |
+| **סה"כ** | **5,659** | +526 שורות |
 
 ### קבצים שנוספו/עודכנו:
 - `app/(tabs)/customers-login.tsx` - זיהוי ביומטרי (Face ID/טביעת אצבע)
