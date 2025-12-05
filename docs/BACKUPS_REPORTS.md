@@ -1,6 +1,30 @@
 # דו״ח גיבוי - restore_checkpoints
 
-## גיבוי אחרון: 2025-12-04 22:00
+## גיבוי אחרון: 2025-12-05 17:30
+**הערה:** זיהוי ביומטרי, מיון לפי מיקום GPS, הגדרות EAS Build
+
+### סיכום
+- ✅ SHA local = remote: `1f0ebc3`
+- ✅ Working directory נקי
+- ✅ קומיטים: main=36, restore_checkpoints=98
+
+### קבצים שנוספו/עודכנו:
+- `app/(tabs)/customers-login.tsx` - זיהוי ביומטרי (Face ID/טביעת אצבע)
+- `app/(tabs)/business_selector.tsx` - מיון עסקים לפי מיקום GPS
+- `app.json` - הגדרות הרשאות מיקום ו-SecureStore
+- `eas.json` - הגדרות EAS Build
+- `.easignore` - קובץ התעלמות ל-EAS Build
+- `assets/icons/biometric.png` - אייקון זיהוי ביומטרי
+- `assets/icons/cardz-logo.png` - לוגו האפליקציה
+
+### פיצ'רים חדשים:
+- זיהוי ביומטרי לכניסה מהירה לכרטיסייה
+- מיון עסקים לפי קרבה גיאוגרפית
+- הכנה ל-EAS Build להפצה
+
+---
+
+## גיבוי קודם: 2025-12-04 22:00
 **הערה:** תפריטים, פופאפים, מדיניות פרטיות, חבר מזמין חבר, תמונת כניסה חדשה
 
 ### סיכום
