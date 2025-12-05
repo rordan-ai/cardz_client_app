@@ -2,17 +2,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 import { useBusiness } from '../../components/BusinessContext';
 import MarketingPopup from '../../components/MarketingPopup';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
+
+// מפתח לשמירה מאובטחת - מספר טלפון בלבד (לא קשור לעסק ספציפי)
+const BIOMETRIC_PHONE_KEY = 'biometric_phone';
 const LotteryIcon = require('../../assets/images/LOTTARY.png');
 const ShareIcon = require('../../assets/images/SHARE.png');
 const PhoneIcon = require('../../assets/images/PHONE.png');
 const WhatsappIcon = require('../../assets/images/whatsapp.png');
 const ClickIcon = require('../../assets/images/5.png');
 const HamburgerIcon = require('../../assets/images/hamburger_menu.png');
+const BiometricIcon = require('../../assets/icons/biometric.png');
 
 const windowWidth = Dimensions.get('window').width;
 
@@ -28,7 +34,102 @@ export default function CustomersLogin() {
   const [accessibilityModalVisible, setAccessibilityModalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-200)).current;
 
+  // מצבי כניסה ביומטרית
+  const [biometricSetupModalVisible, setBiometricSetupModalVisible] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricSetupDone, setBiometricSetupDone] = useState(false);
+  const [biometricAuthInProgress, setBiometricAuthInProgress] = useState(false);
+
   const brandColor = business?.login_brand_color || '#9747FF';
+
+  // בדיקה אם ביומטריה זמינה במכשיר
+  useEffect(() => {
+    const checkBiometricAvailability = async () => {
+      try {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        setBiometricAvailable(compatible && enrolled);
+        
+        // בדיקה אם כבר הוגדרה כניסה ביומטרית (לא קשור לעסק ספציפי)
+        const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
+        setBiometricSetupDone(!!savedPhone);
+        
+        // אם יש מספר שמור, נטען אותו לשדה הטלפון
+        if (savedPhone && !phone) {
+          setPhone(savedPhone);
+        }
+      } catch (error) {
+        if (__DEV__) console.error('[Biometric] Check error:', error);
+      }
+    };
+    checkBiometricAvailability();
+  }, []);
+
+  // פונקציה לאימות ביומטרי
+  const authenticateBiometric = useCallback(async (): Promise<boolean> => {
+    try {
+      setBiometricAuthInProgress(true);
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'אמת את זהותך לכניסה מהירה',
+        cancelLabel: 'ביטול',
+        disableDeviceFallback: false,
+      });
+      setBiometricAuthInProgress(false);
+      return result.success;
+    } catch (error) {
+      setBiometricAuthInProgress(false);
+      if (__DEV__) console.error('[Biometric] Auth error:', error);
+      return false;
+    }
+  }, []);
+
+  // לחיצה על כפתור ביומטרי
+  const handleBiometricPress = useCallback(async () => {
+    if (!biometricAvailable) {
+      Alert.alert('לא זמין', 'זיהוי ביומטרי לא זמין במכשיר זה');
+      return;
+    }
+
+    if (!biometricSetupDone) {
+      // פעם ראשונה - צריך להגדיר
+      if (!phone || !phone.match(/^05\d{8}$/)) {
+        Alert.alert('נדרש מספר טלפון', 'הזן מספר טלפון תקין לפני הגדרת כניסה ביומטרית');
+        return;
+      }
+      setBiometricSetupModalVisible(true);
+    } else {
+      // כבר מוגדר - אימות וכניסה
+      const authenticated = await authenticateBiometric();
+      if (authenticated) {
+        const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
+        if (savedPhone) {
+          router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(savedPhone)}`);
+        }
+      }
+    }
+  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router]);
+
+  // הגדרת כניסה ביומטרית (פעם ראשונה)
+  const setupBiometricLogin = useCallback(async () => {
+    setBiometricSetupModalVisible(false);
+    
+    const authenticated = await authenticateBiometric();
+    if (authenticated) {
+      try {
+        // שמירה מאובטחת של מספר הטלפון בלבד (עובד לכל העסקים)
+        await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, phone);
+        
+        setBiometricSetupDone(true);
+        Alert.alert('הצלחה! 🎉', 'כניסה ביומטרית הוגדרה בהצלחה.\nמעכשיו תוכל להיכנס בלחיצה אחת לכל עסק!');
+        
+        // כניסה אוטומטית
+        router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}`);
+      } catch (error) {
+        if (__DEV__) console.error('[Biometric] Setup error:', error);
+        Alert.alert('שגיאה', 'לא ניתן היה לשמור את ההגדרות');
+      }
+    }
+  }, [phone, authenticateBiometric, router]);
 
   // פופאפים שיווקיים - trigger: entry (בכניסה לאפליקציה)
   const { currentPopup, showPopup, closePopup } = useMarketingPopups({
@@ -259,6 +360,8 @@ export default function CustomersLogin() {
           </Animated.View>
         </Pressable>
       </Modal>
+      {/* עטיפה להזזת כל האלמנטים למעט המבורגר והביומטריה */}
+      <View style={{ transform: [{ translateY: -20 }] }}>
       {/* לוגו מבודד */}
       <Image
         key={`business-logo-${imageKey}`}
@@ -268,7 +371,8 @@ export default function CustomersLogin() {
           height: 170, 
           resizeMode: 'contain',
           transform: [{ scale: 0.68 }],
-          zIndex: 1
+          zIndex: 1,
+          alignSelf: 'center'
         }}
         onLoadStart={() => {}}
         onLoadEnd={() => {}}
@@ -281,7 +385,7 @@ export default function CustomersLogin() {
         {/* טקסט כותרת */}
         <Text style={styles(brandColor).mainTitle} accessibilityRole="header">הכרטיסייה שלי</Text>
         {/* טלפון + הרשמה + תמונה */}
-        <View style={{ width: windowWidth * 0.8, alignSelf: 'center', marginTop: 48 }}>
+        <View style={{ width: windowWidth * 0.8, alignSelf: 'center', marginTop: 3 }}>
           {/* שדה טלפון + כפתור */}
           <View style={styles(brandColor).phoneRow}>
             <View style={{ flex: 1 }}>
@@ -325,8 +429,8 @@ export default function CustomersLogin() {
             <View style={{width: 8}} />
             <Text style={styles(brandColor).registerQuestion}>אין לך עדיין כרטיסייה?</Text>
           </View>
-          {/* תמונת נושא + קרדיט */}
-          <View style={{ alignItems: 'center', marginTop: -28, width: '100%' }}>
+          {/* תמונת נושא */}
+          <View style={{ alignItems: 'center', marginTop: -38, width: '100%' }}>
             {(() => {
               // הסרת הלוגיקה הקבועה - שימוש בנתונים דינמיים
               const originalUrl = business?.login_background_image?.trim().replace(/[\r\n\t]/g, '');
@@ -361,16 +465,32 @@ export default function CustomersLogin() {
                 </Text>
               );
             })()}
-            {/* קרדיט */}
-            <TouchableOpacity
-              style={styles(brandColor).credit}
-              onPress={() => Linking.openURL('https://yula-digital.com/')}
-            >
-              <Text style={styles(brandColor).creditText}>כל הזכויות שמורות ליולה דיגיטל@</Text>
-            </TouchableOpacity>
+            {/* אייקון כניסה ביומטרית - מוסתר כשמודאל ההגדרה או האימות פתוחים */}
+            {biometricAvailable && !biometricSetupModalVisible && !biometricAuthInProgress && (
+              <TouchableOpacity
+                style={styles(brandColor).biometricButton}
+                onPress={handleBiometricPress}
+                accessibilityLabel={biometricSetupDone ? "כניסה מהירה עם זיהוי ביומטרי" : "הגדרת כניסה ביומטרית"}
+                accessibilityRole="button"
+                accessibilityHint={biometricSetupDone ? "לחץ לכניסה מהירה באמצעות טביעת אצבע או זיהוי פנים" : "לחץ להגדרת כניסה מהירה עם זיהוי ביומטרי"}
+              >
+                <Image 
+                  source={BiometricIcon} 
+                  style={[
+                    styles(brandColor).biometricIcon, 
+                    { tintColor: brandColor, opacity: biometricSetupDone ? 1 : 0.5 }
+                  ]} 
+                  resizeMode="contain"
+                />
+                {!biometricSetupDone && (
+                  <Text style={[styles(brandColor).biometricHint, { color: brandColor }]}>הגדר כניסה מהירה</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
+      </View>{/* סגירת עטיפת ההזזה */}
 
       {/* פופאפ שיווקי - entry */}
       <MarketingPopup
@@ -378,6 +498,47 @@ export default function CustomersLogin() {
         popup={currentPopup}
         onClose={closePopup}
       />
+
+      {/* מודאל הגדרת כניסה ביומטרית */}
+      <Modal
+        visible={biometricSetupModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBiometricSetupModalVisible(false)}
+      >
+        <View style={biometricStyles.overlay}>
+          <View style={biometricStyles.container}>
+            <Image 
+              source={BiometricIcon} 
+              style={[biometricStyles.icon, { tintColor: brandColor }]} 
+              resizeMode="contain"
+            />
+            <Text style={biometricStyles.title}>כניסה מהירה 🚀</Text>
+            <Text style={biometricStyles.description}>
+              רוצה להיכנס לכרטיסיות בלחיצה אחת?{'\n'}
+              הגדר כניסה עם טביעת אצבע או זיהוי פנים!
+            </Text>
+            <Text style={biometricStyles.note}>
+              המספר {phone} יישמר בצורה מאובטחת במכשיר שלך בלבד.{'\n'}
+              יעבוד לכניסה לכל העסקים שאתה רשום אליהם.
+            </Text>
+            
+            <TouchableOpacity
+              style={[biometricStyles.setupButton, { backgroundColor: brandColor }]}
+              onPress={setupBiometricLogin}
+            >
+              <Text style={biometricStyles.setupButtonText}>הגדר עכשיו</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={biometricStyles.cancelButton}
+              onPress={() => setBiometricSetupModalVisible(false)}
+            >
+              <Text style={biometricStyles.cancelButtonText}>לא עכשיו</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* מודאל הצהרת נגישות */}
       <Modal
@@ -706,23 +867,21 @@ const styles = (brandColor: string) => StyleSheet.create({
     height: 19,
     resizeMode: 'contain',
   },
-  credit: {
+  biometricButton: {
     position: 'absolute',
-    bottom: 10,
-    left: 0,
-    right: 0,
-    backgroundColor: 'transparent',
-    borderRadius: 0,
-    paddingVertical: 0,
-    paddingHorizontal: 0,
+    bottom: -115,
     alignSelf: 'center',
+    padding: 10,
+    alignItems: 'center',
   },
-  creditText: {
-    color: '#000',
-    fontSize: 7,
-    textAlign: 'center',
-    fontWeight: 'bold',
-    backgroundColor: 'transparent',
+  biometricIcon: {
+    width: 91,
+    height: 91,
+  },
+  biometricHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: -10,
     fontFamily: 'Rubik',
   },
   errorText: {
@@ -832,5 +991,71 @@ const accessibilityStyles = StyleSheet.create({
     fontFamily: 'Rubik',
     textDecorationLine: 'underline',
     paddingVertical: 8,
+  },
+});
+
+// סגנונות מודאל הגדרת ביומטריה
+const biometricStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  container: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  icon: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    fontFamily: 'Rubik',
+  },
+  description: {
+    fontSize: 16,
+    color: '#555',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 24,
+    fontFamily: 'Rubik',
+  },
+  note: {
+    fontSize: 13,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Rubik',
+  },
+  setupButton: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  setupButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontFamily: 'Rubik',
+  },
+  cancelButton: {
+    paddingVertical: 10,
+  },
+  cancelButtonText: {
+    color: '#888',
+    fontSize: 14,
+    textAlign: 'center',
+    fontFamily: 'Rubik',
   },
 }); 

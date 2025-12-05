@@ -1,7 +1,9 @@
 
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import * as Location from 'expo-location';
+import { useEffect, useState, useCallback } from 'react';
 import {
+    ActivityIndicator,
     Dimensions,
     FlatList,
     Image,
@@ -23,8 +25,39 @@ import TutorialSlideshow from '../../components/TutorialSlideshow';
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 1024 && height >= 768;
 
+// פונקציה לחישוב מרחק בין שתי נקודות (בק"מ) - נוסחת Haversine
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // רדיוס כדור הארץ בק"מ
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
+
+// פונקציה להצגת מרחק בפורמט קריא
+const formatDistance = (km: number): string => {
+  if (km < 1) {
+    return `${Math.round(km * 1000)} מ'`;
+  }
+  return `${km.toFixed(1)} ק"מ`;
+};
+
+interface BusinessWithDistance {
+  name: string;
+  id: string;
+  logo?: string;
+  address?: string;
+  city?: string;
+  distance?: number; // מרחק בק"מ
+  coordinates?: { lat: number; lng: number };
+}
+
 export default function BusinessSelector() {
-  const [businesses, setBusinesses] = useState<{ name: string, id: string, logo?: string }[]>([]);
+  const [businesses, setBusinesses] = useState<BusinessWithDistance[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [tutorialVisible, setTutorialVisible] = useState(false);
@@ -34,15 +67,148 @@ export default function BusinessSelector() {
   const { setBusinessCode } = useBusiness();
   const router = useRouter();
 
+  // מצבי מיקום
+  const [locationExplanationVisible, setLocationExplanationVisible] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationAsked, setLocationAsked] = useState(false);
+  const [sortByDistance, setSortByDistance] = useState(false);
+
+  // טעינת עסקים עם כתובות
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase
         .from('businesses')
-        .select('business_code, name, logo')
+        .select('business_code, name, logo, business_address, business_city')
         .order('name', { ascending: true });
-      if (data) setBusinesses(data.map((b: { name: string; business_code: string; logo?: string }) => ({ name: b.name, id: b.business_code, logo: b.logo })));
+      if (data) {
+        setBusinesses(data.map((b: { name: string; business_code: string; logo?: string; business_address?: string; business_city?: string }) => ({ 
+          name: b.name, 
+          id: b.business_code, 
+          logo: b.logo,
+          address: b.business_address,
+          city: b.business_city
+        })));
+      }
     })();
   }, []);
+
+  // פונקציה לבקשת הרשאות מיקום וחישוב מרחקים
+  const requestLocationAndSort = useCallback(async () => {
+    setLocationLoading(true);
+    try {
+      // בקשת הרשאות
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        if (__DEV__) console.log('[Location] Permission denied');
+        setLocationLoading(false);
+        setLocationAsked(true);
+        return;
+      }
+
+      // קבלת מיקום המשתמש
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      
+      const userCoords = {
+        lat: location.coords.latitude,
+        lng: location.coords.longitude
+      };
+      setUserLocation(userCoords);
+      if (__DEV__) console.log('[Location] User location:', userCoords);
+
+      // Geocoding והוספת מרחקים לעסקים
+      const businessesWithDistance = await Promise.all(
+        businesses.map(async (business) => {
+          if (!business.address && !business.city) {
+            return { ...business, distance: undefined };
+          }
+
+          try {
+            const addressString = [business.address, business.city, 'Israel']
+              .filter(Boolean)
+              .join(', ');
+            
+            const geocoded = await Location.geocodeAsync(addressString);
+            
+            if (geocoded && geocoded.length > 0) {
+              const businessCoords = {
+                lat: geocoded[0].latitude,
+                lng: geocoded[0].longitude
+              };
+              
+              const distance = calculateDistance(
+                userCoords.lat, userCoords.lng,
+                businessCoords.lat, businessCoords.lng
+              );
+
+              return { 
+                ...business, 
+                distance,
+                coordinates: businessCoords
+              };
+            }
+          } catch (err) {
+            if (__DEV__) console.log('[Geocoding] Error for', business.name, err);
+          }
+          
+          return { ...business, distance: undefined };
+        })
+      );
+
+      // מיון לפי מרחק (עסקים ללא מרחק בסוף)
+      businessesWithDistance.sort((a, b) => {
+        if (a.distance === undefined && b.distance === undefined) return 0;
+        if (a.distance === undefined) return 1;
+        if (b.distance === undefined) return -1;
+        return a.distance - b.distance;
+      });
+
+      setBusinesses(businessesWithDistance);
+      setSortByDistance(true);
+      if (__DEV__) console.log('[Location] Sorted by distance');
+
+    } catch (error) {
+      if (__DEV__) console.error('[Location] Error:', error);
+    } finally {
+      setLocationLoading(false);
+      setLocationAsked(true);
+    }
+  }, [businesses]);
+
+  // כשהמודאל נפתח - בדיקה אם להציג הסבר מיקום
+  const handleOpenModal = useCallback(() => {
+    setModalVisible(true);
+    
+    // אם עוד לא שאלנו על מיקום ויש עסקים
+    if (!locationAsked && businesses.length > 0) {
+      setLocationExplanationVisible(true);
+    }
+  }, [locationAsked, businesses.length]);
+
+  // המשתמש אישר שימוש במיקום
+  const handleLocationAccept = useCallback(() => {
+    setLocationExplanationVisible(false);
+    requestLocationAndSort();
+  }, [requestLocationAndSort]);
+
+  // המשתמש דחה שימוש במיקום
+  const handleLocationDecline = useCallback(() => {
+    setLocationExplanationVisible(false);
+    setLocationAsked(true);
+  }, []);
+
+  // פילטור עסקים לפי חיפוש
+  const getFilteredBusinesses = useCallback(() => {
+    if (searchBusiness.trim()) {
+      // כשיש חיפוש - סינון לפי טקסט
+      return businesses.filter(b => b.name.includes(searchBusiness));
+    }
+    // כשאין חיפוש - להציג לפי מרחק (אם זמין) או לפי א-ב
+    return businesses;
+  }, [businesses, searchBusiness]);
 
   const selectBusiness = async (businessItem: { id: string; name: string; logo?: string }) => {
     await setBusinessCode(businessItem.id);
@@ -92,7 +258,7 @@ export default function BusinessSelector() {
         {/* שטח מגע כפתור "בחר עסק" - הכפתור הוורוד במרכז */}
         <TouchableOpacity 
           style={[styles.selectBusinessArea, isTablet && styles.tabletSelectBusinessArea]} 
-          onPress={() => setModalVisible(true)}
+          onPress={handleOpenModal}
           accessibilityLabel="בחר עסק"
           accessibilityRole="button"
           accessibilityHint="לחץ לבחירת העסק שברצונך לצפות בכרטיסייה שלו"
@@ -184,19 +350,31 @@ export default function BusinessSelector() {
                 accessibilityHint="הקלד שם עסק לחיפוש ברשימה"
               />
               
+              {locationLoading && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#267884" />
+                  <Text style={styles.loadingText}>מחפש עסקים קרובים...</Text>
+                </View>
+              )}
+              
               <FlatList
-                data={businesses.filter(b => b.name.includes(searchBusiness))}
+                data={getFilteredBusinesses()}
                 keyExtractor={item => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity 
                     style={styles.businessItem}
                     onPress={() => selectBusiness(item)}
-                    accessibilityLabel={`בחר עסק ${item.name}`}
+                    accessibilityLabel={`בחר עסק ${item.name}${item.distance !== undefined ? `, במרחק ${formatDistance(item.distance)}` : ''}`}
                     accessibilityRole="button"
                     accessibilityHint="לחץ לבחירת עסק זה וצפייה בכרטיסייה"
                   >
                     <View style={styles.businessItemContent}>
-                      <Text style={styles.businessName}>{item.name}</Text>
+                      <View style={styles.businessInfo}>
+                        <Text style={styles.businessName}>{item.name}</Text>
+                        {item.distance !== undefined && !searchBusiness && (
+                          <Text style={styles.distanceText}>{formatDistance(item.distance)}</Text>
+                        )}
+                      </View>
                       {item.logo && (
                         <Image
                           source={{ uri: item.logo }}
@@ -221,6 +399,48 @@ export default function BusinessSelector() {
             </View>
           </View>
         </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* מודאל הסבר מיקום */}
+      <Modal
+        visible={locationExplanationVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleLocationDecline}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.locationExplanationContent, isTablet && styles.tabletLocationContent]}>
+            <Text style={styles.locationIcon}>📍</Text>
+            <Text style={styles.locationTitle}>הצגת עסקים קרובים</Text>
+            <Text style={styles.locationText}>
+              האם תרצה לראות את העסקים הקרובים אליך ראשונים ברשימה?
+            </Text>
+            <Text style={styles.locationSubtext}>
+              נשתמש במיקום שלך רק כדי למיין את רשימת העסקים לפי קרבה.{'\n'}
+              המיקום לא נשמר ולא משותף.
+            </Text>
+            
+            <View style={styles.locationButtons}>
+              <TouchableOpacity 
+                style={styles.locationAcceptButton}
+                onPress={handleLocationAccept}
+                accessibilityLabel="אשר שימוש במיקום"
+                accessibilityRole="button"
+              >
+                <Text style={styles.locationAcceptText}>כן, הצג קרובים</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.locationDeclineButton}
+                onPress={handleLocationDecline}
+                accessibilityLabel="דחה שימוש במיקום"
+                accessibilityRole="button"
+              >
+                <Text style={styles.locationDeclineText}>לא, תודה</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* מצגת הדגמה */}
@@ -705,6 +925,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  businessInfo: {
+    flex: 1,
+    flexDirection: 'column',
+  },
   businessLogo: {
     width: 30,
     height: 30,
@@ -713,6 +937,83 @@ const styles = StyleSheet.create({
   businessName: {
     fontSize: 16,
     color: '#333',
+  },
+  distanceText: {
+    fontSize: 12,
+    color: '#267884',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  loadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  // סגנונות מודאל הסבר מיקום
+  locationExplanationContent: {
+    backgroundColor: '#fff',
+    padding: 24,
+    borderRadius: 16,
+    width: '85%',
+    alignItems: 'center',
+  },
+  tabletLocationContent: {
+    width: '50%',
+    padding: 32,
+  },
+  locationIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  locationTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  locationText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
+    lineHeight: 24,
+  },
+  locationSubtext: {
+    fontSize: 13,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  locationButtons: {
+    width: '100%',
+  },
+  locationAcceptButton: {
+    backgroundColor: '#267884',
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  locationAcceptText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  locationDeclineButton: {
+    paddingVertical: 12,
+  },
+  locationDeclineText: {
+    color: '#666',
+    fontSize: 14,
+    textAlign: 'center',
   },
   emptyText: {
     textAlign: 'center',

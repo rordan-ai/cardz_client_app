@@ -1,21 +1,22 @@
 {
   "expo": {
-    "name": "my-new-test-app",
+    "name": "Cardz",
     "slug": "my-new-test-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "mynewtestapp",
+    "scheme": "cardzapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.mynewtestapp",
+      "bundleIdentifier": "com.cardz.app",
       "googleServicesFile": "./ios/GoogleService-Info.plist",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
         ],
-        "NSUserNotificationUsageDescription": "האפליקציה שולחת התראות על שוברים והטבות חדשות."
+        "NSUserNotificationUsageDescription": "האפליקציה שולחת התראות על שוברים והטבות חדשות.",
+        "NSLocationWhenInUseUsageDescription": "האפליקציה משתמשת במיקום שלך כדי להציג עסקים קרובים אליך ראשונים ברשימה. המיקום לא נשמר ולא משותף."
       }
     },
     "android": {
@@ -23,8 +24,12 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.mynewtestapp",
-      "googleServicesFile": "./android/app/google-services.json"
+      "package": "com.cardz.app",
+      "googleServicesFile": "./android/app/google-services.json",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -42,7 +47,14 @@
           "icon": "./assets/icons/1.png",
           "color": "#ffffff"
         }
-      ]
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "האפליקציה משתמשת במיקום שלך כדי להציג עסקים קרובים אליך ראשונים ברשימה."
+        }
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
