@@ -2299,7 +2299,7 @@ export default function PunchCard() {
       </Modal>
       {/* WebView פנימי לצפייה בשובר */}
       <Modal visible={!!voucherInlineUrl} transparent animationType="fade" onRequestClose={() => setVoucherInlineUrl(null)}>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { justifyContent: 'flex-start', alignItems: 'stretch' }]}>
           <View style={styles.webviewCardPunch}>
             <TouchableOpacity
               style={styles.webviewClosePunch}
@@ -2371,7 +2371,7 @@ export default function PunchCard() {
                   setVoucherToast({ visible: false, message: '' });
                   router.push('/customers-login');
                 }}
-                style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
+                style={{ position: 'absolute', top: 40, right: 40, zIndex: 10, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
               >
                 <Text style={{ color: '#000000', fontSize: 20, fontWeight: 'bold', lineHeight: 20 }}>×</Text>
               </TouchableOpacity>
@@ -3189,24 +3189,20 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   webviewCardPunch: {
+    flex: 1,
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 8,
-    width: '92%',
-    height: '80%',
-    overflow: 'hidden',
   },
   webviewClosePunch: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    top: 32,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 2,
+    zIndex: 9999,
   },
   toastCardPunch: {
     backgroundColor: 'rgba(0,0,0,0.85)',
