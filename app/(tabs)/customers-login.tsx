@@ -869,7 +869,7 @@ const styles = (brandColor: string) => StyleSheet.create({
   },
   biometricButton: {
     position: 'absolute',
-    bottom: -115,
+    bottom: -85,
     alignSelf: 'center',
     padding: 10,
     alignItems: 'center',

@@ -1,4 +1,4 @@
-package com.anonymous.mynewtestapp
+package com.mycardz.app
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
@@ -63,3 +63,6 @@ class MainActivity : ReactActivity() {
       super.invokeDefaultOnBackPressed()
   }
 }
+
+
+

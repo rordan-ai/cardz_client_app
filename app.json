@@ -3,9 +3,15 @@
     "name": "Cardz",
     "slug": "my-new-test-app",
     "version": "1.0.0",
+    "icon": "./assets/images/cardz_white_logo_sqwered.png",
     "orientation": "portrait",
-    "scheme": "cardzapp",
+    "scheme": "mycardz",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/cardz_white_logo_sqwered.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
@@ -13,22 +19,29 @@
       "googleServicesFile": "./ios/GoogleService-Info.plist",
       "infoPlist": {
         "UIBackgroundModes": [
+          "remote-notification",
           "remote-notification"
         ],
         "NSUserNotificationUsageDescription": "האפליקציה שולחת התראות על שוברים והטבות חדשות.",
-        "NSLocationWhenInUseUsageDescription": "האפליקציה משתמשת במיקום שלך כדי להציג עסקים קרובים אליך ראשונים ברשימה. המיקום לא נשמר ולא משותף."
+        "NSLocationWhenInUseUsageDescription": "האפליקציה משתמשת במיקום שלך כדי להציג עסקים קרובים אליך ראשונים ברשימה. המיקום לא נשמר ולא משותף.",
+        "NFCReaderUsageDescription": "האפליקציה משתמשת ב-NFC לניקוב כרטיסיות בעסקים",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/images/cardz_white_logo_sqwered.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.cardz.app",
-      "googleServicesFile": "./android/app/google-services.json",
+      "package": "com.mycardz.app",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "android.permission.NFC",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -54,7 +67,8 @@
           "locationWhenInUsePermission": "האפליקציה משתמשת במיקום שלך כדי להציג עסקים קרובים אליך ראשונים ברשימה."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "react-native-nfc-manager"
     ],
     "experiments": {
       "typedRoutes": true
@@ -63,7 +77,7 @@
       "router": {},
       "eas": {
         "projectId": "fc85016d-22a6-4ff7-93c0-3a7768e8a859"
-    }
+      }
     },
     "owner": "rordan"
   }

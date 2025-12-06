@@ -15,6 +15,8 @@ import { getCurrentLogoScale } from '../../components/LogoUtils';
 import MarketingPopup from '../../components/MarketingPopup';
 import { supabase } from '../../components/supabaseClient';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
+import { useNFC } from '../../hooks/useNFC';
+import { NFCPunchModal } from '../../components/NFCPunch';
 
 const { width, height } = Dimensions.get('window');
 
@@ -84,6 +86,10 @@ export default function PunchCard() {
   const [activityNextCursor, setActivityNextCursor] = useState<string | null>(null);
   const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const activityChannelRef = useRef<any>(null);
+
+  // NFC state
+  const [nfcModalVisible, setNfcModalVisible] = useState(false);
+  const { isSupported: nfcSupported, initNFC, startReading, parseBusinessId } = useNFC();
 
   const updateBlacklist = async (channel: 'push' | 'sms', isOptIn: boolean) => {
     try {
@@ -319,6 +325,42 @@ export default function PunchCard() {
       fetchData();
     }
   }, [phoneStr, business?.business_code]); // תלות רק בקוד העסק, לא בכל האובייקט
+
+  // --- NFC INIT ---
+  // אתחול NFC והאזנה
+  useEffect(() => {
+    const setupNFC = async () => {
+      if (!localBusiness?.nfc_string) return;
+      
+      const enabled = await initNFC();
+      if (!enabled) {
+        console.log('[NFC] Not available or disabled');
+        return;
+      }
+      
+      // האזנה רציפה ל-NFC tags
+      const listenForNFC = async () => {
+        try {
+          const tagData = await startReading();
+          if (tagData) {
+            const businessNfc = parseBusinessId(tagData);
+            // בדיקה שה-tag שייך לעסק הנוכחי
+            if (businessNfc === localBusiness.nfc_string) {
+              setNfcModalVisible(true);
+            }
+          }
+          // המשך האזנה
+          listenForNFC();
+        } catch (err) {
+          console.log('[NFC] Listen error:', err);
+        }
+      };
+      
+      listenForNFC();
+    };
+    
+    setupNFC();
+  }, [localBusiness?.nfc_string]);
 
   // --- REALTIME START ---
   // חיבור ל-Realtime לעדכונים מיידיים
@@ -2758,6 +2800,22 @@ export default function PunchCard() {
       </Modal>
 
     </ScrollView>
+
+      {/* מודאל ניקוב NFC */}
+      {localBusiness && (
+        <NFCPunchModal
+          visible={nfcModalVisible}
+          businessId={localBusiness.id}
+          businessName={localBusiness.business_name}
+          nfcString={localBusiness.nfc_string || ''}
+          brandColor={localBusiness.login_brand_color}
+          onClose={() => setNfcModalVisible(false)}
+          onSuccess={() => {
+            // רענון הכרטיסייה אחרי ניקוב
+            refreshBusiness();
+          }}
+        />
+      )}
   );
 }
 
