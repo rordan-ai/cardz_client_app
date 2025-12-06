@@ -59,7 +59,8 @@
         "expo-build-properties",
         {
           "ios": {
-            "useModularHeaders": true
+            "useModularHeaders": true,
+            "useFrameworks": "static"
           }
         }
       ],
