@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
-import { supabase } from '../supabase';
+import { supabase } from '../components/supabaseClient';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 
