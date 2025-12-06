@@ -1,5 +1,4 @@
-export { NFCPunchModal } from './NFCPunchModal';
-export { default } from './NFCPunchModal';
+export { default, NFCPunchModal } from './NFCPunchModal';
 
 
 
