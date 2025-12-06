@@ -1319,6 +1319,7 @@ export default function PunchCard() {
   };
 
   return (
+    <>
     <ScrollView contentContainerStyle={styles.container}>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
@@ -2816,6 +2817,7 @@ export default function PunchCard() {
           }}
         />
       )}
+    </>
   );
 }
 
