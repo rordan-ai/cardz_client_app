@@ -56,6 +56,14 @@
       "@react-native-firebase/messaging",
       "./plugins/ios-modular-headers",
       [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useModularHeaders": true
+          }
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/icons/1.png",
