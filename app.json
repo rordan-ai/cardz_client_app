@@ -60,7 +60,7 @@
         {
           "ios": {
             "useModularHeaders": true,
-            "useFrameworks": "static"
+            "useFrameworks": "dynamic"
           }
         }
       ],
