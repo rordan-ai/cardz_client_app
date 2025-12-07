@@ -43,6 +43,31 @@ export default function Layout() {
     })();
   `;
 
+  // CSS מוזרק להתאמת תצוגת השובר באפליקציה
+  const VOUCHER_STYLE_JS = `
+    (function() {
+      var style = document.createElement('style');
+      style.textContent = \`
+        /* הקטנת השובר ב-10% */
+        .voucher-card-display {
+          transform: scale(0.9) !important;
+          transform-origin: center center !important;
+        }
+        /* העלאת התוכן (לא הברקוד) ב-60px - כשמסובב 90° זה שמאלה */
+        .voucher-card-display .voucher-content,
+        .voucher-card-display .voucher-text,
+        .voucher-card-display .voucher-title,
+        .voucher-card-display .voucher-description,
+        .voucher-card-display .voucher-details,
+        .voucher-card-display .business-name,
+        .voucher-card-display .business-logo {
+          transform: translateX(-60px) !important;
+        }
+      \`;
+      document.head.appendChild(style);
+    })();
+  `;
+
   // אתחול FCM Service - רץ פעם אחת בלבד
   useEffect(() => {
     FCMService.initialize();
@@ -82,10 +107,14 @@ export default function Layout() {
   const appendPhoneToVoucherUrl = (rawUrl: string) => {
     let url = rawUrl;
     const phone = FCMService.getCurrentPhone();
-    if (phone) {
+    // הוספת phone רק אם לא קיים כבר בכתובת
+    if (phone && !url.includes('phone=')) {
       const separator = url.includes('?') ? '&' : '?';
       url = `${url}${separator}phone=${encodeURIComponent(phone)}`;
     }
+    // Cache busting - מוסיף timestamp למניעת cache
+    const cacheBustSeparator = url.includes('?') ? '&' : '?';
+    url = `${url}${cacheBustSeparator}t=${Date.now()}`;
     return url;
   };
 
@@ -191,7 +220,7 @@ export default function Layout() {
       </Modal>
       {/* WebView פנימי לצפייה בשובר – ללא דיאלוג מערכת חיצוני */}
       <Modal visible={!!inlineUrl} transparent animationType="fade" onRequestClose={() => setInlineUrl(null)}>
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, { justifyContent: 'flex-start', alignItems: 'stretch' }]}>
           <View style={styles.webviewCard}>
             <TouchableOpacity
               style={styles.webviewClose}
@@ -210,12 +239,21 @@ export default function Layout() {
                 setSupportMultipleWindows={false}
                 userAgent="Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36"
                 injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
-                injectedJavaScript={ALERT_BRIDGE_JS}
+                injectedJavaScript={ALERT_BRIDGE_JS + VOUCHER_STYLE_JS}
                 onMessage={(e) => {
                   try {
                     const data = JSON.parse(e.nativeEvent.data);
                     if (data.type === 'diagnostics') {
                       console.log('[VoucherDiag-PUSH] Diagnostics payload:', data);
+                      if (data.viewport) {
+                        console.log('[VoucherDiag-PUSH] === VIEWPORT INFO ===');
+                        console.log('[VoucherDiag-PUSH] innerWidth:', data.viewport.innerWidth);
+                        console.log('[VoucherDiag-PUSH] innerHeight:', data.viewport.innerHeight);
+                        console.log('[VoucherDiag-PUSH] devicePixelRatio:', data.viewport.devicePixelRatio);
+                        console.log('[VoucherDiag-PUSH] screen:', data.viewport.screenWidth, 'x', data.viewport.screenHeight);
+                        console.log('[VoucherDiag-PUSH] document:', data.viewport.documentWidth, 'x', data.viewport.documentHeight);
+                        console.log('[VoucherDiag-PUSH] ======================');
+                      }
                     } else {
                       showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
                     }
@@ -230,13 +268,26 @@ export default function Layout() {
                     pushWebViewRef.current?.injectJavaScript(`
                       (function(){
                         try {
+                          const htmlPreview = document.body ? document.body.innerHTML.substring(0, 500) : '';
                           const payload = {
                             type: 'diagnostics',
                             location: window.location.href,
                             hash: window.location.hash,
                             title: document.title,
-                            bodyLength: document.body ? document.body.innerHTML.length : 0
+                            bodyLength: document.body ? document.body.innerHTML.length : 0,
+                            htmlPreview: htmlPreview,
+                            viewport: {
+                              innerWidth: window.innerWidth,
+                              innerHeight: window.innerHeight,
+                              devicePixelRatio: window.devicePixelRatio,
+                              screenWidth: screen.width,
+                              screenHeight: screen.height,
+                              documentWidth: document.documentElement.clientWidth,
+                              documentHeight: document.documentElement.clientHeight
+                            }
                           };
+                          console.log('[VoucherDiag-PUSH] Viewport:', JSON.stringify(payload.viewport));
+                          console.log('[VoucherDiag-PUSH] HTML Preview:', htmlPreview);
                           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
                         } catch(err) {
                           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'diagnostics-error', message: err.message }));
@@ -332,12 +383,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   webviewCard: {
+    flex: 1,
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 8,
-    width: '92%',
-    height: '80%',
-    overflow: 'hidden',
   },
   voucherInsetWrap: {
     flex: 1,

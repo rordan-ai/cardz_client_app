@@ -762,6 +762,31 @@ export default function PunchCard() {
     })();
   `;
 
+  // CSS מוזרק להתאמת תצוגת השובר באפליקציה
+  const VOUCHER_STYLE_JS = `
+    (function() {
+      var style = document.createElement('style');
+      style.textContent = \`
+        /* הקטנת השובר ב-10% */
+        .voucher-card-display {
+          transform: scale(0.9) !important;
+          transform-origin: center center !important;
+        }
+        /* העלאת התוכן (לא הברקוד) ב-60px - כשמסובב 90° זה שמאלה */
+        .voucher-card-display .voucher-content,
+        .voucher-card-display .voucher-text,
+        .voucher-card-display .voucher-title,
+        .voucher-card-display .voucher-description,
+        .voucher-card-display .voucher-details,
+        .voucher-card-display .business-name,
+        .voucher-card-display .business-logo {
+          transform: translateX(-60px) !important;
+        }
+      \`;
+      document.head.appendChild(style);
+    })();
+  `;
+
   const showVoucherToast = (message: string, ms = 3000) => {
     setVoucherToast({ visible: true, message });
     setTimeout(() => setVoucherToast({ visible: false, message: '' }), ms);
@@ -1225,6 +1250,15 @@ export default function PunchCard() {
       const parsed = JSON.parse(data);
       if (parsed.type === 'diagnostics') {
         console.log('[VoucherDiag-INBOX] Diagnostics payload:', parsed);
+        if (parsed.viewport) {
+          console.log('[VoucherDiag-INBOX] === VIEWPORT INFO ===');
+          console.log('[VoucherDiag-INBOX] innerWidth:', parsed.viewport.innerWidth);
+          console.log('[VoucherDiag-INBOX] innerHeight:', parsed.viewport.innerHeight);
+          console.log('[VoucherDiag-INBOX] devicePixelRatio:', parsed.viewport.devicePixelRatio);
+          console.log('[VoucherDiag-INBOX] screen:', parsed.viewport.screenWidth, 'x', parsed.viewport.screenHeight);
+          console.log('[VoucherDiag-INBOX] document:', parsed.viewport.documentWidth, 'x', parsed.viewport.documentHeight);
+          console.log('[VoucherDiag-INBOX] ======================');
+        }
       } else {
         showVoucherToast('השובר נשמר לגלריית התמונות בהצלחה');
       }
@@ -2013,10 +2047,15 @@ export default function PunchCard() {
 
                                 let safeUrl = finalUrl.includes('%') ? finalUrl : encodeURI(finalUrl);
 
-                                if (phoneStr) {
+                                // הוספת phone רק אם לא קיים כבר בכתובת
+                                if (phoneStr && !safeUrl.includes('phone=')) {
                                   const separator = safeUrl.includes('?') ? '&' : '?';
                                   safeUrl = `${safeUrl}${separator}phone=${encodeURIComponent(phoneStr)}`;
                                 }
+
+                                // Cache busting - מוסיף timestamp למניעת cache
+                                const cacheBustSeparator = safeUrl.includes('?') ? '&' : '?';
+                                safeUrl = `${safeUrl}${cacheBustSeparator}t=${Date.now()}`;
 
                                 setVoucherInlineUrl(safeUrl);
                               }}
@@ -2316,8 +2355,9 @@ export default function PunchCard() {
                 domStorageEnabled
                 allowsInlineMediaPlayback
                 setSupportMultipleWindows={false}
+                userAgent="Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36"
                 injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
-                injectedJavaScript={ALERT_BRIDGE_JS}
+                injectedJavaScript={ALERT_BRIDGE_JS + VOUCHER_STYLE_JS}
                 onMessage={(event) => handleVoucherMessage(event.nativeEvent.data)}
                 onLoadStart={(event) => console.log('[VoucherDiag-INBOX] WebView onLoadStart:', event.nativeEvent.url)}
                 onLoadEnd={(event) => {
@@ -2326,13 +2366,26 @@ export default function PunchCard() {
                     voucherWebViewRef.current?.injectJavaScript(`
                       (function(){
                         try {
+                          const htmlPreview = document.body ? document.body.innerHTML.substring(0, 500) : '';
                           const payload = {
                             type: 'diagnostics',
                             location: window.location.href,
                             hash: window.location.hash,
                             title: document.title,
-                            bodyLength: document.body ? document.body.innerHTML.length : 0
+                            bodyLength: document.body ? document.body.innerHTML.length : 0,
+                            htmlPreview: htmlPreview,
+                            viewport: {
+                              innerWidth: window.innerWidth,
+                              innerHeight: window.innerHeight,
+                              devicePixelRatio: window.devicePixelRatio,
+                              screenWidth: screen.width,
+                              screenHeight: screen.height,
+                              documentWidth: document.documentElement.clientWidth,
+                              documentHeight: document.documentElement.clientHeight
+                            }
                           };
+                          console.log('[VoucherDiag-INBOX] Viewport:', JSON.stringify(payload.viewport));
+                          console.log('[VoucherDiag-INBOX] HTML Preview:', htmlPreview);
                           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
                         } catch(err) {
                           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'diagnostics-error', message: err.message }));
