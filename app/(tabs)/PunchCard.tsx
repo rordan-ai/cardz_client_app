@@ -782,6 +782,13 @@ export default function PunchCard() {
         .voucher-card-display .business-logo {
           transform: translateX(-60px) !important;
         }
+        /* הסתרת כפתור ה-X הלא פעיל באמצע השובר */
+        .close-button,
+        .voucher-display-content > button.close-button,
+        button[aria-label="סגור"] {
+          display: none !important;
+          visibility: hidden !important;
+        }
       \`;
       document.head.appendChild(style);
     })();
@@ -3247,11 +3254,11 @@ const styles = StyleSheet.create({
   },
   webviewClosePunch: {
     position: 'absolute',
-    top: 32,
+    top: 52,
     right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',

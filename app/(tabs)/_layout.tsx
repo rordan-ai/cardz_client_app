@@ -63,6 +63,13 @@ export default function Layout() {
         .voucher-card-display .business-logo {
           transform: translateX(-60px) !important;
         }
+        /* הסתרת כפתור ה-X הלא פעיל באמצע השובר */
+        .close-button,
+        .voucher-display-content > button.close-button,
+        button[aria-label="סגור"] {
+          display: none !important;
+          visibility: hidden !important;
+        }
       \`;
       document.head.appendChild(style);
     })();
@@ -399,11 +406,11 @@ const styles = StyleSheet.create({
   },
   webviewClose: {
     position: 'absolute',
-    top: 6,
+    top: 26,
     right: 6,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
