@@ -2362,6 +2362,8 @@ export default function PunchCard() {
                 domStorageEnabled
                 allowsInlineMediaPlayback
                 setSupportMultipleWindows={false}
+                cacheEnabled={false}
+                incognito={true}
                 userAgent="Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36"
                 injectedJavaScriptBeforeContentLoaded={ALERT_BRIDGE_JS}
                 injectedJavaScript={ALERT_BRIDGE_JS + VOUCHER_STYLE_JS}
