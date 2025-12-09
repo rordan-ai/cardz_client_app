@@ -4,6 +4,8 @@ import { DeviceEventEmitter, Modal, StyleSheet, Text, TouchableOpacity, View } f
 import { WebView } from 'react-native-webview';
 import { BusinessProvider } from '../../components/BusinessContext';
 import FCMService from '../../components/FCMService';
+import * as MediaLibrary from 'expo-media-library';
+import ViewShot, { captureRef } from 'react-native-view-shot';
 
 const sanitizeBody = (body: string, voucherUrl?: string) => {
   let result = body;
@@ -27,19 +29,78 @@ export default function Layout() {
   const [inlineUrl, setInlineUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
   const pushWebViewRef = useRef<WebView>(null);
+  const viewShotRef = useRef<ViewShot>(null);
+  const isSavingRef = useRef(false);
 
   const showTimedToast = (message: string, ms = 3000) => {
     setToast({ visible: true, message });
     setTimeout(() => setToast({ visible: false, message: '' }), ms);
   };
 
+  // פונקציה לשמירת שובר לגלריה באמצעות ViewShot
+  const saveVoucherToGallery = async () => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    
+    try {
+      // בקשת הרשאות
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        showTimedToast('נדרשת הרשאה לגישה לגלריה');
+        return;
+      }
+      
+      // לכידת התמונה מ-ViewShot
+      const uri = await captureRef(viewShotRef, {
+        format: 'png',
+        quality: 1,
+      });
+      
+      // שמירה לגלריה
+      await MediaLibrary.createAssetAsync(uri);
+      showTimedToast('השובר נשמר לגלריה בהצלחה! 📸');
+    } catch (error) {
+      console.error('[SaveToGallery] Error:', error);
+      showTimedToast('שגיאה בשמירת השובר');
+    } finally {
+      setTimeout(() => { isSavingRef.current = false; }, 500);
+    }
+  };
+
   const ALERT_BRIDGE_JS = `
     (function() {
       var __bridge = window.ReactNativeWebView && window.ReactNativeWebView.postMessage ? window.ReactNativeWebView : null;
       if (!__bridge) return;
+      
+      // החלפת alert/confirm/prompt
       window.alert = function(msg){ __bridge.postMessage(JSON.stringify({ type: 'alert', message: String(msg||'') })); };
       window.confirm = function(msg){ __bridge.postMessage(JSON.stringify({ type: 'confirm', message: String(msg||'') })); return true; };
       window.prompt = function(msg, def){ __bridge.postMessage(JSON.stringify({ type: 'prompt', message: String(msg||'') })); return ''; };
+      
+      // חיבור כפתור "הוסף לגלריה"
+      function attachSaveButton() {
+        var btns = document.querySelectorAll('button');
+        btns.forEach(function(btn) {
+          if (btn.textContent && btn.textContent.includes('גלריה') && !btn.__saveAttached) {
+            btn.__saveAttached = true;
+            btn.onclick = function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              __bridge.postMessage(JSON.stringify({ type: 'save-to-gallery' }));
+              return false;
+            };
+          }
+        });
+      }
+      
+      // ניסיון מיידי + retry כל 500ms עד 10 שניות
+      attachSaveButton();
+      var attempts = 0;
+      var interval = setInterval(function() {
+        attempts++;
+        attachSaveButton();
+        if (attempts >= 20) clearInterval(interval);
+      }, 500);
     })();
   `;
 
@@ -236,6 +297,7 @@ export default function Layout() {
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#666', fontFamily: 'Heebo' }}>×</Text>
             </TouchableOpacity>
             {inlineUrl ? (
+              <ViewShot ref={viewShotRef} style={{ flex: 1 }}>
               <WebView
                 ref={pushWebViewRef}
                 source={{ uri: inlineUrl }}
@@ -252,6 +314,12 @@ export default function Layout() {
                 onMessage={(e) => {
                   try {
                     const data = JSON.parse(e.nativeEvent.data);
+                    // טיפול בכפתור שמירה לגלריה
+                    if (data.type === 'save-to-gallery') {
+                      console.log('[PUSH] Save to gallery requested');
+                      saveVoucherToGallery();
+                      return;
+                    }
                     if (data.type === 'diagnostics') {
                       console.log('[VoucherDiag-PUSH] Diagnostics payload:', data);
                       if (data.viewport) {
@@ -263,11 +331,9 @@ export default function Layout() {
                         console.log('[VoucherDiag-PUSH] document:', data.viewport.documentWidth, 'x', data.viewport.documentHeight);
                         console.log('[VoucherDiag-PUSH] ======================');
                       }
-                    } else {
-                      showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
                     }
                   } catch {
-                    showTimedToast('השובר נשמר לגלריית התמונות בהצלחה');
+                    // התעלם משגיאות פרסינג
                   }
                 }}
                 onLoadStart={(event) => console.log('[VoucherDiag-PUSH] WebView onLoadStart:', event.nativeEvent.url)}
@@ -318,6 +384,7 @@ export default function Layout() {
                 }}
                 style={styles.webview}
               />
+              </ViewShot>
             ) : null}
           </View>
         </View>
