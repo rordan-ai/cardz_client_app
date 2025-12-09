@@ -955,11 +955,6 @@ export default function PunchCard() {
       case 'renew':
       case 'renew_card':
         return { label: 'חידוש כרטיסייה', amount: 1 };
-      // פעילויות לקוח
-      case 'inbox_message_read':
-        return { label: 'קריאת הודעה', amount: 0 };
-      case 'popup_viewed':
-        return { label: 'צפייה בפופאפ', amount: 0 };
       // שוברים
       case 'voucher_received':
         return { label: 'קבלת שובר', amount: 1 };
@@ -1161,44 +1156,6 @@ export default function PunchCard() {
       }
     }
 
-    // 3. קריאה מ-activity_logs (פעילויות לקוח - inbox_message_read וכו')
-    for (const custPhone of variants) {
-      try {
-        let q = supabase
-          .from('activity_logs')
-          .select('*')
-          .eq('business_code', businessCode)
-          .eq('user_type', 'customer')
-          .eq('user_id', custPhone)
-          .order('timestamp', { ascending: false })
-          .limit(pageSize);
-
-        if (cursorTimestamp) {
-          q = q.lt('timestamp', cursorTimestamp);
-        }
-
-        const { data, error } = await q;
-        if (error) {
-          console.log('[ActivityFeed] activity_logs (customer) query error', { businessCode, custPhone, message: String(error?.message || error) });
-          continue;
-        }
-        const arr = Array.isArray(data) ? data : [];
-        console.log('[ActivityFeed] fetched from activity_logs (customer)', { businessCode, custPhone, count: arr.length });
-        
-        const rows = arr.map((row: any) => {
-          const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
-          const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
-            + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-          const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
-          const qty = typeof row?.amount === 'number' ? row.amount : amount;
-          return { dateStr, actionLabel: label, amount: qty, timestamp: row?.timestamp || ts.toISOString() };
-        });
-        allRows.push(...rows);
-      } catch (e: any) {
-        console.log('[ActivityFeed] activity_logs (customer) exception', { businessCode, raw, error: String(e?.message || e) });
-      }
-    }
-
     // מיון לפי timestamp וסינון כפילויות - עם ID ייחודי
     console.log('[ActivityFeed] Total rows before deduplication:', allRows.length);
     
@@ -1329,30 +1286,6 @@ export default function PunchCard() {
         }
       );
 
-      // 3. Realtime subscription ל-activity_logs (פעילויות לקוח - inbox_message_read וכו')
-      ch.on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'activity_logs',
-          filter: `business_code=eq.${businessCode}`
-        },
-        (payload: any) => {
-          const row = payload?.new;
-          if (!row || row.user_type !== 'customer') return;
-          
-          // בדיקה שזה הלקוח הנוכחי
-          if (!variants.includes(String(row.user_id || '').trim())) return;
-          
-          const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
-          const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
-            + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-          const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
-          console.log('[ActivityFeed] Realtime customer activity:', { action_type: row.action_type, label });
-          setActivityRows((prev) => [{ dateStr, actionLabel: label, amount: typeof amount === 'number' ? amount : 1 }, ...prev]);
-        }
-      );
-      
       ch.subscribe();
       activityChannelRef.current = ch;
     } catch {}
