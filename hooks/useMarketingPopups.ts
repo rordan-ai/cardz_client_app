@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '../components/supabaseClient';
 import { PopupData } from '../components/MarketingPopup';
+import { supabase } from '../components/supabaseClient';
 
 type TriggerLocation = 'entry' | 'after_punch' | 'after_phone';
 
