@@ -50,7 +50,7 @@ export default function Layout() {
       style.textContent = \`
         /* הקטנת השובר ב-10% */
         .voucher-card-display {
-          transform: scale(0.9) !important;
+          transform: scale(0.75) !important;
           transform-origin: center center !important;
         }
         /* העלאת התוכן (לא הברקוד) ב-60px - כשמסובב 90° זה שמאלה */
