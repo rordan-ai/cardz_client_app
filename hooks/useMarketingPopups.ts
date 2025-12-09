@@ -10,7 +10,6 @@ interface UseMarketingPopupsOptions {
   customerPhone?: string;
   trigger: TriggerLocation;
   enabled?: boolean;
-  onPopupViewed?: (popupId: number) => void;
 }
 
 interface UseMarketingPopupsReturn {
@@ -29,7 +28,6 @@ export function useMarketingPopups({
   customerPhone,
   trigger,
   enabled = true,
-  onPopupViewed,
 }: UseMarketingPopupsOptions): UseMarketingPopupsReturn {
   const [popups, setPopups] = useState<PopupData[]>([]);
   const [currentPopup, setCurrentPopup] = useState<PopupData | null>(null);
