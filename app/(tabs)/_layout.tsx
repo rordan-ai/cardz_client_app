@@ -147,7 +147,11 @@ export default function Layout() {
           height: 44px !important;
           border-radius: 8px !important;
           margin: 10px auto !important;
-          display: block !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          flex-direction: row !important;
+          white-space: nowrap !important;
           font-size: 16px !important;
           font-weight: bold !important;
         }
