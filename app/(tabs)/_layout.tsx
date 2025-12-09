@@ -341,7 +341,7 @@ export default function Layout() {
                     // טיפול בכפתור שמירה לגלריה
                     if (data.type === 'save-to-gallery') {
                       console.log('[PUSH] Save to gallery requested');
-                      saveVoucherToGallery();
+                      saveVoucherToGallery().catch(err => console.error('[PUSH] Save error:', err));
                       return;
                     }
                     if (data.type === 'diagnostics') {

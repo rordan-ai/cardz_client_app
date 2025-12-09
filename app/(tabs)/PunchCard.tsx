@@ -1343,7 +1343,7 @@ export default function PunchCard() {
       // טיפול בכפתור שמירה לגלריה
       if (parsed.type === 'save-to-gallery') {
         console.log('[INBOX] Save to gallery requested');
-        saveVoucherToGallery();
+        saveVoucherToGallery().catch(err => console.error('[INBOX] Save error:', err));
         return;
       }
       if (parsed.type === 'diagnostics') {
