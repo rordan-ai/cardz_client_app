@@ -710,17 +710,13 @@ export default function PunchCard() {
         .eq('business_code', localBusiness?.business_code || '')
         .eq('customer_phone', phoneStr || '');
       
-      // לוג קריאת הודעה לטבלת activity_logs
-      await supabase.from('activity_logs').insert({
+      // לוג קריאת הודעה לטבלת user_activities
+      await supabase.from('user_activities').insert({
+        customer_id: phoneStr || '',
         business_code: localBusiness?.business_code || '',
-        user_type: 'customer',
-        user_id: phoneStr || '',
-        action_type: 'inbox_message_read',
-        action_details: { message_id: notificationId },
-        target_entity: String(notificationId),
-        source: 'mobile',
-        timestamp: new Date().toISOString(),
-        created_at: new Date().toISOString()
+        action_type: 'inbox_read',
+        action_time: new Date().toISOString(),
+        source: 'mobile'
       });
       
       const updatedNotifications = notifications.map(n => 

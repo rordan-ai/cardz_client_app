@@ -109,13 +109,14 @@ export function useMarketingPopups({
         if (__DEV__) console.log('[MarketingPopups] Showing popup now');
         setShowPopup(true);
         
-        // לוג צפייה בפופאפ לטבלת popup_views
+        // לוג צפייה בפופאפ לטבלת user_activities
         try {
-          await supabase.from('popup_views').insert({
+          await supabase.from('user_activities').insert({
+            customer_id: customerPhone || null,
             business_code: businessCode,
-            popup_id: popup.id,
-            customer_phone: customerPhone || null,
-            viewed_at: new Date().toISOString()
+            action_type: 'popup_view',
+            action_time: new Date().toISOString(),
+            source: 'mobile'
           });
           if (__DEV__) console.log('[MarketingPopups] Logged popup view for popup:', popup.id);
         } catch (logError) {
