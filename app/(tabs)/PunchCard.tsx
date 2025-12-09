@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, DeviceEventEmitter, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Barcode } from 'react-native-svg-barcode';
 import { WebView } from 'react-native-webview';
+import * as MediaLibrary from 'expo-media-library';
+import ViewShot, { captureRef } from 'react-native-view-shot';
 import { useBusiness } from '../../components/BusinessContext';
 import FCMService from '../../components/FCMService';
 import { getCurrentLogoScale } from '../../components/LogoUtils';
@@ -77,6 +79,8 @@ export default function PunchCard() {
     message: '',
   });
   const voucherWebViewRef = useRef<WebView>(null);
+  const voucherViewShotRef = useRef<ViewShot>(null);
+  const isSavingRef = useRef(false);
   const [activityVisible, setActivityVisible] = useState(false);
   const [accessibilityVisible, setAccessibilityVisible] = useState(false);
   const [privacyVisible, setPrivacyVisible] = useState(false);
@@ -751,14 +755,41 @@ export default function PunchCard() {
     setLoading(false);
   };
 
-  // גשר לביטול alert בדף השובר ולהחליפו בטוסט פנימי
+  // גשר לביטול alert בדף השובר ולהחליפו בטוסט פנימי + חיבור כפתור שמירה
   const ALERT_BRIDGE_JS = `
     (function() {
       var __bridge = window.ReactNativeWebView && window.ReactNativeWebView.postMessage ? window.ReactNativeWebView : null;
       if (!__bridge) return;
+      
+      // החלפת alert/confirm/prompt
       window.alert = function(msg){ __bridge.postMessage(JSON.stringify({ type: 'alert', message: String(msg||'') })); };
       window.confirm = function(msg){ __bridge.postMessage(JSON.stringify({ type: 'confirm', message: String(msg||'') })); return true; };
       window.prompt = function(msg, def){ __bridge.postMessage(JSON.stringify({ type: 'prompt', message: String(msg||'') })); return ''; };
+      
+      // חיבור כפתור "הוסף לגלריה"
+      function attachSaveButton() {
+        var btns = document.querySelectorAll('button');
+        btns.forEach(function(btn) {
+          if (btn.textContent && btn.textContent.includes('גלריה') && !btn.__saveAttached) {
+            btn.__saveAttached = true;
+            btn.onclick = function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              __bridge.postMessage(JSON.stringify({ type: 'save-to-gallery' }));
+              return false;
+            };
+          }
+        });
+      }
+      
+      // ניסיון מיידי + retry כל 500ms עד 10 שניות
+      attachSaveButton();
+      var attempts = 0;
+      var interval = setInterval(function() {
+        attempts++;
+        attachSaveButton();
+        if (attempts >= 20) clearInterval(interval);
+      }, 500);
     })();
   `;
 
@@ -797,6 +828,36 @@ export default function PunchCard() {
   const showVoucherToast = (message: string, ms = 3000) => {
     setVoucherToast({ visible: true, message });
     setTimeout(() => setVoucherToast({ visible: false, message: '' }), ms);
+  };
+
+  // פונקציה לשמירת שובר לגלריה באמצעות ViewShot
+  const saveVoucherToGallery = async () => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    
+    try {
+      // בקשת הרשאות
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        showVoucherToast('נדרשת הרשאה לגישה לגלריה');
+        return;
+      }
+      
+      // לכידת התמונה מ-ViewShot
+      const uri = await captureRef(voucherViewShotRef, {
+        format: 'png',
+        quality: 1,
+      });
+      
+      // שמירה לגלריה
+      await MediaLibrary.createAssetAsync(uri);
+      showVoucherToast('השובר נשמר לגלריה בהצלחה! 📸');
+    } catch (error) {
+      console.error('[SaveToGallery-INBOX] Error:', error);
+      showVoucherToast('שגיאה בשמירת השובר');
+    } finally {
+      setTimeout(() => { isSavingRef.current = false; }, 500);
+    }
   };
 
   const normalizePhone = (p?: string) => {
@@ -1255,6 +1316,12 @@ export default function PunchCard() {
   const handleVoucherMessage = (data: string) => {
     try {
       const parsed = JSON.parse(data);
+      // טיפול בכפתור שמירה לגלריה
+      if (parsed.type === 'save-to-gallery') {
+        console.log('[INBOX] Save to gallery requested');
+        saveVoucherToGallery();
+        return;
+      }
       if (parsed.type === 'diagnostics') {
         console.log('[VoucherDiag-INBOX] Diagnostics payload:', parsed);
         if (parsed.viewport) {
@@ -1266,11 +1333,9 @@ export default function PunchCard() {
           console.log('[VoucherDiag-INBOX] document:', parsed.viewport.documentWidth, 'x', parsed.viewport.documentHeight);
           console.log('[VoucherDiag-INBOX] ======================');
         }
-      } else {
-        showVoucherToast('השובר נשמר לגלריית התמונות בהצלחה');
       }
     } catch {
-      showVoucherToast('השובר נשמר לגלריית התמונות בהצלחה');
+      // התעלם משגיאות פרסינג
     }
   };
 
@@ -2354,6 +2419,7 @@ export default function PunchCard() {
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#666' }}>×</Text>
             </TouchableOpacity>
             {voucherInlineUrl ? (
+              <ViewShot ref={voucherViewShotRef} style={{ flex: 1 }}>
               <WebView
                 ref={voucherWebViewRef}
                 source={{ uri: voucherInlineUrl }}
@@ -2418,6 +2484,7 @@ export default function PunchCard() {
                 }}
                 style={{ flex: 1, backgroundColor: 'transparent' }}
               />
+              </ViewShot>
             ) : null}
           </View>
         </View>
