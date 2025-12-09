@@ -131,6 +131,26 @@ export default function Layout() {
           display: none !important;
           visibility: hidden !important;
         }
+        /* הסתרת כפתור הדפסה */
+        .print-button,
+        button.print-button,
+        button[class*="print"] {
+          display: none !important;
+          visibility: hidden !important;
+        }
+        /* עיצוב כפתור גלריה - מלבן שטוח לכל רוחב */
+        .save-button,
+        button.save-button,
+        button[class*="save"] {
+          width: 100% !important;
+          max-width: 280px !important;
+          height: 44px !important;
+          border-radius: 8px !important;
+          margin: 10px auto !important;
+          display: block !important;
+          font-size: 16px !important;
+          font-weight: bold !important;
+        }
       \`;
       document.head.appendChild(style);
     })();
