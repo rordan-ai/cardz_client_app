@@ -357,6 +357,29 @@ export default function CustomersLogin() {
                 <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>צור קשר עם {business?.name || 'העסק'}</Text>
               </View>
             </TouchableOpacity>
+            
+            {/* בקר באתר של העסק */}
+            {business?.business_website ? (
+              <TouchableOpacity 
+                onPress={() => {
+                  if (__DEV__) { console.log('Visit website pressed'); }
+                  closeMenu();
+                  const url = business.business_website.startsWith('http') 
+                    ? business.business_website 
+                    : `https://${business.business_website}`;
+                  Linking.openURL(url);
+                }}
+                style={{ paddingVertical: 8, paddingHorizontal: 4, marginTop: 8, borderTopWidth: 1, borderTopColor: '#E0E0E0' }}
+                accessibilityLabel={`בקר באתר של ${business?.name || 'העסק'}`}
+                accessibilityRole="button"
+                accessibilityHint="לחץ לפתיחת אתר העסק בדפדפן"
+              >
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
+                  <Ionicons name="globe-outline" size={28} color={brandColor} style={{ marginLeft: 12 }} />
+                  <Text style={{ fontSize: 16, color: brandColor, fontWeight: 'bold', fontFamily: 'Rubik' }}>בקר באתר של {business?.name || 'העסק'}</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
           </Animated.View>
         </Pressable>
       </Modal>

@@ -3,22 +3,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, DeviceEventEmitter, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Barcode } from 'react-native-svg-barcode';
-import { WebView } from 'react-native-webview';
-import * as MediaLibrary from 'expo-media-library';
 import ViewShot, { captureRef } from 'react-native-view-shot';
+import { WebView } from 'react-native-webview';
 import { useBusiness } from '../../components/BusinessContext';
 import FCMService from '../../components/FCMService';
 import { getCurrentLogoScale } from '../../components/LogoUtils';
 import MarketingPopup from '../../components/MarketingPopup';
+import { NFCPunchModal } from '../../components/NFCPunch';
 import { supabase } from '../../components/supabaseClient';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
 import { useNFC } from '../../hooks/useNFC';
-import { NFCPunchModal } from '../../components/NFCPunch';
 
 const { width, height } = Dimensions.get('window');
 
@@ -709,6 +709,20 @@ export default function PunchCard() {
         .eq('id', notificationId)
         .eq('business_code', localBusiness?.business_code || '')
         .eq('customer_phone', phoneStr || '');
+      
+      // לוג קריאת הודעה לטבלת activity_logs
+      await supabase.from('activity_logs').insert({
+        business_code: localBusiness?.business_code || '',
+        user_type: 'customer',
+        user_id: phoneStr || '',
+        action_type: 'inbox_message_read',
+        action_details: { message_id: notificationId },
+        target_entity: String(notificationId),
+        source: 'mobile',
+        timestamp: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      });
+      
       const updatedNotifications = notifications.map(n => 
         n.id === notificationId ? { ...n, read: true } : n
       );

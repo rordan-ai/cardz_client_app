@@ -10,6 +10,7 @@ interface UseMarketingPopupsOptions {
   customerPhone?: string;
   trigger: TriggerLocation;
   enabled?: boolean;
+  onPopupViewed?: (popupId: number) => void;
 }
 
 interface UseMarketingPopupsReturn {
@@ -28,6 +29,7 @@ export function useMarketingPopups({
   customerPhone,
   trigger,
   enabled = true,
+  onPopupViewed,
 }: UseMarketingPopupsOptions): UseMarketingPopupsReturn {
   const [popups, setPopups] = useState<PopupData[]>([]);
   const [currentPopup, setCurrentPopup] = useState<PopupData | null>(null);
@@ -106,6 +108,19 @@ export function useMarketingPopups({
         // הצגה מיידית (ללא השהייה)
         if (__DEV__) console.log('[MarketingPopups] Showing popup now');
         setShowPopup(true);
+        
+        // לוג צפייה בפופאפ לטבלת popup_views
+        try {
+          await supabase.from('popup_views').insert({
+            business_code: businessCode,
+            popup_id: popup.id,
+            customer_phone: customerPhone || null,
+            viewed_at: new Date().toISOString()
+          });
+          if (__DEV__) console.log('[MarketingPopups] Logged popup view for popup:', popup.id);
+        } catch (logError) {
+          if (__DEV__) console.log('[MarketingPopups] Failed to log popup view:', logError);
+        }
         
         // עדכון ספירת הצגות
         const key = getViewCountKey(businessCode, popup.id);
