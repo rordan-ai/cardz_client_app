@@ -1,24 +1,44 @@
 // Config plugin to fix Firebase modular headers with New Architecture
-// Adds use_modular_headers! globally and fixes CLANG settings
+// Based on official rnfirebase.io documentation
 const { withPodfile } = require('@expo/config-plugins');
 
 function withModularHeadersFix(config) {
   return withPodfile(config, (config) => {
     let contents = config.modResults.contents;
 
-    // 1. Add use_modular_headers! globally if not present
-    if (!contents.includes('use_modular_headers!')) {
+    // 1. Add $RNFirebaseAsStaticFramework = true (REQUIRED for static frameworks)
+    // This must be at the top of the Podfile, before use_frameworks!
+    if (!contents.includes('$RNFirebaseAsStaticFramework')) {
       // Insert after platform :ios line
       const platformRegex = /(platform :ios, ['"][\d.]+['"])/;
       if (platformRegex.test(contents)) {
-        contents = contents.replace(platformRegex, `$1\nuse_modular_headers!`);
-        console.log('[ios-modular-headers] Added use_modular_headers! globally');
+        contents = contents.replace(
+          platformRegex, 
+          `$1\n\n# Required for React Native Firebase with static frameworks\n$RNFirebaseAsStaticFramework = true`
+        );
+        console.log('[ios-modular-headers] Added $RNFirebaseAsStaticFramework = true');
       }
     }
 
-    // 2. Add CLANG fix to post_install block (this is the main fix for Firebase + New Architecture)
+    // 2. Add use_modular_headers! globally if not present
+    if (!contents.includes('use_modular_headers!')) {
+      // Insert after the $RNFirebaseAsStaticFramework line or after platform
+      if (contents.includes('$RNFirebaseAsStaticFramework = true')) {
+        contents = contents.replace(
+          '$RNFirebaseAsStaticFramework = true',
+          '$RNFirebaseAsStaticFramework = true\nuse_modular_headers!'
+        );
+      } else {
+        const platformRegex = /(platform :ios, ['"][\d.]+['"])/;
+        if (platformRegex.test(contents)) {
+          contents = contents.replace(platformRegex, `$1\nuse_modular_headers!`);
+        }
+      }
+      console.log('[ios-modular-headers] Added use_modular_headers! globally');
+    }
+
+    // 3. Add CLANG fix to post_install block (for New Architecture compatibility)
     if (!contents.includes('CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES')) {
-      // The code to inject - must be properly indented Ruby code
       const fixCode = `
     # Fix for Firebase modular headers with New Architecture (added by ios-modular-headers plugin)
     installer.pods_project.targets.each do |target|
@@ -28,7 +48,6 @@ function withModularHeadersFix(config) {
     end
 `;
 
-      // Find the post_install block and inject our code right after the opening
       const postInstallRegex = /(post_install\s+do\s+\|installer\|\s*\n)/;
       
       if (postInstallRegex.test(contents)) {
