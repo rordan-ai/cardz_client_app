@@ -2,6 +2,8 @@
 # This ensures fresh Podfile generation with our custom plugin
 /ios
 ios/
+/android
+android/
 
 # Dependencies
 node_modules/
