@@ -1,3 +1,8 @@
+# Native folders - force CNG (Continuous Native Generation)
+# This ensures fresh Podfile generation with our custom plugin
+/ios
+ios/
+
 # Dependencies
 node_modules/
 
