@@ -1,6 +1,7 @@
 # Native folders - use CNG (Continuous Native Generation)
 # This fixes Firebase/GoogleUtilities modular_headers issue
-/ios
+ios/
+ios
 
 # Dependencies
 node_modules/
