@@ -50,19 +50,19 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      "expo-web-browser",
       [
         "expo-build-properties",
         {
           "ios": {
-            "useFrameworks": "static"
+            "useFrameworks": "static",
+            "forceStaticLinking": ["RNFBApp", "RNFBMessaging"]
           }
         }
       ],
+      "expo-router",
+      "expo-web-browser",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
-      "./plugins/ios-modular-headers",
       [
         "expo-notifications",
         {
