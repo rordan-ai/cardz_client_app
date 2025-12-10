@@ -1705,15 +1705,17 @@ export default function PunchCard() {
         </Text>
       </View>
       
-      {/* ברקוד */}
+      </View>
+      
+      {/* ברקוד - מוסתר מתחת לקיפול, מתגלה בגלילה */}
       {cardCode && (
-      <View style={styles.barcodeBox}>
-        <Barcode value={cardCode} format="CODE128" height={60} />
+      <View style={{ marginTop: 200, alignItems: 'center', width: '100%', paddingBottom: 10 }}>
+        <View style={{ maxWidth: 250, width: '70%' }}>
+          <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
+        </View>
+        <Text style={styles.cardCode}>#{cardCode}</Text>
       </View>
       )}
-      {/* מספר סידורי */}
-      {cardCode && <Text style={styles.cardCode}>#{cardCode}</Text>}
-      </View>
       
              {/* מודאל תפריט המבורגר */}
        <Modal 
@@ -3100,7 +3102,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FBF8F8',
     paddingTop: 8,
-    paddingBottom: 150,
+    paddingBottom: 20,
     paddingHorizontal: 8,
   },
   topIconOffsetClean: {
