@@ -94,3 +94,33 @@
 4. מימוש צד האדמין (קבלת בקשות, אישור, ניקוב)
 5. שליחת Push ללקוח
 
+---
+
+## 📱 iOS Build Credentials (עדכון: 10/12/2024)
+
+### פרטי אפליקציה
+| שדה | ערך |
+|-----|-----|
+| **App** | @rordan/my-new-test-app |
+| **Bundle Identifier** | com.cardz.app |
+
+### Distribution Certificate
+| שדה | ערך |
+|-----|-----|
+| **Serial Number** | 44621BE3E76AAF3B93996ADAD4572EF5 |
+| **Expiration Date** | Sat, 05 Dec 2026 18:12:39 GMT+0200 |
+| **Apple Team** | C4N93LK5V7 (Ramy Ordan - Individual) |
+
+### Provisioning Profile (Ad Hoc)
+| שדה | ערך |
+|-----|-----|
+| **Developer Portal ID** | J3Y7JFX2PL |
+| **Status** | ✅ active |
+| **Expiration** | Sat, 05 Dec 2026 18:12:39 GMT+0200 |
+| **Apple Team** | C4N93LK5V7 (Ramy Ordan - Individual) |
+
+### Provisioned Devices
+| מכשיר | UDID |
+|-------|------|
+| **iPhone** | `00008110-001835CA1E51801E` |
+
