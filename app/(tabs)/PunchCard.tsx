@@ -710,20 +710,25 @@ export default function PunchCard() {
         .eq('business_code', localBusiness?.business_code || '')
         .eq('customer_phone', phoneStr || '');
       
-      // לוג קריאת הודעה לטבלת user_activities
-      await supabase.from('user_activities').insert({
-        customer_id: phoneStr || '',
-        business_code: localBusiness?.business_code || '',
-        action_type: 'inbox_read',
-        action_time: new Date().toISOString(),
-        source: 'mobile'
-      });
-      
+      // עדכון UI מיד לאחר עדכון ה-inbox
       const updatedNotifications = notifications.map(n => 
         n.id === notificationId ? { ...n, read: true } : n
       );
       setNotifications(updatedNotifications);
       setUnreadMessages(updatedNotifications.filter(n => !n.read).length);
+      
+      // לוג קריאת הודעה לטבלת user_activities (לא חוסם את ה-UI)
+      supabase.from('user_activities').insert({
+        customer_id: phoneStr || '',
+        business_code: localBusiness?.business_code || '',
+        action_type: 'inbox_read',
+        action_time: new Date().toISOString(),
+        source: 'mobile'
+      }).then(() => {
+        if (__DEV__) console.log('[Inbox] Logged inbox_read');
+      }).catch((err) => {
+        if (__DEV__) console.log('[Inbox] Failed to log inbox_read:', err);
+      });
     } catch (_) {
       // ignore
     }
