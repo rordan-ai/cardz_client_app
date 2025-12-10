@@ -16,7 +16,7 @@ function withModularHeadersFix(config) {
       }
     }
 
-    // 2. Add CLANG fix to post_install block
+    // 2. Add CLANG fix to post_install block (this is the main fix for Firebase + New Architecture)
     if (!contents.includes('CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES')) {
       // The code to inject - must be properly indented Ruby code
       const fixCode = `
@@ -36,21 +36,6 @@ function withModularHeadersFix(config) {
         console.log('[ios-modular-headers] Added CLANG_ALLOW_NON_MODULAR_INCLUDES fix');
       } else {
         console.log('[ios-modular-headers] WARNING: Could not find post_install block');
-      }
-    }
-
-    // 3. Add modular_headers: true for specific Firebase-related pods
-    // This ensures React Native headers are accessible to Firebase
-    if (!contents.includes("pod 'React-Core', :modular_headers => true")) {
-      const targetRegex = /(target\s+['"].*['"]\s+do)/;
-      if (targetRegex.test(contents)) {
-        const modularPodsFix = `
-  # Modular headers for Firebase compatibility (added by ios-modular-headers plugin)
-  pod 'React-Core', :modular_headers => true
-  pod 'React-RCTFabric', :modular_headers => true
-`;
-        contents = contents.replace(targetRegex, `$1${modularPodsFix}`);
-        console.log('[ios-modular-headers] Added modular_headers for React pods');
       }
     }
 
