@@ -1,51 +1,39 @@
 // Config plugin to fix Firebase modular headers with New Architecture
-// Combines withPodfile (for use_modular_headers!) and withDangerousMod (for post_install modifications)
+// Properly injects code INSIDE the post_install block
 const { withPodfile } = require('@expo/config-plugins');
 
 function withModularHeadersFix(config) {
   return withPodfile(config, (config) => {
     let contents = config.modResults.contents;
 
-    // 1. Add use_modular_headers! if not present
-    if (!contents.includes('use_modular_headers!')) {
-      // Add after platform line
-      contents = contents.replace(
-        /(platform :ios.*\n)/,
-        `$1use_modular_headers!\n`
-      );
-      console.log('[ios-modular-headers] Added use_modular_headers!');
+    // Check if our fix is already present
+    if (contents.includes('CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES')) {
+      console.log('[ios-modular-headers] Fix already present, skipping');
+      return config;
     }
 
-    // 2. Add CLANG_ALLOW_NON_MODULAR_INCLUDES fix to post_install
-    const modularHeadersFix = `
-    # Fix for Firebase modular headers with New Architecture
+    // The code to inject - must be properly indented Ruby code
+    const fixCode = `
+    # Fix for Firebase modular headers with New Architecture (added by ios-modular-headers plugin)
     installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      target.build_configurations.each do |build_config|
+        build_config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       end
     end
 `;
 
-    if (!contents.includes('CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES')) {
-      // Find post_install and add our code inside it
-      const postInstallMatch = contents.match(/post_install\s+do\s+\|installer\|/);
-      
-      if (postInstallMatch) {
-        contents = contents.replace(
-          /(post_install\s+do\s+\|installer\|)/,
-          `$1${modularHeadersFix}`
-        );
-        console.log('[ios-modular-headers] Added CLANG_ALLOW_NON_MODULAR_INCLUDES fix to post_install');
-      } else {
-        // If no post_install exists, add one before the final 'end'
-        contents = contents.replace(
-          /(\nend\s*)$/,
-          `
-  post_install do |installer|${modularHeadersFix}  end
-$1`
-        );
-        console.log('[ios-modular-headers] Created new post_install with CLANG fix');
-      }
+    // Find the post_install block and inject our code right after the opening
+    // Pattern: post_install do |installer| followed by newline and some content
+    // We need to add our code after the first line of the block
+    
+    // Look for the pattern and add after "post_install do |installer|" + first newline
+    const postInstallRegex = /(post_install\s+do\s+\|installer\|\s*\n)/;
+    
+    if (postInstallRegex.test(contents)) {
+      contents = contents.replace(postInstallRegex, `$1${fixCode}`);
+      console.log('[ios-modular-headers] Successfully injected CLANG fix into post_install');
+    } else {
+      console.log('[ios-modular-headers] WARNING: Could not find post_install block');
     }
 
     config.modResults.contents = contents;
