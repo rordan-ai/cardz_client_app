@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // AsyncStorage no longer used for inbox; messages loaded from Supabase inbox table
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
@@ -357,6 +358,21 @@ export default function PunchCard() {
             const businessNfc = parseBusinessId(tagData);
             // בדיקה שה-tag שייך לעסק הנוכחי
             if (businessNfc === localBusiness.nfc_string) {
+              // השמעת צליל הצלחה
+              try {
+                const { sound } = await Audio.Sound.createAsync(
+                  require('../../assets/sounds/the-sound-of-paying-for-a-purchase-with-a-card-apple-pay---successful.mp3')
+                );
+                await sound.playAsync();
+                // שחרור הצליל אחרי השמעה
+                sound.setOnPlaybackStatusUpdate((status) => {
+                  if (status.isLoaded && status.didJustFinish) {
+                    sound.unloadAsync();
+                  }
+                });
+              } catch (soundErr) {
+                console.log('[NFC] Sound play error:', soundErr);
+              }
               setNfcModalVisible(true);
             }
           }
