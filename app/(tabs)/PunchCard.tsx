@@ -367,9 +367,9 @@ export default function PunchCard() {
           }
         }
         
-        // המשך האזנה עם delay של 2 שניות
+        // המשך האזנה עם delay של 500ms
         if (mounted) {
-          readTimeoutId = setTimeout(listenForNFC, 2000);
+          readTimeoutId = setTimeout(listenForNFC, 500);
         }
       };
       
