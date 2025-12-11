@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Platform, Alert } from 'react-native';
-import NfcManager, { NfcTech, Ndef } from 'react-native-nfc-manager';
+import { Platform } from 'react-native';
+import NfcManager, { NfcTech, Ndef, NfcAdapter } from 'react-native-nfc-manager';
+
+// דגלים לביטול צליל המערכת באנדרואיד
+const READER_MODE_FLAGS = 
+  NfcAdapter.FLAG_READER_NFC_A |
+  NfcAdapter.FLAG_READER_NFC_B |
+  NfcAdapter.FLAG_READER_NFC_V |
+  NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS; // ביטול צליל המערכת!
 
 interface NFCState {
   isSupported: boolean;
@@ -29,7 +36,7 @@ export const useNFC = (): UseNFCReturn => {
     error: null,
   });
 
-  // אתחול NFC
+  // אתחול NFC עם Reader Mode (ללא צליל מערכת)
   const initNFC = useCallback(async (): Promise<boolean> => {
     try {
       const supported = await NfcManager.isSupported();
@@ -43,6 +50,20 @@ export const useNFC = (): UseNFCReturn => {
       await NfcManager.start();
       const enabled = await NfcManager.isEnabled();
       console.log('[NFC] Enabled:', enabled);
+
+      // הפעלת Reader Mode עם ביטול צליל המערכת (Android בלבד)
+      if (Platform.OS === 'android' && enabled) {
+        try {
+          await NfcManager.registerTagEvent({
+            isReaderModeEnabled: true,
+            readerModeFlags: READER_MODE_FLAGS,
+            readerModeDelay: 20,
+          });
+          console.log('[NFC] Reader mode enabled (no platform sounds)');
+        } catch (readerErr) {
+          console.log('[NFC] Reader mode error:', readerErr);
+        }
+      }
 
       setState(prev => ({ 
         ...prev, 
@@ -153,6 +174,7 @@ export const useNFC = (): UseNFCReturn => {
   // ניקוי בעת unmount
   useEffect(() => {
     return () => {
+      NfcManager.unregisterTagEvent().catch(() => {});
       NfcManager.cancelTechnologyRequest().catch(() => {});
     };
   }, []);
