@@ -93,7 +93,7 @@ export default function PunchCard() {
 
   // NFC state
   const [nfcModalVisible, setNfcModalVisible] = useState(false);
-  const { isSupported: nfcSupported, initNFC, startReading, parseBusinessId } = useNFC();
+  const { isSupported: nfcSupported, initNFC, startReading, stopReading, parseBusinessId } = useNFC();
 
   const updateBlacklist = async (channel: 'push' | 'sms', isOptIn: boolean) => {
     try {
@@ -333,6 +333,9 @@ export default function PunchCard() {
   // --- NFC INIT ---
   // אתחול NFC והאזנה
   useEffect(() => {
+    let mounted = true;
+    let readTimeoutId: NodeJS.Timeout | null = null;
+    
     const setupNFC = async () => {
       if (!localBusiness?.nfc_string) return;
       
@@ -342,10 +345,14 @@ export default function PunchCard() {
         return;
       }
       
-      // האזנה רציפה ל-NFC tags
+      // האזנה רציפה ל-NFC tags עם delay למניעת לופ אינסופי
       const listenForNFC = async () => {
+        if (!mounted) return;
+        
         try {
           const tagData = await startReading();
+          if (!mounted) return;
+          
           if (tagData) {
             const businessNfc = parseBusinessId(tagData);
             // בדיקה שה-tag שייך לעסק הנוכחי
@@ -353,10 +360,16 @@ export default function PunchCard() {
               setNfcModalVisible(true);
             }
           }
-          // המשך האזנה
-          listenForNFC();
-        } catch (err) {
-          console.log('[NFC] Listen error:', err);
+        } catch (err: any) {
+          // התעלמות משגיאות רגילות של NFC
+          if (!err?.message?.includes('cancelled') && !err?.message?.includes('request at a time')) {
+            console.log('[NFC] Listen error:', err);
+          }
+        }
+        
+        // המשך האזנה עם delay של 2 שניות
+        if (mounted) {
+          readTimeoutId = setTimeout(listenForNFC, 2000);
         }
       };
       
@@ -364,6 +377,15 @@ export default function PunchCard() {
     };
     
     setupNFC();
+    
+    // Cleanup - עצירת הלופ כשהקומפוננטה מתפרקת
+    return () => {
+      mounted = false;
+      if (readTimeoutId) {
+        clearTimeout(readTimeoutId);
+      }
+      stopReading();
+    };
   }, [localBusiness?.nfc_string]);
 
   // --- REALTIME START ---
@@ -813,9 +835,9 @@ export default function PunchCard() {
     (function() {
       var style = document.createElement('style');
       style.textContent = \`
-        /* הגדלת השובר ב-10% מ-0.75 ל-0.825 */
+        /* הקטנת השובר ב-10% */
         .voucher-card-display {
-          transform: scale(0.825) !important;
+          transform: scale(0.75) !important;
           transform-origin: center center !important;
         }
         /* העלאת התוכן (לא הברקוד) ב-60px - כשמסובב 90° זה שמאלה */
