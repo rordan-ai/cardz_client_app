@@ -17,6 +17,9 @@ interface UseNFCReturn extends NFCState {
   parseBusinessId: (tagData: string) => string | null;
 }
 
+// נעילה גלובלית למניעת קריאות NFC מקבילות
+let isNfcLocked = false;
+
 export const useNFC = (): UseNFCReturn => {
   const [state, setState] = useState<NFCState>({
     isSupported: false,
@@ -56,8 +59,15 @@ export const useNFC = (): UseNFCReturn => {
     }
   }, []);
 
-  // התחלת קריאה
+  // התחלת קריאה - עם נעילה למניעת קריאות מקבילות
   const startReading = useCallback(async (): Promise<string | null> => {
+    // בדיקת נעילה - אם כבר יש קריאה פעילה, לא מתחילים חדשה
+    if (isNfcLocked) {
+      return null;
+    }
+    
+    isNfcLocked = true;
+    
     try {
       setState(prev => ({ ...prev, isReading: true, error: null }));
 
@@ -69,6 +79,7 @@ export const useNFC = (): UseNFCReturn => {
       
       if (!tag) {
         setState(prev => ({ ...prev, isReading: false, error: 'No tag found' }));
+        isNfcLocked = false;
         return null;
       }
 
@@ -92,33 +103,41 @@ export const useNFC = (): UseNFCReturn => {
 
       // ניקוי
       await NfcManager.cancelTechnologyRequest();
+      isNfcLocked = false;
 
       return tagData;
     } catch (error: any) {
-      console.log('[NFC] Error:', 'read', error?.message || error);
+      // התעלמות משגיאות NFC רגילות - לא מדפיסים לקונסול
+      const msg = error?.message || '';
+      if (!msg.includes('request at a time') && !msg.includes('requestTagEvent')) {
+        console.log('[NFC] Error:', 'read', msg || error);
+      }
+      
       setState(prev => ({ 
         ...prev, 
         isReading: false, 
-        error: error?.message || 'Failed to read NFC tag' 
+        error: msg || 'Failed to read NFC tag' 
       }));
       
       // ניקוי במקרה של שגיאה
       try {
         await NfcManager.cancelTechnologyRequest();
       } catch {}
-
+      
+      isNfcLocked = false;
       return null;
     }
   }, []);
 
-  // עצירת קריאה
+  // עצירת קריאה ושחרור נעילה
   const stopReading = useCallback(async (): Promise<void> => {
     try {
       await NfcManager.cancelTechnologyRequest();
       setState(prev => ({ ...prev, isReading: false }));
     } catch (error) {
-      console.log('[NFC] Error:', 'stop', error);
+      // התעלמות משגיאות stop
     }
+    isNfcLocked = false;
   }, []);
 
   // פענוח מזהה עסק מהמחרוזת
