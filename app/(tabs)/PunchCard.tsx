@@ -813,9 +813,9 @@ export default function PunchCard() {
     (function() {
       var style = document.createElement('style');
       style.textContent = \`
-        /* הקטנת השובר ב-10% */
+        /* הגדלת השובר ב-10% מ-0.75 ל-0.825 */
         .voucher-card-display {
-          transform: scale(0.75) !important;
+          transform: scale(0.825) !important;
           transform-origin: center center !important;
         }
         /* העלאת התוכן (לא הברקוד) ב-60px - כשמסובב 90° זה שמאלה */
