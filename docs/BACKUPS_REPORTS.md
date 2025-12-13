@@ -1,5 +1,30 @@
 # דו״ח גיבוי - restore_checkpoints
 
+## גיבוי אחרון: 2025-12-13 23:51
+**הערה:** גיבוי מלא + מיזוג ל-main + ניקוי אבטחה (הסרת `.env` ומפתחות קשיחים מה-repo)
+
+### סיכום
+- ✅ SHA local (main) = `a5283fe055b46ca0451a872f78e9ead91d4cdc42`
+- ✅ SHA local (restore_checkpoints) = `a5283fe055b46ca0451a872f78e9ead91d4cdc42`
+- ✅ Diff: ריק (`git diff main restore_checkpoints --name-only` → ריק)
+- ✅ Working directory: נקי (`git status --porcelain` → ריק)
+- ✅ קומיטים: main=179, restore_checkpoints=179
+
+### ענפי ביטחון / Snapshots
+- `safety_snapshot_20251213_235027`
+- `safety_backup_20251213_235039`
+- `restorepoint_snapshot_20251213_235113`
+
+### אבטחה (קריטי)
+- הוסר `.env` ממעקב git והוסף `.env*` ל-`.gitignore` (עם `!.env.example`)
+- הוסר מפתח Supabase ANON קשיח מקבצים: `components/supabaseClient.ts`, `shared-mcp-server/agents-comm.js`, `tools/check_remaining_keys.js`
+- הוסרו קבצי טמפ' של Cursor שיכלו להכיל סודות: `.cursor/temp_files_for_deleet/`
+- הוסר `temp-export/` מה-repo והוסף ל-`.gitignore` (ארטיפקטים/מפות שעלולים להכיל מידע רגיש)
+
+**המלצה מחייבת:** לבצע רוטציה למפתחות Supabase (ANON וגם SERVICE_ROLE אם היה חשוף אי פעם) ולבדוק גם מפתחות Firebase/`google-services*.json` אם הופיעו בהיסטוריה.
+
+---
+
 ## גיבוי אחרון: 2025-12-05 17:30
 **הערה:** זיהוי ביומטרי, מיון לפי מיקום GPS, הגדרות EAS Build
 
