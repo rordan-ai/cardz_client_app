@@ -1,10 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Using environment variables for security
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://noqfwkxzmvpkorcaymcb.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vcWZ3a3h6bXZwa29yY2F5bWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU0MTgzMTgsImV4cCI6MjA2MDk5NDMxOH0.LNozVpUNhbNR09WGCb79vKgUnrtflG2bEwPKQO7Q1oM';
+// Using environment variables for security (no hardcoded secrets in repo)
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn(
+    '[Supabase] Missing EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY. ' +
+      'Create a local .env (not committed) based on .env.example.'
+  );
+}
+
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   realtime: {
     params: {
       eventsPerSecond: '10',

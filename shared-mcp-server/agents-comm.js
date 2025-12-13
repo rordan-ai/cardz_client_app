@@ -7,10 +7,14 @@ import {
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase client - משותף לשני הסוכנים
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://noqfwkxzmvpkorcaymcb.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vcWZ3a3h6bXZwa29yY2F5bWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU0MTgzMTgsImV4cCI6MjA2MDk5NDMxOH0.LNozVpUNhbNR09WGCb79vKgUnrtflG2bEwPKQO7Q1oM';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn('[agents-comm] Missing SUPABASE_URL / SUPABASE_ANON_KEY in environment');
+}
+
+const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '');
 
 // Message Queue Management
 const messageQueue = {

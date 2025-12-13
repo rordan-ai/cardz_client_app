@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const glob = require('glob');
 
-const OLD_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vcWZ3a3h6bXZwa29yY2F5bWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU0MTgzMTgsImV4cCI6MjA2MDk5NDMxOH0.LNozVpUNhbNR09WGCb79vKgUnrtflG2bEwPKQO7Q1oM';
+// NOTE: Do not store real keys in repo. This is a placeholder for detection only.
+const OLD_KEY = '<OLD_SUPABASE_ANON_KEY_PLACEHOLDER>';
 
 console.log('🔍 בודק קבצים עם מפתחות חשופים...\n');
 
