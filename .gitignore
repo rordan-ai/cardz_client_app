@@ -40,6 +40,9 @@ yarn-error.*
 # Cursor temp files (may contain pasted secrets / logs)
 .cursor/temp_files_for_deleet/
 
+# build/export artifacts (may contain bundled secrets)
+temp-export/
+
 # typescript
 *.tsbuildinfo
 
