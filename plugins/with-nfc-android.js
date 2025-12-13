@@ -46,7 +46,38 @@ const NFC_TECH_FILTER_XML = `<?xml version="1.0" encoding="utf-8"?>
 </resources>
 `;
 
-// יצירת קובץ nfc_tech_filter.xml
+const NFC_DISPATCH_ACTIVITY_KT = `package com.mycardz.app
+
+import android.app.Activity
+import android.content.Intent
+import android.os.Bundle
+
+/**
+ * Activity ייעודי ל-NFC כדי למנוע התנגשות עם expo-router / deep linking ב-MainActivity.
+ * תפקידו: לקבל Intent של NFC ולהעביר אותו ל-MainActivity (singleTop) ואז להיסגר.
+ */
+class NfcDispatchActivity : Activity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+
+    val launchIntent = Intent(this, MainActivity::class.java)
+    launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+    launchIntent.action = intent?.action
+    launchIntent.data = intent?.data
+    launchIntent.type = intent?.type
+    val extras = intent?.extras
+    if (extras != null) {
+      launchIntent.putExtras(extras)
+    }
+
+    startActivity(launchIntent)
+    finish()
+  }
+}
+`;
+
+// יצירת קובץ nfc_tech_filter.xml + Activity ייעודי ל-NFC
 function withNfcTechFilter(config) {
   return withDangerousMod(config, [
     'android',
@@ -62,6 +93,26 @@ function withNfcTechFilter(config) {
       const filePath = path.join(resPath, 'nfc_tech_filter.xml');
       fs.writeFileSync(filePath, NFC_TECH_FILTER_XML);
       console.log('[NFC Plugin] Created nfc_tech_filter.xml');
+
+      // כתיבת Activity ייעודי ל-NFC (כדי שהמערכת תפתח את האפליקציה במקום "New tag scanned")
+      const ktPath = path.join(
+        config.modRequest.platformProjectRoot,
+        'app',
+        'src',
+        'main',
+        'java',
+        'com',
+        'mycardz',
+        'app'
+      );
+      if (!fs.existsSync(ktPath)) {
+        fs.mkdirSync(ktPath, { recursive: true });
+      }
+      const activityFilePath = path.join(ktPath, 'NfcDispatchActivity.kt');
+      if (!fs.existsSync(activityFilePath)) {
+        fs.writeFileSync(activityFilePath, NFC_DISPATCH_ACTIVITY_KT);
+        console.log('[NFC Plugin] Created NfcDispatchActivity.kt');
+      }
       
       return config;
     },
@@ -123,6 +174,41 @@ function withNfcManifest(config) {
         }
       });
       console.log('[NFC Plugin] Added TECH_DISCOVERED meta-data');
+    }
+
+    // הוספת Activity ייעודי ל-NFC (ללא התנגשות עם expo-router ב-MainActivity)
+    const hasNfcDispatchActivity = activities.some((a) => a?.$?.['android:name'] === '.NfcDispatchActivity');
+    if (!hasNfcDispatchActivity) {
+      activities.push({
+        $: {
+          'android:name': '.NfcDispatchActivity',
+          'android:exported': 'true',
+          'android:launchMode': 'singleTask',
+          'android:noHistory': 'true',
+          'android:theme': '@style/Theme.App.SplashScreen',
+        },
+        'intent-filter': [
+          {
+            action: [{ $: { 'android:name': 'android.nfc.action.TECH_DISCOVERED' } }],
+            category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
+          },
+          {
+            action: [{ $: { 'android:name': 'android.nfc.action.TAG_DISCOVERED' } }],
+            category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
+          },
+        ],
+        'meta-data': [
+          {
+            $: {
+              'android:name': 'android.nfc.action.TECH_DISCOVERED',
+              'android:resource': '@xml/nfc_tech_filter',
+            },
+          },
+        ],
+      });
+      // חשוב: להחזיר את המערך לאחר push (manifest object מוחזק לפי הפניה אבל נשמור עקביות)
+      mainApplication.activity = activities;
+      console.log('[NFC Plugin] Added NfcDispatchActivity');
     }
     
     return config;
