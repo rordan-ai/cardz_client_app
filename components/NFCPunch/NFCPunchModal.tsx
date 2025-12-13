@@ -1,18 +1,18 @@
+import { Audio } from 'expo-av';
+import LottieView from 'lottie-react-native';
 import React, { useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
   Modal,
   StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
+  Text,
   TextInput,
-  FlatList,
-  Dimensions,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useNFCPunch, CustomerCard, PunchFlowState } from '../../hooks/useNFCPunch';
-import LottieView from 'lottie-react-native';
-import { Audio } from 'expo-av';
+import { useNFCPunch } from '../../hooks/useNFCPunch';
 
 const { width } = Dimensions.get('window');
 
