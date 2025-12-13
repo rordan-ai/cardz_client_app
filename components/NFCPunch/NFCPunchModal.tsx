@@ -86,7 +86,7 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
     if (visible && nfcString && customerPhoneFromProps) {
       startPunchFlow(nfcString, customerPhoneFromProps, selectedCardNumber);
     }
-  }, [visible, nfcString, customerPhoneFromProps, selectedCardNumber]);
+  }, [visible, nfcString, customerPhoneFromProps, selectedCardNumber, startPunchFlow]);
 
   // טיפול בהצלחה
   useEffect(() => {
