@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Platform } from 'react-native';
-import NfcManager, { NfcTech, Ndef, NfcAdapter } from 'react-native-nfc-manager';
+import NfcManager, { NfcTech, Ndef, NfcAdapter, NfcEvents } from 'react-native-nfc-manager';
 
 // דגלים לביטול צליל המערכת באנדרואיד
 const READER_MODE_FLAGS = 
@@ -22,10 +22,15 @@ interface UseNFCReturn extends NFCState {
   startReading: () => Promise<string | null>;
   stopReading: () => Promise<void>;
   parseBusinessId: (tagData: string) => string | null;
+  checkLaunchTag: () => Promise<string | null>;
+  checkBackgroundTag: () => Promise<string | null>;
 }
 
 // נעילה גלובלית למניעת קריאות NFC מקבילות
 let isNfcLocked = false;
+
+// Callback גלובלי לטיפול בתג שנקרא
+let onTagDiscoveredCallback: ((tagData: string | null) => void) | null = null;
 
 export const useNFC = (): UseNFCReturn => {
   const [state, setState] = useState<NFCState>({
@@ -36,7 +41,25 @@ export const useNFC = (): UseNFCReturn => {
     error: null,
   });
 
-  // אתחול NFC עם Reader Mode (ללא צליל מערכת)
+  const resolveRef = useRef<((value: string | null) => void) | null>(null);
+
+  // פענוח תג NFC
+  const parseTag = (tag: any): string | null => {
+    if (!tag) return null;
+    
+    if (tag.ndefMessage && tag.ndefMessage.length > 0) {
+      const ndefRecord = tag.ndefMessage[0];
+      if (ndefRecord.payload) {
+        const payload = ndefRecord.payload;
+        const langCodeLength = payload[0] & 0x3f;
+        const textBytes = payload.slice(1 + langCodeLength);
+        return String.fromCharCode(...textBytes);
+      }
+    }
+    return null;
+  };
+
+  // אתחול NFC עם Foreground Dispatch
   const initNFC = useCallback(async (): Promise<boolean> => {
     try {
       const supported = await NfcManager.isSupported();
@@ -51,17 +74,32 @@ export const useNFC = (): UseNFCReturn => {
       const enabled = await NfcManager.isEnabled();
       console.log('[NFC] Enabled:', enabled);
 
-      // הפעלת Reader Mode עם ביטול צליל המערכת (Android בלבד)
-      if (Platform.OS === 'android' && enabled) {
-        try {
-          await NfcManager.registerTagEvent({
-            isReaderModeEnabled: true,
-            readerModeFlags: READER_MODE_FLAGS,
-            readerModeDelay: 20,
-          });
-          console.log('[NFC] Reader mode enabled (no platform sounds)');
-        } catch (readerErr) {
-          console.log('[NFC] Reader mode error:', readerErr);
+      if (enabled) {
+        // רישום Event Listener לקבלת תגי NFC
+        NfcManager.setEventListener(NfcEvents.DiscoverTag, (tag: any) => {
+          console.log('[NFC] Tag discovered via event:', tag);
+          const tagData = parseTag(tag);
+          setState(prev => ({ ...prev, lastTag: tagData, isReading: false }));
+          
+          // אם יש resolve callback, קרא לו
+          if (resolveRef.current) {
+            resolveRef.current(tagData);
+            resolveRef.current = null;
+          }
+        });
+
+        // הפעלת Foreground Dispatch (Android)
+        if (Platform.OS === 'android') {
+          try {
+            await NfcManager.registerTagEvent({
+              isReaderModeEnabled: true,
+              readerModeFlags: READER_MODE_FLAGS,
+              readerModeDelay: 10,
+            });
+            console.log('[NFC] Foreground dispatch enabled');
+          } catch (readerErr) {
+            console.log('[NFC] Foreground dispatch error:', readerErr);
+          }
         }
       }
 
@@ -80,7 +118,7 @@ export const useNFC = (): UseNFCReturn => {
     }
   }, []);
 
-  // התחלת קריאה - עם נעילה למניעת קריאות מקבילות
+  // התחלת קריאה - מחכה לאירוע מה-event listener
   const startReading = useCallback(async (): Promise<string | null> => {
     // בדיקת נעילה - אם כבר יש קריאה פעילה, לא מתחילים חדשה
     if (isNfcLocked) {
@@ -88,66 +126,26 @@ export const useNFC = (): UseNFCReturn => {
     }
     
     isNfcLocked = true;
-    
-    try {
-      setState(prev => ({ ...prev, isReading: true, error: null }));
+    setState(prev => ({ ...prev, isReading: true, error: null }));
 
-      // בקשת טכנולוגיית NFC
-      await NfcManager.requestTechnology(NfcTech.Ndef);
-
-      // קריאת ה-tag
-      const tag = await NfcManager.getTag();
-      
-      if (!tag) {
-        setState(prev => ({ ...prev, isReading: false, error: 'No tag found' }));
+    return new Promise((resolve) => {
+      // שמירת ה-resolve callback
+      resolveRef.current = (tagData) => {
+        console.log('[NFC] Tag read via listener:', tagData);
         isNfcLocked = false;
-        return null;
-      }
+        resolve(tagData);
+      };
 
-      // פענוח הנתונים
-      let tagData: string | null = null;
-
-      if (tag.ndefMessage && tag.ndefMessage.length > 0) {
-        const ndefRecord = tag.ndefMessage[0];
-        if (ndefRecord.payload) {
-          // המרת payload לטקסט
-          const payload = ndefRecord.payload;
-          // דילוג על byte ראשון (language code length) ו-language code
-          const langCodeLength = payload[0] & 0x3f;
-          const textBytes = payload.slice(1 + langCodeLength);
-          tagData = String.fromCharCode(...textBytes);
+      // Timeout של 30 שניות
+      setTimeout(() => {
+        if (resolveRef.current) {
+          resolveRef.current = null;
+          isNfcLocked = false;
+          setState(prev => ({ ...prev, isReading: false }));
+          resolve(null);
         }
-      }
-
-      console.log('[NFC] Tag read:', tagData);
-      setState(prev => ({ ...prev, isReading: false, lastTag: tagData }));
-
-      // ניקוי
-      await NfcManager.cancelTechnologyRequest();
-      isNfcLocked = false;
-
-      return tagData;
-    } catch (error: any) {
-      // התעלמות משגיאות NFC רגילות - לא מדפיסים לקונסול
-      const msg = error?.message || '';
-      if (!msg.includes('request at a time') && !msg.includes('requestTagEvent')) {
-        console.log('[NFC] Error:', 'read', msg || error);
-      }
-      
-      setState(prev => ({ 
-        ...prev, 
-        isReading: false, 
-        error: msg || 'Failed to read NFC tag' 
-      }));
-      
-      // ניקוי במקרה של שגיאה
-      try {
-        await NfcManager.cancelTechnologyRequest();
-      } catch {}
-      
-      isNfcLocked = false;
-      return null;
-    }
+      }, 30000);
+    });
   }, []);
 
   // עצירת קריאה ושחרור נעילה
@@ -171,11 +169,52 @@ export const useNFC = (): UseNFCReturn => {
     return tagData;
   }, []);
 
+  // בדיקת תג שהפעיל את האפליקציה (Android בלבד)
+  const checkLaunchTag = useCallback(async (): Promise<string | null> => {
+    if (Platform.OS !== 'android') return null;
+    
+    try {
+      const launchTag = await NfcManager.getLaunchTagEvent();
+      if (launchTag) {
+        console.log('[NFC] Launch tag found:', launchTag);
+        const tagData = parseTag(launchTag);
+        setState(prev => ({ ...prev, lastTag: tagData }));
+        return tagData;
+      }
+    } catch (error) {
+      console.log('[NFC] No launch tag');
+    }
+    return null;
+  }, []);
+
+  // בדיקת תג רקע (Android בלבד)
+  const checkBackgroundTag = useCallback(async (): Promise<string | null> => {
+    if (Platform.OS !== 'android') return null;
+    
+    try {
+      const backgroundTag = await NfcManager.getBackgroundTag();
+      if (backgroundTag) {
+        console.log('[NFC] Background tag found:', backgroundTag);
+        const tagData = parseTag(backgroundTag);
+        setState(prev => ({ ...prev, lastTag: tagData }));
+        // נקה את התג אחרי קריאה
+        await NfcManager.clearBackgroundTag();
+        return tagData;
+      }
+    } catch (error) {
+      console.log('[NFC] No background tag');
+    }
+    return null;
+  }, []);
+
   // ניקוי בעת unmount
   useEffect(() => {
     return () => {
+      NfcManager.setEventListener(NfcEvents.DiscoverTag, null);
       NfcManager.unregisterTagEvent().catch(() => {});
       NfcManager.cancelTechnologyRequest().catch(() => {});
+      resolveRef.current = null;
+      isNfcLocked = false;
     };
   }, []);
 
@@ -185,6 +224,8 @@ export const useNFC = (): UseNFCReturn => {
     startReading,
     stopReading,
     parseBusinessId,
+    checkLaunchTag,
+    checkBackgroundTag,
   };
 };
 

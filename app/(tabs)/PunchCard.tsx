@@ -157,14 +157,19 @@ export default function PunchCard() {
     products?: { product_name: string }[];
   }>>([]);
   const [localBusiness, setLocalBusiness] = useState<{
+    id?: number;
     business_code: string;
     name: string;
+    business_name?: string;
     logo?: string;
     max_punches: number;
     punched_icon?: string;
     unpunched_icon?: string;
     card_text_color?: string;
     expiration_date?: string;
+    nfc_string?: string;
+    login_brand_color?: string;
+    punch_mode?: string;
   } | null>(null);
 
   // פונקציה ליצירת קוד הזמנה מספרי חדש
@@ -335,11 +340,9 @@ export default function PunchCard() {
   // אתחול NFC והאזנה
   useEffect(() => {
     let mounted = true;
-    let readTimeoutId: NodeJS.Timeout | null = null;
+    let readTimeoutId: ReturnType<typeof setTimeout> | null = null;
     
-    const setupNFC = async () => {
-      if (!localBusiness?.nfc_string) return;
-      
+    const startNFCListening = async () => {
       const enabled = await initNFC();
       if (!enabled) {
         console.log('[NFC] Not available or disabled');
@@ -357,11 +360,11 @@ export default function PunchCard() {
           if (tagData) {
             const businessNfc = parseBusinessId(tagData);
             // בדיקה שה-tag שייך לעסק הנוכחי
-            if (businessNfc === localBusiness.nfc_string) {
+            if (businessNfc === localBusiness?.nfc_string) {
               // השמעת צליל הצלחה
               try {
                 const { sound } = await Audio.Sound.createAsync(
-                  require('../../assets/sounds/the-sound-of-paying-for-a-purchase-with-a-card-apple-pay---successful.mp3')
+                  require('../../assets/sounds/nfc-success.mp3')
                 );
                 await sound.playAsync();
                 // שחרור הצליל אחרי השמעה
@@ -390,6 +393,32 @@ export default function PunchCard() {
       };
       
       listenForNFC();
+    };
+    
+    const setupNFC = async () => {
+      if (!localBusiness?.nfc_string) return;
+      
+      // ב-iOS - הצגת דיאלוג אישור לסריקה
+      if (Platform.OS === 'ios') {
+        Alert.alert(
+          'ברוכים הבאים לסריקה אוטומטית של קארדז',
+          'האם לאפשר סריקת NFC?',
+          [
+            {
+              text: 'בטל',
+              style: 'cancel',
+              onPress: () => console.log('[NFC] User cancelled iOS NFC permission'),
+            },
+            {
+              text: 'אשר',
+              onPress: () => startNFCListening(),
+            },
+          ]
+        );
+      } else {
+        // באנדרואיד - התחלה אוטומטית
+        startNFCListening();
+      }
     };
     
     setupNFC();
@@ -756,17 +785,20 @@ export default function PunchCard() {
       setUnreadMessages(updatedNotifications.filter(n => !n.read).length);
       
       // לוג קריאת הודעה לטבלת user_activities (לא חוסם את ה-UI)
-      supabase.from('user_activities').insert({
-        customer_id: phoneStr || '',
-        business_code: localBusiness?.business_code || '',
-        action_type: 'inbox_read',
-        action_time: new Date().toISOString(),
-        source: 'mobile'
-      }).then(() => {
-        if (__DEV__) console.log('[Inbox] Logged inbox_read');
-      }).catch((err) => {
-        if (__DEV__) console.log('[Inbox] Failed to log inbox_read:', err);
-      });
+      (async () => {
+        try {
+          await supabase.from('user_activities').insert({
+            customer_id: phoneStr || '',
+            business_code: localBusiness?.business_code || '',
+            action_type: 'inbox_read',
+            action_time: new Date().toISOString(),
+            source: 'mobile'
+          });
+          if (__DEV__) console.log('[Inbox] Logged inbox_read');
+        } catch (err: unknown) {
+          if (__DEV__) console.log('[Inbox] Failed to log inbox_read:', err);
+        }
+      })();
     } catch (_) {
       // ignore
     }
@@ -1540,9 +1572,10 @@ export default function PunchCard() {
             
             try {
               const phoneVariants = [phoneStr, phoneIntl].filter(Boolean);
+              // שאילתה מתוקנת - רק שדות שקיימים בטבלת inbox
               const { data, error } = await supabase
                 .from('inbox')
-                .select('id, title, message, status, created_at, data')
+                .select('id, message, status, created_at')
                 .eq('business_code', localBusiness.business_code)
                 .in('customer_phone', phoneVariants.length > 0 ? phoneVariants : ['__NO_MATCH__'])
                 .order('created_at', { ascending: false });
@@ -1553,11 +1586,11 @@ export default function PunchCard() {
               } else if (data) {
                 const mapped = data.map((row: any) => ({
                   id: String(row.id),
-                  title: row.title || 'הודעה',
+                  title: 'הודעה מהעסק',  // ברירת מחדל - אין שדה title בטבלה
                   body: row.message || '',
                   timestamp: new Date(row.created_at).getTime(),
                   read: row.status === 'read',
-                  voucherUrl: row.data?.voucher_url || null,
+                  voucherUrl: undefined,  // אין שדה data בטבלה
                 }));
                 setNotifications(mapped);
                 setUnreadMessages(mapped.filter(n => !n.read).length);
@@ -3014,12 +3047,14 @@ export default function PunchCard() {
     </ScrollView>
 
       {/* מודאל ניקוב NFC */}
-      {localBusiness && (
+      {localBusiness && localBusiness.nfc_string && (
         <NFCPunchModal
           visible={nfcModalVisible}
-          businessId={localBusiness.id}
-          businessName={localBusiness.business_name}
-          nfcString={localBusiness.nfc_string || ''}
+          businessId={localBusiness.id || 0}
+          businessName={localBusiness.business_name || localBusiness.name}
+          nfcString={localBusiness.nfc_string}
+          customerPhone={phoneStr || phoneIntl || ''} // הלקוח כבר מזוהה!
+          selectedCardNumber={punchCard?.card_number} // הכרטיסייה שכבר נבחרה - לא יציג מודאל בחירה!
           brandColor={localBusiness.login_brand_color}
           onClose={() => setNfcModalVisible(false)}
           onSuccess={() => {

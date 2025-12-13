@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Dimensions,
 } from 'react-native';
 import { useNFCPunch, CustomerCard, PunchFlowState } from '../../hooks/useNFCPunch';
+import LottieView from 'lottie-react-native';
+import { Audio } from 'expo-av';
 
 const { width } = Dimensions.get('window');
 
@@ -19,6 +21,8 @@ interface NFCPunchModalProps {
   businessId: number;
   businessName: string;
   nfcString: string;
+  customerPhone: string; // מספר הטלפון של הלקוח המחובר (כבר מזוהה!)
+  selectedCardNumber?: string; // מספר הכרטיסייה שכבר נבחרה (אופציונלי)
   brandColor?: string;
   onClose: () => void;
   onSuccess: () => void;
@@ -29,6 +33,8 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   businessId,
   businessName,
   nfcString,
+  customerPhone: customerPhoneFromProps,
+  selectedCardNumber,
   brandColor = '#9747FF',
   onClose,
   onSuccess,
@@ -49,13 +55,38 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
 
   const [phoneInput, setPhoneInput] = React.useState('');
   const [showPhoneInput, setShowPhoneInput] = React.useState(false);
+  const confettiRef = useRef<LottieView>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  // ניגון סאונד חגיגי לניקוב מזכה
+  const playRewardingSound = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require('../../assets/sounds/nfc-success.mp3')
+      );
+      soundRef.current = sound;
+      await sound.playAsync();
+    } catch (err) {
+      console.log('[NFC] Error playing rewarding sound:', err);
+    }
+  };
+
+  // ניקוי סאונד
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
 
   // התחלת פלואו כשהמודאל נפתח
+  // שולחים את מספר הטלפון ומספר הכרטיסייה כי הלקוח כבר מזוהה וכבר בחר כרטיסייה!
   useEffect(() => {
-    if (visible && businessId && nfcString) {
-      startPunchFlow(businessId, nfcString);
+    if (visible && nfcString && customerPhoneFromProps) {
+      startPunchFlow(nfcString, customerPhoneFromProps, selectedCardNumber);
     }
-  }, [visible, businessId, nfcString]);
+  }, [visible, nfcString, customerPhoneFromProps, selectedCardNumber]);
 
   // טיפול בהצלחה
   useEffect(() => {
@@ -64,6 +95,19 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
         onSuccess();
         handleClose();
       }, 2000);
+    }
+  }, [flowState]);
+
+  // טיפול בניקוב מזכה - קונפטי וסאונד
+  useEffect(() => {
+    if (flowState === 'rewarding_punch') {
+      playRewardingSound();
+      confettiRef.current?.play();
+      // אחרי 4 שניות מעבר להצלחה
+      setTimeout(() => {
+        onSuccess();
+        handleClose();
+      }, 4000);
     }
   }, [flowState]);
 
@@ -154,7 +198,7 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
             </Text>
             <FlatList
               data={customerCards}
-              keyExtractor={(item) => item.id.toString()}
+              keyExtractor={(item) => item.card_number}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[styles.cardItem, { borderColor: brandColor }]}
@@ -162,9 +206,9 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
                 >
                   <Text style={styles.cardName}>{item.product_name}</Text>
                   <Text style={styles.cardPunches}>
-                    {item.current_punches}/{item.total_punches} ניקובים
+                    {item.used_punches}/{item.total_punches} ניקובים
                   </Text>
-                  {item.is_prepaid && (
+                  {item.prepaid === 'כן' && (
                     <Text style={[styles.prepaidBadge, { backgroundColor: brandColor }]}>
                       שולם מראש
                     </Text>
@@ -194,6 +238,58 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
           </View>
         );
 
+      case 'card_full':
+        return (
+          <View style={styles.content}>
+            <Text style={styles.fullCardIcon}>🎉</Text>
+            <Text style={styles.title}>הכרטיסייה מלאה!</Text>
+            <Text style={styles.message}>
+              סיימת למלא את כל הניקובים בכרטיסייה זו.{'\n'}
+              האם לפתוח כרטיסייה חדשה?
+            </Text>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: brandColor }]}
+                onPress={() => {
+                  // TODO: יצירת כרטיסייה חדשה
+                  console.log('[NFC] User requested new card');
+                  handleClose();
+                }}
+              >
+                <Text style={styles.buttonText}>כן, פתח חדשה</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.buttonOutline, { borderColor: brandColor }]}
+                onPress={handleClose}
+              >
+                <Text style={[styles.buttonOutlineText, { color: brandColor }]}>
+                  לא תודה
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+
+      case 'rewarding_punch':
+        return (
+          <View style={styles.content}>
+            {/* אנימציית קונפטי */}
+            <LottieView
+              ref={confettiRef}
+              source={require('../../assets/animations/confetti.json')}
+              autoPlay
+              loop={false}
+              style={styles.confettiAnimation}
+            />
+            <Text style={styles.celebrationIcon}>🎊</Text>
+            <Text style={styles.celebrationTitle}>מזל טוב!</Text>
+            <Text style={styles.celebrationMessage}>
+              השלמת את כל הניקובים!{'\n'}
+              הזכאות שלך: {selectedCard?.benefit || 'מוצר מתנה'}
+            </Text>
+          </View>
+        );
+
       case 'success':
         return (
           <View style={styles.content}>
@@ -214,7 +310,7 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
             <Text style={styles.errorMessage}>{error}</Text>
             <TouchableOpacity
               style={[styles.button, { backgroundColor: brandColor }]}
-              onPress={() => startPunchFlow(businessId, nfcString)}
+              onPress={() => startPunchFlow(nfcString, customerPhoneFromProps)}
             >
               <Text style={styles.buttonText}>נסה שוב</Text>
             </TouchableOpacity>
@@ -390,6 +486,40 @@ const styles = StyleSheet.create({
     color: '#e74c3c',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  fullCardIcon: {
+    fontSize: 60,
+    marginBottom: 16,
+  },
+  confettiAnimation: {
+    position: 'absolute',
+    top: -50,
+    left: -50,
+    right: -50,
+    bottom: -50,
+    width: 400,
+    height: 400,
+    zIndex: 10,
+  },
+  celebrationIcon: {
+    fontSize: 80,
+    marginBottom: 16,
+  },
+  celebrationTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFD700',
+    marginBottom: 12,
+    textAlign: 'center',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  celebrationMessage: {
+    fontSize: 18,
+    color: '#333',
+    textAlign: 'center',
+    lineHeight: 26,
   },
 });
 
