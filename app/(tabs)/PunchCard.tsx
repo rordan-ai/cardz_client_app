@@ -41,6 +41,7 @@ export default function PunchCard() {
     benefit: string; 
     prepaid: string; 
     product_code?: string;
+    product_name?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -274,6 +275,7 @@ export default function PunchCard() {
       
       let cardNumber: string;
       let productCode: string;
+      let productNameForCard = '';
       
       // אם יש יותר מכרטיסייה אחת - צריך לבחור
       if (customerCards.length > 1) {
@@ -285,6 +287,7 @@ export default function PunchCard() {
         // יש כרטיסייה אחת בלבד
         cardNumber = customerCards[0].card_number;
         productCode = customerCards[0].product_code;
+        productNameForCard = customerCards[0]?.products?.[0]?.product_name || '';
       }
       
       // שליפת נתוני העסק (כולל max_punches)
@@ -328,7 +331,25 @@ export default function PunchCard() {
         setLoading(false);
         return;
       }
-              setPunchCard(punchCards[0] as typeof punchCard);
+      // Fallback: אם לא הצלחנו למפות product_name קודם (למשל בעיית join/mapping),
+      // נשלוף ישירות את שם המוצר מהטבלה products לפי product_code של הכרטיסייה.
+      if (!productNameForCard) {
+        const pc = String((punchCards[0] as any)?.product_code || '').trim();
+        if (pc) {
+          const { data: prodRow } = await supabase
+            .from('products')
+            .select('product_name')
+            .eq('business_code', businessCode)
+            .eq('product_code', pc)
+            .maybeSingle();
+          productNameForCard = String((prodRow as any)?.product_name || '').trim();
+        }
+      }
+
+      setPunchCard({
+        ...(punchCards[0] as any),
+        product_name: productNameForCard,
+      } as typeof punchCard);
       setLoading(false);
     };
     if (phoneStr) {
@@ -455,9 +476,13 @@ export default function PunchCard() {
           table: 'PunchCards',
           filter: `card_number=eq.${cardNumber}`
         },
-                 (payload: { new?: Record<string, any>; old?: Record<string, any> }) => {
-           if (payload.new) {
-            setPunchCard(payload.new as typeof punchCard);
+        (payload: { new?: Record<string, any>; old?: Record<string, any> }) => {
+          if (payload.new) {
+            // לשמור על product_name (שמגיע מטבלת products) גם לאחר עדכוני Realtime
+            setPunchCard((prev) => ({
+              ...(prev || {}),
+              ...(payload.new as any),
+            }) as any);
           }
         }
       )
@@ -724,7 +749,9 @@ export default function PunchCard() {
   const unpunched = totalPunches - usedPunches;
   const punchedIcon = business?.punched_icon;
   const unpunchedIcon = business?.unpunched_icon;
-  const benefit = punchCard?.benefit || '';
+  // בשורת "לקבלת" מציגים את שם מוצר הכרטיסייה (למקרה של כמה כרטיסיות בעסק).
+  // אם אין לנו product_name, ניפול אחורה ל-benefit / product_code כדי לא להשאיר ריק.
+  const benefit = (punchCard?.product_name || '').trim() || (punchCard?.benefit || '').trim() || punchCard?.product_code || '';
   const prepaid = punchCard?.prepaid === 'כן' ? 'כן' : 'לא';
 
   
@@ -835,8 +862,23 @@ export default function PunchCard() {
       return;
     }
 
+    // אם אין product_name על ה-card שנבחר (מיפוי products לא הצליח), נביא fallback מהטבלה.
+    let selectedProductName = selectedCard?.products?.[0]?.product_name || '';
+    if (!selectedProductName && selectedCard?.product_code) {
+      const { data: prodRow } = await supabase
+        .from('products')
+        .select('product_name')
+        .eq('business_code', business?.business_code)
+        .eq('product_code', selectedCard.product_code)
+        .maybeSingle();
+      selectedProductName = String((prodRow as any)?.product_name || '').trim();
+    }
+
     setLocalBusiness(businessData);
-    setPunchCard(punchCard);
+    setPunchCard({
+      ...(punchCard as any),
+      product_name: selectedProductName,
+    } as any);
     setLoading(false);
   };
 
