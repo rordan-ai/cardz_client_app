@@ -52,11 +52,11 @@
       android:launchMode="singleTask"
       android:noHistory="true"
       android:theme="@style/Theme.App.SplashScreen">
-      <intent-filter>
+      <intent-filter android:priority="1000">
         <action android:name="android.nfc.action.TECH_DISCOVERED"/>
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>
-      <intent-filter>
+      <intent-filter android:priority="1000">
         <action android:name="android.nfc.action.TAG_DISCOVERED"/>
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>

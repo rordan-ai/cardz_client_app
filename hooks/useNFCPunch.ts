@@ -199,7 +199,15 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       });
 
       if (error) {
-        console.log('[NFC] Error:', 'sendRequest.invoke', error);
+        // לוג מפורט כדי להבין למה הפונקציה מחזירה non-2xx
+        let errorBody = '';
+        try {
+          const ctx = (error as any)?.context;
+          if (ctx && typeof ctx.text === 'function') {
+            errorBody = await ctx.text();
+          }
+        } catch {}
+        console.log('[NFC] Error:', 'sendRequest.invoke', error, errorBody);
         return null;
       }
 

@@ -362,6 +362,7 @@ export default function PunchCard() {
   useEffect(() => {
     let mounted = true;
     let readTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    const expectedNfcString = localBusiness?.nfc_string;
     
     const startNFCListening = async () => {
       const enabled = await initNFC();
@@ -381,7 +382,7 @@ export default function PunchCard() {
           if (tagData) {
             const businessNfc = parseBusinessId(tagData);
             // בדיקה שה-tag שייך לעסק הנוכחי
-            if (businessNfc === localBusiness?.nfc_string) {
+            if (businessNfc === expectedNfcString) {
               // השמעת צליל הצלחה
               try {
                 const { sound } = await Audio.Sound.createAsync(
@@ -417,7 +418,7 @@ export default function PunchCard() {
     };
     
     const setupNFC = async () => {
-      if (!localBusiness?.nfc_string) return;
+      if (!expectedNfcString) return;
       
       // ב-iOS - הצגת דיאלוג אישור לסריקה
       if (Platform.OS === 'ios') {
@@ -452,7 +453,7 @@ export default function PunchCard() {
       }
       stopReading();
     };
-  }, [localBusiness?.nfc_string]);
+  }, [localBusiness?.nfc_string, initNFC, startReading, stopReading, parseBusinessId]);
 
   // --- REALTIME START ---
   // חיבור ל-Realtime לעדכונים מיידיים

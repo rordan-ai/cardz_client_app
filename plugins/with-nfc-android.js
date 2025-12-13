@@ -189,10 +189,12 @@ function withNfcManifest(config) {
         },
         'intent-filter': [
           {
+            $: { 'android:priority': '1000' },
             action: [{ $: { 'android:name': 'android.nfc.action.TECH_DISCOVERED' } }],
             category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
           },
           {
+            $: { 'android:priority': '1000' },
             action: [{ $: { 'android:name': 'android.nfc.action.TAG_DISCOVERED' } }],
             category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
           },
