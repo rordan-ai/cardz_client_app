@@ -37,6 +37,9 @@ yarn-error.*
 !.env.example
 .env.bak.*
 
+# Cursor temp files (may contain pasted secrets / logs)
+.cursor/temp_files_for_deleet/
+
 # typescript
 *.tsbuildinfo
 
