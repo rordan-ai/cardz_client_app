@@ -508,8 +508,6 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
 
     const isPrepaid = card.prepaid === 'כן';
     const effectiveMode = punchModeRef.current ?? currentPunchMode;
-    const isSemiAuto = effectiveMode === 'semi_auto' || effectiveMode === 'semi';
-    const isAuto = effectiveMode === 'auto';
     console.log('[NFC] processPunch route:', {
       businessCode,
       currentPunchMode: effectiveMode,
@@ -517,8 +515,9 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       cardNumber: card.card_number,
     });
 
-    // לפי אפיון: במצב auto או כרטיסייה prepaid - מבצעים ניקוב ישיר (עדכון PunchCards)
-    if (isAuto || isPrepaid) {
+    // לפי אפיון: כרטיסייה Prepaid בלבד מבצעת ניקוב ישיר.
+    // כל כרטיסייה שאינה Prepaid חייבת לעבור אישור אדמין (בלי קשר ל-punch_mode של העסק).
+    if (isPrepaid) {
       setFlowState('punching');
       const result = await executePunch(
         { ...card, used_punches: latestUsed, total_punches: latestTotal },
@@ -544,13 +543,8 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       return;
     }
 
-    // מצב semi_auto (לא prepaid): שולחים בקשה לאדמין וממתינים
-    if (isSemiAuto) {
-      setFlowState('waiting_approval');
-    } else {
-      // fallback (לא אמור לקרות, אבל לא לשבור פלואו)
-      setFlowState('waiting_approval');
-    }
+    // לא Prepaid: שולחים בקשה לאדמין וממתינים
+    setFlowState('waiting_approval');
 
     const requestId = await sendPunchRequest(
       businessCode,

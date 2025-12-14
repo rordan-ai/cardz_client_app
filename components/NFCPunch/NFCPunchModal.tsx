@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useNFCPunch } from '../../hooks/useNFCPunch';
+import { supabase } from '../../components/supabaseClient';
 
 const { width } = Dimensions.get('window');
 
@@ -26,6 +27,7 @@ interface NFCPunchModalProps {
   brandColor?: string;
   onClose: () => void;
   onSuccess: () => void;
+  onCardRenewed?: (newCardNumber: string) => void;
 }
 
 export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
@@ -38,12 +40,14 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   brandColor = '#9747FF',
   onClose,
   onSuccess,
+  onCardRenewed,
 }) => {
   const {
     flowState,
     customerPhone,
     customerCards,
     selectedCard,
+    currentBusinessCode,
     error,
     startPunchFlow,
     identifyWithBiometric,
@@ -58,6 +62,9 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   const confettiRef = useRef<LottieView>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const [showRenewalAfterReward, setShowRenewalAfterReward] = React.useState(false);
+  const [renewing, setRenewing] = React.useState(false);
+  const [renewalSuccessMessage, setRenewalSuccessMessage] = React.useState<string | null>(null);
+  const [renewalErrorMessage, setRenewalErrorMessage] = React.useState<string | null>(null);
 
   // ניגון סאונד חגיגי לניקוב מזכה
   const playRewardingSound = async () => {
@@ -126,7 +133,63 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
     resetFlow();
     setPhoneInput('');
     setShowPhoneInput(false);
+    setRenewing(false);
+    setRenewalSuccessMessage(null);
+    setRenewalErrorMessage(null);
     onClose();
+  };
+
+  const handleRenewCard = async () => {
+    if (renewing) return;
+    setRenewalErrorMessage(null);
+    setRenewalSuccessMessage(null);
+
+    const businessCode = currentBusinessCode;
+    const cardNumber = selectedCard?.card_number || selectedCardNumber;
+    const productName = selectedCard?.product_name || businessName || 'מוצר';
+
+    if (!businessCode || !cardNumber || !customerPhoneFromProps) {
+      setRenewalErrorMessage('חסרים פרטים לחידוש הכרטיסייה. נסה שוב.');
+      return;
+    }
+
+    setRenewing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('punch-card-renew', {
+        body: {
+          business_code: businessCode,
+          customer_phone: customerPhoneFromProps,
+          card_number: cardNumber,
+        },
+      });
+
+      if (error) {
+        console.log('[NFC] Error:', 'punch-card-renew.invoke', error);
+        setRenewalErrorMessage('שגיאה בחידוש הכרטיסייה. נסה שוב.');
+        setRenewing(false);
+        return;
+      }
+
+      const newCardNumber = (data as any)?.new_card_number as string | undefined;
+      if (!newCardNumber) {
+        setRenewalErrorMessage('שגיאה בחידוש הכרטיסייה. נסה שוב.');
+        setRenewing(false);
+        return;
+      }
+
+      // עדכון מסך הכרטיסייה מאחורי המודאל
+      onCardRenewed?.(newCardNumber);
+
+      // הודעת הצלחה + סגירה אחרי 3 שניות (לפי הפלואו)
+      setRenewalSuccessMessage(`הונפקה לך כרטיסיית ${productName} חדשה בהצלחה`);
+      setTimeout(() => {
+        handleClose();
+      }, 3000);
+    } catch (e) {
+      console.log('[NFC] Error:', 'punch-card-renew', e);
+      setRenewalErrorMessage('שגיאה בחידוש הכרטיסייה. נסה שוב.');
+      setRenewing(false);
+    }
   };
 
   const handlePhoneSubmit = async () => {
@@ -163,20 +226,25 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
               style={[styles.button, { backgroundColor: brandColor }]}
               onPress={() => {
                 console.log('[NFC] User requested new card');
-                handleClose();
+                handleRenewCard();
               }}
+              disabled={renewing}
             >
               <Text style={styles.buttonText}>כן, פתח חדשה</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.buttonOutline, { borderColor: brandColor }]}
               onPress={handleClose}
+              disabled={renewing}
             >
               <Text style={[styles.buttonOutlineText, { color: brandColor }]}>
                 לא תודה
               </Text>
             </TouchableOpacity>
           </View>
+          {renewing && <ActivityIndicator size="large" color={brandColor} style={styles.loader} />}
+          {!!renewalSuccessMessage && <Text style={styles.successMessage}>{renewalSuccessMessage}</Text>}
+          {!!renewalErrorMessage && <Text style={styles.errorMessage}>{renewalErrorMessage}</Text>}
         </View>
       );
     }
@@ -293,31 +361,35 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: brandColor }]}
                 onPress={() => {
-                  // TODO: יצירת כרטיסייה חדשה
                   console.log('[NFC] User requested new card');
-                  handleClose();
+                  handleRenewCard();
                 }}
+                disabled={renewing}
               >
                 <Text style={styles.buttonText}>כן, פתח חדשה</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.buttonOutline, { borderColor: brandColor }]}
                 onPress={handleClose}
+                disabled={renewing}
               >
                 <Text style={[styles.buttonOutlineText, { color: brandColor }]}>
                   לא תודה
                 </Text>
               </TouchableOpacity>
             </View>
+            {renewing && <ActivityIndicator size="large" color={brandColor} style={styles.loader} />}
+            {!!renewalSuccessMessage && <Text style={styles.successMessage}>{renewalSuccessMessage}</Text>}
+            {!!renewalErrorMessage && <Text style={styles.errorMessage}>{renewalErrorMessage}</Text>}
           </View>
         );
 
       case 'rewarding_punch':
         return (
-          <View style={styles.rewardOverlay}>
+          <View style={styles.fullScreenOverlay}>
             <LottieView
               ref={confettiRef}
-              source={require('../../assets/animations/confetti.json')}
+              source={require('../../assets/images/Animation_2.json')}
               autoPlay
               loop={false}
               style={styles.confettiFullScreen}
@@ -370,19 +442,19 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
           flowState === 'rewarding_punch' && !showRenewalAfterReward ? styles.overlayTransparent : null,
         ]}
       >
-        <View
-          style={[
-            styles.container,
-            flowState === 'rewarding_punch' && !showRenewalAfterReward ? styles.containerTransparent : null,
-          ]}
-        >
-          {/* כפתור סגירה */}
-          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-            <Text style={styles.closeText}>✕</Text>
-          </TouchableOpacity>
+        {flowState === 'rewarding_punch' && !showRenewalAfterReward ? (
+          // בזמן קונפטי: שכבת Overlay שקופה מלאה על גבי המסך (בלי מודאל/תיבה/כפתור סגירה)
+          renderContent()
+        ) : (
+          <View style={styles.container}>
+            {/* כפתור סגירה */}
+            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+              <Text style={styles.closeText}>✕</Text>
+            </TouchableOpacity>
 
-          {renderContent()}
-        </View>
+            {renderContent()}
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -540,15 +612,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
+  successMessage: {
+    fontSize: 16,
+    color: '#1e7f3b',
+    textAlign: 'center',
+    marginTop: 12,
+  },
   fullCardIcon: {
     fontSize: 60,
     marginBottom: 16,
   },
-  rewardOverlay: {
+  fullScreenOverlay: {
+    flex: 1,
     width: '100%',
-    height: 380,
-    justifyContent: 'center',
-    alignItems: 'center',
+    height: '100%',
   },
   confettiFullScreen: {
     position: 'absolute',

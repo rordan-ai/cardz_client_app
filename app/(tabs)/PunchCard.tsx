@@ -3109,6 +3109,41 @@ export default function PunchCard() {
           selectedCardNumber={punchCard?.card_number} // הכרטיסייה שכבר נבחרה - לא יציג מודאל בחירה!
           brandColor={localBusiness.login_brand_color}
           onClose={() => setNfcModalVisible(false)}
+          onCardRenewed={(newCardNumber) => {
+            // עדכון מסך הכרטיסייה לכרטיסייה החדשה המאופסת
+            (async () => {
+              try {
+                const businessCode = localBusiness?.business_code || customer?.business_code;
+                if (!businessCode) return;
+
+                const { data: newCardRow } = await supabase
+                  .from('PunchCards')
+                  .select('business_code, customer_phone, product_code, card_number, total_punches, used_punches, status, created_at, updated_at, benefit, prepaid')
+                  .eq('card_number', newCardNumber)
+                  .maybeSingle();
+
+                if (!newCardRow) return;
+
+                // שליפת שם המוצר (כמו ב-fetch הראשי)
+                let productNameForCard = '';
+                const pc = String((newCardRow as any)?.product_code || '').trim();
+                if (pc) {
+                  const { data: prodRow } = await supabase
+                    .from('products')
+                    .select('product_name')
+                    .eq('business_code', businessCode)
+                    .eq('product_code', pc)
+                    .maybeSingle();
+                  productNameForCard = String((prodRow as any)?.product_name || '').trim();
+                }
+
+                setPunchCard({
+                  ...(newCardRow as any),
+                  product_name: productNameForCard,
+                } as any);
+              } catch {}
+            })();
+          }}
           onSuccess={() => {
             // רענון הכרטיסייה אחרי ניקוב (מיידי, כדי למנוע ניקוב נוסף על נתונים ישנים)
             refreshBusiness();

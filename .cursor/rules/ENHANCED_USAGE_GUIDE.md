@@ -1,3 +1,4 @@
+
 # 🚀 Enhanced MCP Agent Communication System - מדריך שימוש
 
 ## ✨ תכונות חדשות בגרסה 2.0
@@ -280,6 +281,73 @@ mcp_AgentsCommunication_read_messages({
 
 ### בעיה: הודעות לא מגיעות
 **פתרון:** בדוק `get_queue_status` ו-`get_message_status`
+
+---
+
+## 🧯 פרוטוקול חירום: טרמינל תקוע (Cursor + Windows)
+
+> מטרה: לשחרר טרמינל **בלי לסכן גיבוי/קומיטים** ובלי להשאיר ריפו במצב נעול.
+
+### 1) זיהוי מה נתקע (הכי נפוץ)
+- **Pager פתוח (`less`)**: אם הרצת `git log`/`git diff`/`git show` ונפתח מסך גלילה
+  - **פתרון**: לחץ `q`
+- **עורך נפתח ב-`git commit`** (vim/nano/notepad)
+  - **vim**: `Esc` ואז `:q!` ואז Enter
+  - **nano**: `Ctrl+X` (ואם שואל לשמור → `N`)
+- **ננעל אינדקס (`.git/index.lock`)** בעקבות Git שנקטע
+- **פקודה “כבדה” שנתקעה** (למשל `grep -R` על תיקיות גדולות)
+
+### 2) פעולות מיידיות בטוחות (לא הורסות גיט)
+1. **עצור את מה שרץ**:
+   - בטרמינל: `Ctrl+C` (פעמיים אם צריך)
+2. **אל תמשיך להריץ פקודות ארוכות באותו טרמינל**.
+3. ב־Cursor:
+   - `Terminal: Kill All Terminals`
+   - `Terminal: Create New Terminal`
+4. **בחר PowerShell כ-Default** (כדי להימנע מבאגים של Git Bash/MSYS):
+   - `Terminal: Select Default Profile` → **PowerShell**
+
+### 3) אימות שהריפו לא “בסכנה” אחרי תקיעה
+ב־PowerShell בתוך תיקיית הפרויקט:
+```powershell
+cd C:\cardz_curser\cards_project
+git status
+```
+- אם רואים `nothing to commit, working tree clean` → מצוין.
+- אם יש שינויים לא מתוכננים ב־`.cursor/rules/*` (או כל קובץ אחר) → **לא לקמטל מיד**; קודם לבדוק `git diff` ולהחזיר עם `git restore -- <file>` אם זה זבל.
+
+### 4) טיפול בנעילת Git (index.lock) בצורה בטוחה
+> עושים זאת **רק** אם אין תהליך Git פעיל.
+
+ב־PowerShell:
+```powershell
+cd C:\cardz_curser\cards_project
+Get-ChildItem .git\index.lock -ErrorAction SilentlyContinue
+```
+אם הקובץ קיים:
+1. ודא שאין תהליך Git פעיל:
+```powershell
+Get-Process git -ErrorAction SilentlyContinue
+```
+2. אם אין תהליך Git:
+```powershell
+Remove-Item .git\index.lock -Force
+git status
+```
+
+### 5) מניעה (כדי שלא ייתקע שוב)
+- **לא להריץ פקודות “כבדות”** על `C:\Users\<user>\.cursor\...` או תיקיות ענק (לוגים/History) מתוך טרמינל משולב.
+- **להעדיף PowerShell** לפקודות ניהול תהליכים (Kill/Stop) במקום Git Bash.
+- **להימנע מ־`git commit` שפותח עורך**:
+  - תמיד להשתמש ב־`git commit -m "message"` (ולא להשאיר את העורך להיפתח).
+- **לבטל pager של Git** כדי למנוע `less`:
+```powershell
+git config --global core.pager cat
+git config --global pager.branch false
+git config --global pager.log false
+```
+- **אם מופיע טקסט כמו `[200~` לפני פקודה**: זה סימן לבעיה בהדבקה/terminal mode.
+  - פתרון מהיר: לסגור את כל הטרמינלים ב־Cursor (`Kill All Terminals`) ולפתוח מחדש **PowerShell**.
 
 ---
 
