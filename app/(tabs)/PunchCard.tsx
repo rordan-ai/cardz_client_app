@@ -374,6 +374,13 @@ export default function PunchCard() {
       // האזנה רציפה ל-NFC tags עם delay למניעת לופ אינסופי
       const listenForNFC = async () => {
         if (!mounted) return;
+        // אם מודאל הניקוב פתוח - לא קוראים תג נוסף (מונע ניקובים כפולים מאותה סריקה)
+        if (nfcModalVisible) {
+          if (mounted) {
+            readTimeoutId = setTimeout(listenForNFC, 500);
+          }
+          return;
+        }
         
         try {
           const tagData = await startReading();
@@ -399,6 +406,8 @@ export default function PunchCard() {
                 console.log('[NFC] Sound play error:', soundErr);
               }
               setNfcModalVisible(true);
+              // עצירה מיידית של הקריאה כדי שלא תיתפס אותה סריקה שוב
+              stopReading().catch?.(() => {});
             }
           }
         } catch (err: any) {
@@ -453,7 +462,7 @@ export default function PunchCard() {
       }
       stopReading();
     };
-  }, [localBusiness?.nfc_string, initNFC, startReading, stopReading, parseBusinessId]);
+  }, [localBusiness?.nfc_string, initNFC, startReading, stopReading, parseBusinessId, nfcModalVisible]);
 
   // --- REALTIME START ---
   // חיבור ל-Realtime לעדכונים מיידיים
@@ -515,7 +524,7 @@ export default function PunchCard() {
       // ניקוי activity subscription אם קיים
       cleanupActivitySubscription();
     };
-  }, [phoneStr, customer?.business_code]);
+  }, [phoneStr, customer?.business_code, punchCard?.card_number, punchCard?.product_code]);
   // --- REALTIME END ---
 
   // רישום העסק למכשיר (ללא תלות במספר טלפון)
@@ -3101,8 +3110,25 @@ export default function PunchCard() {
           brandColor={localBusiness.login_brand_color}
           onClose={() => setNfcModalVisible(false)}
           onSuccess={() => {
-            // רענון הכרטיסייה אחרי ניקוב
+            // רענון הכרטיסייה אחרי ניקוב (מיידי, כדי למנוע ניקוב נוסף על נתונים ישנים)
             refreshBusiness();
+            (async () => {
+              try {
+                const cardNumber = punchCard?.card_number;
+                if (!cardNumber) return;
+                const { data: cardRow } = await supabase
+                  .from('PunchCards')
+                  .select('used_punches, total_punches, status, updated_at')
+                  .eq('card_number', cardNumber)
+                  .maybeSingle();
+
+                if (!cardRow) return;
+                setPunchCard((prev) => ({
+                  ...(prev || {}),
+                  ...(cardRow as any),
+                }) as any);
+              } catch {}
+            })();
           }}
         />
       )}

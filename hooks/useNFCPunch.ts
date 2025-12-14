@@ -76,6 +76,8 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
   
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const subscriptionRef = useRef<any>(null);
+  const punchLockRef = useRef(false);
+  const punchModeRef = useRef<string | null>(null);
 
   // ניקוי
   const cleanup = useCallback(() => {
@@ -101,6 +103,8 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
     setCurrentBusinessName(null);
     setCurrentPunchMode(null);
     setPunchRequestId(null);
+    punchLockRef.current = false;
+    punchModeRef.current = null;
   }, [cleanup]);
 
   // ביטול
@@ -225,46 +229,48 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
     }
   }, []);
 
-  // ביצוע ניקוב ישיר (לכרטיסיות Prepaid)
+  // ביצוע ניקוב ישיר (לכרטיסיות Prepaid / auto)
   const executePunch = useCallback(async (
     card: CustomerCard,
-    phone: string
-  ): Promise<{ success: boolean; isRewardingPunch: boolean }> => {
+    phone: string,
+    businessCode: string
+  ): Promise<{ success: boolean; isRewardingPunch: boolean; atMax?: boolean }> => {
     try {
       const newPunches = card.used_punches + 1;
       const isRewardingPunch = newPunches >= card.total_punches;
 
-      // UPDATE PunchCards
-      const { error: updateError } = await supabase
+      // UPDATE PunchCards (אטומי + חסימה מעל המקסימום)
+      // אם כבר ב-max, ה-update יחזיר 0 שורות ולא ייחשב "הצלחה שקטה".
+      const { data: updatedRows, error: updateError } = await supabase
         .from('PunchCards')
         .update({ used_punches: newPunches })
-        .eq('card_number', card.card_number);
+        .eq('card_number', card.card_number)
+        .lt('used_punches', card.total_punches)
+        .select('card_number, used_punches, total_punches');
 
       if (updateError) {
         console.log('[NFC] Error updating PunchCards:', updateError);
         return { success: false, isRewardingPunch: false };
       }
 
-      // INSERT activity_logs
-      const { error: logError } = await supabase
-        .from('activity_logs')
-        .insert({
-          action_type: 'punch',
-          card_number: card.card_number,
-          customer_phone: phone,
-          performed_by: 'client',
-          source: 'nfc',
-          details: {
-            previous_punches: card.used_punches,
-            new_punches: newPunches,
-            total_punches: card.total_punches,
-            is_rewarding: isRewardingPunch,
-            product_name: card.benefit || card.product_name
-          }
-        });
+      // אם לא עודכנה אף שורה - או שהכרטיס כבר מלא, או שהכרטיס לא נמצא/לא תואם
+      if (!updatedRows || updatedRows.length === 0) {
+        console.log('[NFC] Punch update affected 0 rows (at max or card not found):', card.card_number);
+        return { success: false, isRewardingPunch: false, atMax: true };
+      }
 
-      if (logError) {
-        console.log('[NFC] Error logging activity:', logError);
+      // לוג לקוח: user_activities (קיים אצלך; activity_logs אצלך ללא card_number ולכן נכשל)
+      try {
+        await supabase.from('user_activities').insert({
+          customer_id: phone,
+          business_code: businessCode,
+          action_type: 'punch',
+          action_time: new Date().toISOString(),
+          amount: 1,
+          source: 'nfc',
+        });
+      } catch (logErr) {
+        console.log('[NFC] Error logging user_activities:', logErr);
         // לא נכשל - הניקוב כבר בוצע
       }
 
@@ -385,7 +391,10 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
 
       setCurrentBusinessCode(business.business_code);
       setCurrentBusinessName(business.name);
-      setCurrentPunchMode(business.punch_mode || null);
+      const mode = business.punch_mode || null;
+      setCurrentPunchMode(mode);
+      // חשוב: state אסינכרוני; משתמשים גם ב-ref כדי למנוע stale mode בתהליך המיידי
+      punchModeRef.current = mode;
 
       // אם יש מספר טלפון מהקונטקסט (הלקוח כבר מזוהה בכרטיסייה)
       // אין צורך בהזדהות ביומטרית נוספת!
@@ -440,7 +449,7 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       const preSelectedCard = cards.find(c => c.card_number === preSelectedCardNumber);
       if (preSelectedCard) {
         console.log('[NFC] Using pre-selected card:', preSelectedCardNumber);
-        await processPunch(businessCode, preSelectedCard);
+        await processPunch(businessCode, preSelectedCard, phone);
         return;
       }
       // אם הכרטיסייה הנבחרת לא נמצאה - נמשיך לפי הלוגיקה הרגילה
@@ -449,7 +458,7 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
 
     if (cards.length === 1) {
       // כרטיסייה אחת - ממשיכים
-      await processPunch(businessCode, cards[0]);
+      await processPunch(businessCode, cards[0], phone);
     } else {
       // F4: יותר מכרטיסייה אחת - צריך לבחור
       setFlowState('selecting_card');
@@ -457,31 +466,98 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
   }, [customerPhone, fetchCustomerCards]);
 
   // עיבוד ניקוב
-  const processPunch = useCallback(async (businessCode: string, card: CustomerCard) => {
+  const processPunch = useCallback(async (businessCode: string, card: CustomerCard, phoneOverride?: string) => {
+    if (punchLockRef.current) {
+      console.log('[NFC] Ignored punch - lock active');
+      return;
+    }
+    punchLockRef.current = true;
     setSelectedCard(card);
+    const phone = phoneOverride || customerPhone;
+    if (!phone) {
+      console.log('[NFC] Error:', 'processPunch', 'Missing customer phone');
+      setError('חסר מספר טלפון לביצוע ניקוב');
+      setFlowState('error');
+      punchLockRef.current = false;
+      return;
+    }
 
-    // F5: בדיקת הגעה למקסימום
-    const isAtMax = card.used_punches >= card.total_punches;
+    // F5: בדיקת הגעה למקסימום (תמיד מול שרת כדי למנוע ניקוב מעל המקסימום גם אם ה-UI לא התעדכן עדיין)
+    let latestUsed = card.used_punches;
+    let latestTotal = card.total_punches;
+    try {
+      const { data: cardRow } = await supabase
+        .from('PunchCards')
+        .select('used_punches, total_punches')
+        .eq('card_number', card.card_number)
+        .maybeSingle();
+      if (cardRow) {
+        latestUsed = Number((cardRow as any).used_punches ?? latestUsed);
+        latestTotal = Number((cardRow as any).total_punches ?? latestTotal);
+      }
+    } catch {}
+
+    const isAtMax = Number.isFinite(latestUsed) && Number.isFinite(latestTotal) && latestUsed >= latestTotal;
     if (isAtMax) {
       console.log('[NFC] Card at max punches - showing renewal prompt');
       // הצגת מודאל עם שאלה לפתיחת כרטיסייה חדשה
       setFlowState('card_full');
+      punchLockRef.current = false;
       return;
     }
 
     const isPrepaid = card.prepaid === 'כן';
-    const isSemiAuto = currentPunchMode === 'semi_auto' || currentPunchMode === 'semi';
+    const effectiveMode = punchModeRef.current ?? currentPunchMode;
+    const isSemiAuto = effectiveMode === 'semi_auto' || effectiveMode === 'semi';
+    const isAuto = effectiveMode === 'auto';
+    console.log('[NFC] processPunch route:', {
+      businessCode,
+      currentPunchMode: effectiveMode,
+      isPrepaid,
+      cardNumber: card.card_number,
+    });
 
-    // UI בלבד: במצב semi_auto + לא prepaid מציגים "ממתין לאישור"
-    // בכל מצב אחר (auto / prepaid) מציגים "מבצע ניקוב" והאדמין מבצע אוטומטית.
-    if (isSemiAuto && !isPrepaid) {
-      setFlowState('waiting_approval');
-    } else {
+    // לפי אפיון: במצב auto או כרטיסייה prepaid - מבצעים ניקוב ישיר (עדכון PunchCards)
+    if (isAuto || isPrepaid) {
       setFlowState('punching');
+      const result = await executePunch(
+        { ...card, used_punches: latestUsed, total_punches: latestTotal },
+        phone,
+        businessCode
+      );
+      if (result.success) {
+        if (result.isRewardingPunch) {
+          setFlowState('rewarding_punch');
+          return; // לא משחררים נעילה כאן — המודאל יתקדם למסך חידוש/סגירה
+        }
+        setFlowState('success');
+      } else {
+        if (result.atMax) {
+          setFlowState('card_full');
+          punchLockRef.current = false;
+          return;
+        }
+        setError('שגיאה בביצוע הניקוב');
+        setFlowState('error');
+      }
+      punchLockRef.current = false;
+      return;
     }
 
-    // שליחת בקשה לאדמין (האדמין מבצע את הניקוב בפועל בהתאם ל-punch_mode)
-    const requestId = await sendPunchRequest(businessCode, customerPhone!, card, card.benefit || 'מוצר');
+    // מצב semi_auto (לא prepaid): שולחים בקשה לאדמין וממתינים
+    if (isSemiAuto) {
+      setFlowState('waiting_approval');
+    } else {
+      // fallback (לא אמור לקרות, אבל לא לשבור פלואו)
+      setFlowState('waiting_approval');
+    }
+
+    const requestId = await sendPunchRequest(
+      businessCode,
+      phone,
+      { ...card, used_punches: latestUsed, total_punches: latestTotal },
+      card.benefit || 'מוצר'
+    );
 
     if (requestId) {
       setPunchRequestId(requestId);
@@ -492,12 +568,14 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
         cleanup();
         setError('יתכן שיש בעיית תקשורת או שבית העסק השתהה באישור הניקוב, נסה שוב');
         setFlowState('timeout');
+        punchLockRef.current = false;
       }, ADMIN_APPROVAL_TIMEOUT);
     } else {
       setError('שגיאה בשליחת בקשת הניקוב');
       setFlowState('error');
+      punchLockRef.current = false;
     }
-  }, [customerPhone, currentPunchMode, sendPunchRequest, subscribeToResponse, cleanup]);
+  }, [customerPhone, currentPunchMode, sendPunchRequest, subscribeToResponse, cleanup, executePunch]);
 
   // Effect להמשך אחרי הזנת מספר
   useEffect(() => {
@@ -509,7 +587,7 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
   // Effect להמשך אחרי בחירת כרטיסייה
   useEffect(() => {
     if (selectedCard && currentBusinessCode && flowState === 'selecting_card') {
-      processPunch(currentBusinessCode, selectedCard);
+      processPunch(currentBusinessCode, selectedCard, customerPhone || undefined);
     }
   }, [selectedCard, currentBusinessCode, flowState, processPunch]);
 

@@ -57,6 +57,7 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   const [showPhoneInput, setShowPhoneInput] = React.useState(false);
   const confettiRef = useRef<LottieView>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const [showRenewalAfterReward, setShowRenewalAfterReward] = React.useState(false);
 
   // ניגון סאונד חגיגי לניקוב מזכה
   const playRewardingSound = async () => {
@@ -66,6 +67,16 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
       );
       soundRef.current = sound;
       await sound.playAsync();
+      // שחרור סאונד מיד בסיום (כדי שלא יישאר "תקוע")
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) return;
+        if (status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+          if (soundRef.current === sound) {
+            soundRef.current = null;
+          }
+        }
+      });
     } catch (err) {
       console.log('[NFC] Error playing rewarding sound:', err);
     }
@@ -101,13 +112,13 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   // טיפול בניקוב מזכה - קונפטי וסאונד
   useEffect(() => {
     if (flowState === 'rewarding_punch') {
+      setShowRenewalAfterReward(false);
       playRewardingSound();
       confettiRef.current?.play();
-      // אחרי 4 שניות מעבר להצלחה
-      setTimeout(() => {
-        onSuccess();
-        handleClose();
-      }, 4000);
+      // לפי האפיון: בזמן הקונפטי כבר צריך להתעדכן מספר הניקובים בכרטיסייה
+      // לכן מרעננים מייד, ואת מודאל החידוש מציגים אחרי האנימציה.
+      onSuccess();
+      setTimeout(() => setShowRenewalAfterReward(true), 3500);
     }
   }, [flowState]);
 
@@ -138,6 +149,37 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
 
   // רינדור לפי מצב
   const renderContent = () => {
+    // לאחר ניקוב מזכה: קודם קונפטי על גבי הכרטיסייה (רקע שקוף), ואז הצעת חידוש
+    if (flowState === 'rewarding_punch' && showRenewalAfterReward) {
+      return (
+        <View style={styles.content}>
+          <Text style={styles.title}>הכרטיסייה מלאה!</Text>
+          <Text style={styles.message}>
+            סיימת למלא את כל הניקובים בכרטיסייה זו.{'\n'}
+            האם לפתוח כרטיסייה חדשה?
+          </Text>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: brandColor }]}
+              onPress={() => {
+                console.log('[NFC] User requested new card');
+                handleClose();
+              }}
+            >
+              <Text style={styles.buttonText}>כן, פתח חדשה</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.buttonOutline, { borderColor: brandColor }]}
+              onPress={handleClose}
+            >
+              <Text style={[styles.buttonOutlineText, { color: brandColor }]}>
+                לא תודה
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
     switch (flowState) {
       case 'identifying':
         if (showPhoneInput) {
@@ -224,9 +266,9 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
         return (
           <View style={styles.content}>
             <Text style={styles.title}>ממתין לאישור</Text>
-            <Text style={styles.message}>מחכה לאישור ממסוף העסק!</Text>
+            <Text style={styles.message}>הניקוב נשלח לאישור בית העסק</Text>
             <ActivityIndicator size="large" color={brandColor} style={styles.loader} />
-            <Text style={styles.hint}>אנא המתן, האדמין יאשר בקרוב...</Text>
+            <Text style={styles.hint}>נעדכן אותך ברגע שהניקוב יאושר/יבוצע</Text>
           </View>
         );
 
@@ -272,21 +314,14 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
 
       case 'rewarding_punch':
         return (
-          <View style={styles.content}>
-            {/* אנימציית קונפטי */}
+          <View style={styles.rewardOverlay}>
             <LottieView
               ref={confettiRef}
               source={require('../../assets/animations/confetti.json')}
               autoPlay
               loop={false}
-              style={styles.confettiAnimation}
+              style={styles.confettiFullScreen}
             />
-            <Text style={styles.celebrationIcon}>🎊</Text>
-            <Text style={styles.celebrationTitle}>מזל טוב!</Text>
-            <Text style={styles.celebrationMessage}>
-              השלמת את כל הניקובים!{'\n'}
-              הזכאות שלך: {selectedCard?.benefit || 'מוצר מתנה'}
-            </Text>
           </View>
         );
 
@@ -329,8 +364,18 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
       animationType="fade"
       onRequestClose={handleClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.container}>
+      <View
+        style={[
+          styles.overlay,
+          flowState === 'rewarding_punch' && !showRenewalAfterReward ? styles.overlayTransparent : null,
+        ]}
+      >
+        <View
+          style={[
+            styles.container,
+            flowState === 'rewarding_punch' && !showRenewalAfterReward ? styles.containerTransparent : null,
+          ]}
+        >
           {/* כפתור סגירה */}
           <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
             <Text style={styles.closeText}>✕</Text>
@@ -350,6 +395,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  overlayTransparent: {
+    backgroundColor: 'transparent',
+  },
   container: {
     width: width * 0.9,
     maxWidth: 400,
@@ -357,6 +405,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     position: 'relative',
+  },
+  containerTransparent: {
+    backgroundColor: 'transparent',
+    padding: 0,
+    borderRadius: 0,
   },
   closeButton: {
     position: 'absolute',
@@ -491,15 +544,20 @@ const styles = StyleSheet.create({
     fontSize: 60,
     marginBottom: 16,
   },
-  confettiAnimation: {
+  rewardOverlay: {
+    width: '100%',
+    height: 380,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confettiFullScreen: {
     position: 'absolute',
-    top: -50,
-    left: -50,
-    right: -50,
-    bottom: -50,
-    width: 400,
-    height: 400,
-    zIndex: 10,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   celebrationIcon: {
     fontSize: 80,
