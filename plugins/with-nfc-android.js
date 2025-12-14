@@ -188,8 +188,16 @@ function withNfcManifest(config) {
           'android:theme': '@style/Theme.App.SplashScreen',
         },
         'intent-filter': [
+          // 1) NDEF_DISCOVERED לטקסט רגיל (התגים שלנו הם NDEF text). מטרתנו: לנסות למנוע chooser מול "Tag/New tag scanned".
           {
             $: { 'android:priority': '1000' },
+            action: [{ $: { 'android:name': 'android.nfc.action.NDEF_DISCOVERED' } }],
+            category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
+            data: [{ $: { 'android:mimeType': 'text/plain' } }],
+          },
+          // 2) TECH_DISCOVERED כגיבוי
+          {
+            $: { 'android:priority': '999' },
             action: [{ $: { 'android:name': 'android.nfc.action.TECH_DISCOVERED' } }],
             category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
           },

@@ -100,8 +100,11 @@ serve(async (req) => {
 
     const total_punches = Number((cardRow as any).total_punches ?? 0);
     const benefit = (cardRow as any).benefit ?? null;
-    const prepaid = (cardRow as any).prepaid ?? null;
+    // לפי הדרישה: כרטיסייה חדשה תמיד נפתחת כ"לא שולם מראש" (רק אדמין רשאי לשנות אחרי תשלום)
+    const prepaid = "לא";
     const prevRenewal = Number((cardRow as any).renewal_count ?? 0) || 0;
+    // שמירה על פורמט הטלפון בדיוק כמו בכרטיסייה הישנה כדי שלא תהיה אי-התאמה בפילטרים/מסכים
+    const customer_phone_for_new = String((cardRow as any).customer_phone || "").trim() || customer_phone_raw;
 
     // יצירת card_number חדש: "{business_code}-{phone}-{random4digits}"
     let new_card_number = "";
@@ -112,7 +115,7 @@ serve(async (req) => {
         .from("PunchCards")
         .insert({
           business_code,
-          customer_phone: customer_phone_raw,
+          customer_phone: customer_phone_for_new,
           product_code,
           card_number: new_card_number,
           total_punches,

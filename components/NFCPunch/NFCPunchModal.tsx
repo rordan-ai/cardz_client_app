@@ -1,5 +1,4 @@
-import { Audio } from 'expo-av';
-import LottieView from 'lottie-react-native';
+import { Video, ResizeMode } from 'expo-av';
 import React, { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -59,49 +58,30 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
 
   const [phoneInput, setPhoneInput] = React.useState('');
   const [showPhoneInput, setShowPhoneInput] = React.useState(false);
-  const confettiRef = useRef<LottieView>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const hasStartedRef = useRef(false);
+  const initialSelectedCardNumberRef = useRef<string | undefined>(undefined);
   const [showRenewalAfterReward, setShowRenewalAfterReward] = React.useState(false);
   const [renewing, setRenewing] = React.useState(false);
   const [renewalSuccessMessage, setRenewalSuccessMessage] = React.useState<string | null>(null);
   const [renewalErrorMessage, setRenewalErrorMessage] = React.useState<string | null>(null);
 
-  // ניגון סאונד חגיגי לניקוב מזכה
-  const playRewardingSound = async () => {
-    try {
-      const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/sounds/nfc-success.mp3')
-      );
-      soundRef.current = sound;
-      await sound.playAsync();
-      // שחרור סאונד מיד בסיום (כדי שלא יישאר "תקוע")
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded) return;
-        if (status.didJustFinish) {
-          sound.unloadAsync().catch(() => {});
-          if (soundRef.current === sound) {
-            soundRef.current = null;
-          }
-        }
-      });
-    } catch (err) {
-      console.log('[NFC] Error playing rewarding sound:', err);
-    }
-  };
-
-  // ניקוי סאונד
-  useEffect(() => {
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-    };
-  }, []);
-
   // התחלת פלואו כשהמודאל נפתח
   // שולחים את מספר הטלפון ומספר הכרטיסייה כי הלקוח כבר מזוהה וכבר בחר כרטיסייה!
   useEffect(() => {
+    // איפוס נעילה כשסוגרים את המודאל
+    if (!visible) {
+      hasStartedRef.current = false;
+      initialSelectedCardNumberRef.current = undefined;
+      return;
+    }
+
+    // חשוב: לא להפעיל מחדש startPunchFlow בגלל שינוי ב-selectedCardNumber בזמן שהמודאל פתוח
+    // (למשל אחרי חידוש כרטיסייה), אחרת נוצר ניקוב/אישור נוסף לא רצוי.
+    if (hasStartedRef.current) return;
+
     if (visible && nfcString && customerPhoneFromProps) {
+      hasStartedRef.current = true;
+      initialSelectedCardNumberRef.current = selectedCardNumber;
       startPunchFlow(nfcString, customerPhoneFromProps, selectedCardNumber);
     }
   }, [visible, nfcString, customerPhoneFromProps, selectedCardNumber, startPunchFlow]);
@@ -120,8 +100,6 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   useEffect(() => {
     if (flowState === 'rewarding_punch') {
       setShowRenewalAfterReward(false);
-      playRewardingSound();
-      confettiRef.current?.play();
       // לפי האפיון: בזמן הקונפטי כבר צריך להתעדכן מספר הניקובים בכרטיסייה
       // לכן מרעננים מייד, ואת מודאל החידוש מציגים אחרי האנימציה.
       onSuccess();
@@ -387,11 +365,12 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
       case 'rewarding_punch':
         return (
           <View style={styles.fullScreenOverlay}>
-            <LottieView
-              ref={confettiRef}
-              source={require('../../assets/images/Animation_2.json')}
-              autoPlay
-              loop={false}
+            {/* וידאו מלא עם קול (לפי הדרישה) */}
+            <Video
+              source={require('../../assets/animations/confetti.mp4')}
+              shouldPlay
+              isLooping={false}
+              resizeMode={ResizeMode.CONTAIN}
               style={styles.confettiFullScreen}
             />
           </View>
