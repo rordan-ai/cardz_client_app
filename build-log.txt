@@ -1,2 +1,0 @@
-[36m-[39m Fetching the uncompleted builds…[36m\[39m Fetching the uncompleted builds…[36m|[39m Fetching the uncompleted builds…'Select-String' is not recognized as an internal or external command,
-operable program or batch file.

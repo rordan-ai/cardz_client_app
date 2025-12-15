@@ -28,6 +28,15 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+build-log.txt
+
+# Android build artifacts
+android/**/build/
+android/**/.gradle/
+android/**/.kotlin/
+
+# Supabase CLI temp
+supabase/.temp/
 
 # macOS
 .DS_Store
