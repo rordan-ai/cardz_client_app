@@ -60,6 +60,17 @@ agent_chats/
 # Cursor temp files (may contain pasted secrets / logs)
 .cursor/temp_files_for_deleet/
 
+# Old development docs backup (local only)
+OLD_DEV_DOCS_STORAGE/
+
+# Cursor internal files (not needed in repo)
+.cursor/AUTO_NOTIFY_README.md
+.cursor/environment.json
+.cursor/mcp.json
+.cursor/repository-error.txt
+.cursor/sync-signal.txt
+.cursor/urgent-sync.txt
+
 # build/export artifacts (may contain bundled secrets)
 temp-export/
 
