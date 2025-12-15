@@ -201,10 +201,55 @@ agent_chats/
 | `restorepoint_snapshot_20251215_153151` | `2521ddc` | 2025-12-15 | גיבוי לפני שכבה 1 |
 | `safety_snapshot_separation_20251215` | `5995f0e` | 2025-12-15 | גיבוי לפני שכבה 2 |
 
+---
+
+## 🗑️ שכבה 3: ניקיון מסמכי פיתוח ותמונות לא בשימוש
+
+**זמן:** 2025-12-15  
+**סטטוס:** ✅ הושלם  
+**SHA:** `0868176`
+
+**גיבוי מקומי נוצר:** `OLD_DEV_DOCS_STORAGE/`
+
+### קבצים שהועברו לגיבוי ונמחקו מהריפו:
+
+**קבצי SQL בשורש (8):**
+- `create_agent_tables.sql`, `add_product_44.sql`, `add_sample_products.sql`
+- `check_fit_cafe.sql`, `check_schema.sql`, `delete_old_business.sql`
+- `fix_rls_products.sql`, `fix_supabase_replica_identity.sql`
+
+**תיקיית sql/ (24 קבצים):**
+- כל תיקיית `sql/` עם סקריפטי RLS, מחיקה, תיקונים
+
+**מסמכי פיתוח (8):**
+- `CONVERSATION_SUMMARY.md`, `DEVELOPMENT_NOTES.md`, `PROJECT_STATUS.md`
+- `TODO.md`, `CHECK_RULES_BEFORE_ACTION.md`, `lessons_learned_supabase_realtime.md`
+- `UNIFIED_BACKEND_SPECIFICATION.md`, `client_front_specification.md`
+
+**תיקיות ישנות:**
+- `assets/Projet defenitions/` (אפיונים ישנים)
+- `shared-mcp-server/` (שרת תקשורת סוכנים)
+- `cardz/` (submodule ריק)
+
+**קבצי Cursor פנימיים (6):**
+- `.cursor/AUTO_NOTIFY_README.md`, `.cursor/environment.json`, `.cursor/mcp.json`
+- `.cursor/repository-error.txt`, `.cursor/sync-signal.txt`, `.cursor/urgent-sync.txt`
+
+**תמונות/וידאו לא בשימוש (5):**
+- `assets/icons/deleet.png`, `assets/images/delete.png`
+- `assets/images/cardz_home_bg.jpg.png`, `assets/images/entry_app_image.png`
+- `assets/movie/1211.mp4`
+
+**סה"כ:** 61 קבצים, 7,357 שורות נמחקו
+
+---
+
 ## 📋 היסטוריית קומיטים
 
 | SHA | הודעה |
 |-----|-------|
+| `0868176` | Cleanup: remove dev-only files, SQL scripts, old docs, unused assets |
+| `c4f6794` | Docs: add Layer 1 cleanup to separation log |
 | `50b46fb` | Complete separation log with summary and work procedures |
 | `756dccc` | Production separation: remove sensitive files from repo |
 | `6da5dde` | Chore: ignore and remove local build/temp artifacts |
