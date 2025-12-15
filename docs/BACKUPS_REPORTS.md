@@ -1,5 +1,44 @@
 # דו״ח גיבוי - restore_checkpoints
 
+## גיבוי אחרון: 2025-12-15 15:31
+**הערה:** גיבוי לפי `backup_rules_1611.md` לפני ניקיון פרה-ייצור.
+
+### סיכום
+- ✅ ענף עבודה: `restore_checkpoints`
+- ✅ Working directory: נקי (`git status --porcelain` → ריק)
+- ✅ סנכרון remote: זהה (`git show-branch origin/restore_checkpoints restore_checkpoints` → זהות)
+- ℹ️ קומיטים: main=180, restore_checkpoints=188 (לא נדרש להיות זהה בשלב זה; תועד)
+- ℹ️ Diff main↔restore_checkpoints: לא ריק (רשימת קבצים תועדה להלן)
+
+### ענפי ביטחון / Snapshots שנוצרו והועלו ל-origin
+- `safety_snapshot_20251215_153151` (SHA: `2521ddc`)
+- `safety_backup_20251215_153151` (SHA: `2521ddc`)
+- `restorepoint_snapshot_20251215_153151` (SHA: `2521ddc`)
+
+### בדיקות איכות שבוצעו
+- `git fetch origin` ✅
+- `git status --porcelain` → ריק ✅
+- `git show-branch origin/restore_checkpoints restore_checkpoints` → זהות ✅
+- `git rev-list --count`: main=180, restore_checkpoints=188 ℹ️
+- `git diff main restore_checkpoints --name-only` → **לא ריק** (קבצים):
+  - `.cursor/rules/ENHANCED_USAGE_GUIDE.md`
+  - `.gitignore`
+  - `.playwright-mcp/*.png`
+  - `android/app/src/main/AndroidManifest.xml`
+  - `android/app/src/main/res/xml/nfc_tech_filter.xml`
+  - `app/(tabs)/PunchCard.tsx`
+  - `assets/animations/confetti.mp4`
+  - `components/NFCPunch/NFCPunchModal.tsx`
+  - `hooks/useNFCPunch.ts`
+  - `plugins/with-nfc-android.js`
+  - `supabase/functions/punch-card-renew/index.ts`
+
+### אבטחה (סריקה מהירה)
+- בוצע חיפוש `eyJhbGciOiJI` → לא נמצאו התאמות ✅
+- נמצאו אזכורים טכניים למשתני Supabase (`SUPABASE_*`) בקבצי קונפיג/כלים/פונקציות (ללא מפתחות אמיתיים בקוד) ✅
+
+---
+
 ## גיבוי אחרון: 2025-12-13 23:51
 **הערה:** גיבוי מלא + מיזוג ל-main + ניקוי אבטחה (הסרת `.env` ומפתחות קשיחים מה-repo)
 
