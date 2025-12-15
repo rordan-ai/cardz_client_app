@@ -106,63 +106,31 @@ serve(async (req) => {
     // שמירה על פורמט הטלפון בדיוק כמו בכרטיסייה הישנה כדי שלא תהיה אי-התאמה בפילטרים/מסכים
     const customer_phone_for_new = String((cardRow as any).customer_phone || "").trim() || customer_phone_raw;
 
-    // יצירת card_number חדש: "{business_code}-{phone}-{random4digits}"
-    let new_card_number = "";
-    let insertOk = false;
-    for (let i = 0; i < 5; i++) {
-      new_card_number = `${business_code}-${customer_phone_norm}-${rand4()}`;
-      const { error: insertErr } = await supabaseAdmin
-        .from("PunchCards")
-        .insert({
-          business_code,
-          customer_phone: customer_phone_for_new,
-          product_code,
-          card_number: new_card_number,
-          total_punches,
-          used_punches: 0,
-          status: "active",
-          benefit,
-          prepaid,
-          renewal_count: prevRenewal + 1,
-          last_action_date: new Date().toISOString(),
-        });
-      if (!insertErr) {
-        insertOk = true;
-        break;
-      }
-      console.error("[punch-card-renew] insert attempt failed", insertErr);
-    }
-
-    if (!insertOk) {
-      return new Response(JSON.stringify({ error: "Failed to create new card" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // כיבוי הכרטיסייה הישנה (לא מופיעה יותר ב-active)
-    const { error: updateOldErr } = await supabaseAdmin
+    // חשוב: בעקבות חסימה/אכיפה חדשה נגד כרטיסיות כפולות לאותו לקוח+מוצר,
+    // חידוש כרטיסייה מתבצע ע"י איפוס הכרטיסייה הנוכחית (UPDATE) ולא ע"י יצירת שורה חדשה.
+    const { error: renewErr } = await supabaseAdmin
       .from("PunchCards")
       .update({
-        status: "completed",
+        used_punches: 0,
+        status: "active",
+        prepaid,
+        renewal_count: prevRenewal + 1,
+        customer_phone: customer_phone_for_new,
         updated_at: new Date().toISOString(),
         last_action_date: new Date().toISOString(),
       })
       .eq("card_number", card_number);
 
-    if (updateOldErr) {
-      console.error("[punch-card-renew] failed to complete old card", updateOldErr);
-      // rollback best-effort: לא להשאיר כרטיסייה חדשה אם הישנה לא עודכנה
-      try {
-        await supabaseAdmin.from("PunchCards").delete().eq("card_number", new_card_number);
-      } catch {}
-      return new Response(JSON.stringify({ error: "Failed to finalize renewal" }), {
+    if (renewErr) {
+      console.error("[punch-card-renew] renewal update failed", renewErr);
+      return new Response(JSON.stringify({ error: "Failed to renew card" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ new_card_number, product_code }), {
+    // נשמור תאימות לאחור מול קליינט שמצפה ל-new_card_number
+    return new Response(JSON.stringify({ new_card_number: card_number, product_code, renewed: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

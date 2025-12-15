@@ -370,7 +370,7 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
               source={require('../../assets/animations/confetti.mp4')}
               shouldPlay
               isLooping={false}
-              resizeMode={ResizeMode.CONTAIN}
+              resizeMode={ResizeMode.COVER}
               style={styles.confettiFullScreen}
             />
           </View>
