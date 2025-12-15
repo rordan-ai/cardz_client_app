@@ -370,8 +370,8 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
               source={require('../../assets/animations/confetti.mp4')}
               shouldPlay
               isLooping={false}
-              resizeMode={ResizeMode.COVER}
-              style={styles.confettiFullScreen}
+              resizeMode={ResizeMode.CONTAIN}
+              style={[styles.confettiFullScreen, styles.confettiScaled]}
             />
           </View>
         );
@@ -605,6 +605,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+    backgroundColor: 'transparent',
   },
   confettiFullScreen: {
     position: 'absolute',
@@ -614,6 +615,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '100%',
+    backgroundColor: 'transparent',
+  },
+  confettiScaled: {
+    transform: [{ scale: 1.1 }],
   },
   celebrationIcon: {
     fontSize: 80,
