@@ -47,6 +47,16 @@ supabase/.temp/
 !.env.example
 .env.bak.*
 
+# Firebase config files (contain API keys - keep locally, not in repo)
+google-services.json
+android/app/google-services.json
+GoogleService-Info.plist
+
+# Internal documentation / agent chats (development only)
+docs/chats/
+docs/cursor_1112NFC.md
+agent_chats/
+
 # Cursor temp files (may contain pasted secrets / logs)
 .cursor/temp_files_for_deleet/
 
