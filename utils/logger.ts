@@ -29,8 +29,8 @@ export const logger = {
     if (isDev) console.log('[DEBUG]', ...args);
   },
   
-  // לוגים קריטיים שיופיעו גם בייצור (למעקב אחר בעיות)
-  critical: (...args: any[]) => console.log('[CRITICAL]', ...args),
+  // לוגים קריטיים שיופיעו גם בייצור (למעקב אחר בעיות) - stderr לזיהוי ע"י error tracking
+  critical: (...args: any[]) => console.error('[CRITICAL]', ...args),
 };
 
 // Export default לנוחות
