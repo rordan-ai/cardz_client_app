@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useNFCPunch } from '../../hooks/useNFCPunch';
 import { supabase } from '../../components/supabaseClient';
+import logger from '../../utils/logger';
 
 const { width } = Dimensions.get('window');
 
@@ -372,7 +373,7 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
               isLooping={false}
               resizeMode={ResizeMode.CONTAIN}
               style={[styles.confettiFullScreen, styles.confettiScaled]}
-              onError={(e) => console.log('[Video] Non-critical error:', e)}
+              onError={(e) => logger.log('[Video] Non-critical error:', e)}
             />
           </View>
         );
