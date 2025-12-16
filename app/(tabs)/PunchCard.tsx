@@ -1914,6 +1914,42 @@ export default function PunchCard() {
             ? new Date(business.expiration_date).toLocaleDateString('he-IL') 
             : 'ללא זמן תפוגה'}
         </Text>
+
+        {/* כפתור NFC ל-iOS בלבד - באנדרואיד הסריקה אוטומטית */}
+        {Platform.OS === 'ios' && nfcSupported && (
+          <TouchableOpacity
+            style={{
+              marginTop: 20,
+              backgroundColor: brandColor,
+              paddingVertical: 14,
+              paddingHorizontal: 32,
+              borderRadius: 25,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 4,
+            }}
+            onPress={async () => {
+              try {
+                const tagData = await startReading();
+                if (tagData) {
+                  setNfcModalVisible(true);
+                }
+              } catch (err) {
+                console.log('[iOS NFC] Scan error:', err);
+              }
+            }}
+            accessibilityLabel="סרוק תג NFC לניקוב"
+            accessibilityRole="button"
+          >
+            <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600', fontFamily: 'Rubik' }}>
+              📱 סרוק לניקוב
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
       
       </View>
