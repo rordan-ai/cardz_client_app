@@ -27,8 +27,9 @@ export default function PunchCard() {
   const router = useRouter();
   const navigation = useNavigation();
   const { business, refresh: refreshBusiness } = useBusiness();
-  const { phone } = useLocalSearchParams();
+  const { phone, nfcLaunch } = useLocalSearchParams();
   const phoneStr = typeof phone === 'string' ? phone.trim() : Array.isArray(phone) ? phone[0].trim() : '';
+  const isNfcLaunch = nfcLaunch === 'true';
   const phoneIntl = phoneStr && /^05\d{8}$/.test(phoneStr) ? `972${phoneStr.slice(1)}` : phoneStr;
   const [customer, setCustomer] = useState<{ 
     business_code: string; 
@@ -96,6 +97,30 @@ export default function PunchCard() {
   // NFC state
   const [nfcModalVisible, setNfcModalVisible] = useState(false);
   const { isSupported: nfcSupported, initNFC, startReading, stopReading, parseBusinessId, checkLaunchTag, checkBackgroundTag } = useNFC();
+  const nfcLaunchHandled = useRef(false);
+  const nfcCooldownRef = useRef(false); // מניעת פתיחה כפולה של מודאל NFC
+
+  // פתיחת מודאל NFC אוטומטית כשהאפליקציה נפתחה מתג NFC
+  useEffect(() => {
+    if (isNfcLaunch && !nfcLaunchHandled.current && localBusiness?.nfc_string && !nfcCooldownRef.current) {
+      nfcLaunchHandled.current = true;
+      console.log('[NFC PunchCard] Auto-opening NFC modal from NFC launch');
+      // המתנה קצרה לטעינת נתונים
+      setTimeout(() => setNfcModalVisible(true), 500);
+    }
+  }, [isNfcLaunch, localBusiness?.nfc_string]);
+
+  // פונקציה לסגירת מודאל NFC עם cooldown
+  const closeNfcModalWithCooldown = () => {
+    setNfcModalVisible(false);
+    nfcCooldownRef.current = true;
+    console.log('[NFC] Modal closed, cooldown started');
+    // cooldown של 3 שניות למניעת פתיחה חוזרת מיידית
+    setTimeout(() => {
+      nfcCooldownRef.current = false;
+      console.log('[NFC] Cooldown ended');
+    }, 3000);
+  };
 
   const updateBlacklist = async (channel: 'push' | 'sms', isOptIn: boolean) => {
     try {
@@ -376,7 +401,9 @@ export default function PunchCard() {
         try {
           // בדיקת תג שהפעיל את האפליקציה
           const launchTag = await checkLaunchTag();
-          if (launchTag && launchTag === expectedNfcString && !nfcModalVisible) {
+          const launchMatch = launchTag && expectedNfcString && 
+            (launchTag === expectedNfcString || expectedNfcString.includes(launchTag) || launchTag.includes(expectedNfcString));
+          if (launchMatch && !nfcModalVisible && !nfcCooldownRef.current) {
             console.log('[NFC] App launched with tag:', launchTag);
             // השמעת צליל הצלחה
             try {
@@ -398,7 +425,9 @@ export default function PunchCard() {
           
           // בדיקת תג רקע
           const backgroundTag = await checkBackgroundTag();
-          if (backgroundTag && backgroundTag === expectedNfcString && !nfcModalVisible) {
+          const bgMatch = backgroundTag && expectedNfcString && 
+            (backgroundTag === expectedNfcString || expectedNfcString.includes(backgroundTag) || backgroundTag.includes(expectedNfcString));
+          if (bgMatch && !nfcModalVisible && !nfcCooldownRef.current) {
             console.log('[NFC] Background tag found:', backgroundTag);
             try {
               const { sound } = await Audio.Sound.createAsync(
@@ -438,8 +467,12 @@ export default function PunchCard() {
           
           if (tagData) {
             const businessNfc = parseBusinessId(tagData);
-            // בדיקה שה-tag שייך לעסק הנוכחי
-            if (businessNfc === expectedNfcString) {
+            // בדיקה שה-tag שייך לעסק הנוכחי - תומך גם בהתאמה מלאה וגם בחלקית
+            const isMatch = businessNfc === expectedNfcString || 
+                           (expectedNfcString && expectedNfcString.includes(businessNfc || '')) ||
+                           (businessNfc && businessNfc.includes(expectedNfcString || ''));
+            // בדיקת cooldown למניעת לולאות
+            if (isMatch && !nfcCooldownRef.current) {
               // השמעת צליל הצלחה
               try {
                 const { sound } = await Audio.Sound.createAsync(
@@ -3156,9 +3189,9 @@ export default function PunchCard() {
           businessName={localBusiness.business_name || localBusiness.name}
           nfcString={localBusiness.nfc_string}
           customerPhone={phoneStr || phoneIntl || ''} // הלקוח כבר מזוהה!
-          // לא שולחים selectedCardNumber - תמיד יוצג מסך בחירה אם יש יותר מכרטיסייה אחת
+          selectedCardNumber={punchCard?.card_number} // אם המשתמש כבר בחר כרטיסייה - לא להציג בחירה שוב
           brandColor={localBusiness.login_brand_color}
-          onClose={() => setNfcModalVisible(false)}
+          onClose={closeNfcModalWithCooldown}
           onCardRenewed={(newCardNumber) => {
             // עדכון מסך הכרטיסייה לכרטיסייה החדשה המאופסת
             (async () => {

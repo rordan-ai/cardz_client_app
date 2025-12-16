@@ -165,6 +165,7 @@ export default function Layout() {
     FCMService.initialize();
   }, []);
 
+
   // האזנה להתראות FCM
   useEffect(() => {
           const listener = DeviceEventEmitter.addListener('show_inapp_notification', (data: { title: string; body: string; voucherUrl?: string }) => {

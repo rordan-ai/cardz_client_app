@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
@@ -24,8 +24,10 @@ const windowWidth = Dimensions.get('window').width;
 
 export default function CustomersLogin() {
   const router = useRouter();
+  const { businessCode: nfcBusinessCode, nfcLaunch } = useLocalSearchParams();
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
+  const nfcAutoLoginAttempted = useRef(false);
 
   const [backgroundImageError, setBackgroundImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0);
@@ -64,6 +66,45 @@ export default function CustomersLogin() {
     };
     checkBiometricAvailability();
   }, []);
+
+  // כניסה אוטומטית כשהאפליקציה נפתחה מ-NFC
+  useEffect(() => {
+    if (nfcLaunch !== 'true' || nfcAutoLoginAttempted.current) return;
+    nfcAutoLoginAttempted.current = true;
+
+    const handleNfcAutoLogin = async () => {
+      console.log('[NFC Login] Auto-login triggered for business:', nfcBusinessCode);
+      
+      // בדיקה אם יש מספר טלפון שמור
+      const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
+      if (!savedPhone) {
+        console.log('[NFC Login] No saved phone, showing login form');
+        return;
+      }
+
+      // ניסיון אימות ביומטרי
+      if (biometricAvailable) {
+        console.log('[NFC Login] Attempting biometric auth');
+        const authSuccess = await authenticateBiometric();
+        if (authSuccess) {
+          console.log('[NFC Login] Biometric auth success, navigating to PunchCard');
+          router.replace({
+            pathname: '/PunchCard',
+            params: { phone: savedPhone, nfcLaunch: 'true' }
+          });
+          return;
+        }
+      }
+      
+      // אם ביומטריה לא זמינה או נכשלה - ממלאים את הטלפון ומציגים את הטופס
+      setPhone(savedPhone);
+      console.log('[NFC Login] Pre-filled phone, showing login form');
+    };
+
+    // המתנה קצרה לטעינת state של biometric
+    const timer = setTimeout(handleNfcAutoLogin, 300);
+    return () => clearTimeout(timer);
+  }, [nfcLaunch, nfcBusinessCode, biometricAvailable, authenticateBiometric, router]);
 
   // פונקציה לאימות ביומטרי
   const authenticateBiometric = useCallback(async (): Promise<boolean> => {
