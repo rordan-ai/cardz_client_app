@@ -3,11 +3,12 @@ import { Platform } from 'react-native';
 import NfcManager, { NfcTech, Ndef, NfcAdapter, NfcEvents } from 'react-native-nfc-manager';
 
 // דגלים לביטול צליל המערכת באנדרואיד
-const READER_MODE_FLAGS = 
+const READER_MODE_FLAGS = Platform.OS === 'android' ? (
   NfcAdapter.FLAG_READER_NFC_A |
   NfcAdapter.FLAG_READER_NFC_B |
   NfcAdapter.FLAG_READER_NFC_V |
-  NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS; // ביטול צליל המערכת!
+  NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS
+) : 0;
 
 interface NFCState {
   isSupported: boolean;
@@ -88,7 +89,7 @@ export const useNFC = (): UseNFCReturn => {
           }
         });
 
-        // הפעלת Foreground Dispatch (Android)
+        // הפעלת Foreground Dispatch (Android בלבד)
         if (Platform.OS === 'android') {
           try {
             await NfcManager.registerTagEvent({
@@ -230,7 +231,3 @@ export const useNFC = (): UseNFCReturn => {
 };
 
 export default useNFC;
-
-
-
-

@@ -14,7 +14,6 @@
     },
     "newArchEnabled": true,
     "ios": {
-      "newArchEnabled": false,
       "supportsTablet": true,
       "bundleIdentifier": "com.mycompany.mycard",
       "googleServicesFile": "./GoogleService-Info.plist",
