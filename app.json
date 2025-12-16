@@ -14,14 +14,12 @@
     },
     "newArchEnabled": true,
     "ios": {
+      "newArchEnabled": false,
       "supportsTablet": true,
       "bundleIdentifier": "com.mycompany.mycard",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "UIBackgroundModes": [
-          "remote-notification",
-          "remote-notification",
-          "remote-notification",
           "remote-notification"
         ],
         "NSUserNotificationUsageDescription": "האפליקציה שולחת התראות על שוברים והטבות חדשות.",
@@ -109,6 +107,9 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }
