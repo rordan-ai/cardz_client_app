@@ -95,7 +95,7 @@ export default function PunchCard() {
 
   // NFC state
   const [nfcModalVisible, setNfcModalVisible] = useState(false);
-  const { isSupported: nfcSupported, initNFC, startReading, stopReading, parseBusinessId } = useNFC();
+  const { isSupported: nfcSupported, initNFC, startReading, stopReading, parseBusinessId, checkLaunchTag, checkBackgroundTag } = useNFC();
 
   const updateBlacklist = async (channel: 'push' | 'sms', isOptIn: boolean) => {
     try {
@@ -371,6 +371,56 @@ export default function PunchCard() {
         return;
       }
       
+      // בדיקת תג NFC שהפעיל את האפליקציה מרקע (Android בלבד)
+      if (Platform.OS === 'android') {
+        try {
+          // בדיקת תג שהפעיל את האפליקציה
+          const launchTag = await checkLaunchTag();
+          if (launchTag && launchTag === expectedNfcString && !nfcModalVisible) {
+            console.log('[NFC] App launched with tag:', launchTag);
+            // השמעת צליל הצלחה
+            try {
+              const { sound } = await Audio.Sound.createAsync(
+                require('../../assets/sounds/nfc-success.mp3')
+              );
+              await sound.playAsync();
+              sound.setOnPlaybackStatusUpdate((status) => {
+                if (status.isLoaded && status.didJustFinish) {
+                  sound.unloadAsync();
+                }
+              });
+            } catch (soundErr) {
+              console.log('[NFC] Sound play error:', soundErr);
+            }
+            setNfcModalVisible(true);
+            return; // לא צריך להמשיך להאזנה רגילה אם כבר טיפלנו בתג
+          }
+          
+          // בדיקת תג רקע
+          const backgroundTag = await checkBackgroundTag();
+          if (backgroundTag && backgroundTag === expectedNfcString && !nfcModalVisible) {
+            console.log('[NFC] Background tag found:', backgroundTag);
+            try {
+              const { sound } = await Audio.Sound.createAsync(
+                require('../../assets/sounds/nfc-success.mp3')
+              );
+              await sound.playAsync();
+              sound.setOnPlaybackStatusUpdate((status) => {
+                if (status.isLoaded && status.didJustFinish) {
+                  sound.unloadAsync();
+                }
+              });
+            } catch (soundErr) {
+              console.log('[NFC] Sound play error:', soundErr);
+            }
+            setNfcModalVisible(true);
+            return;
+          }
+        } catch (err) {
+          console.log('[NFC] Launch/background tag check error:', err);
+        }
+      }
+      
       // האזנה רציפה ל-NFC tags עם delay למניעת לופ אינסופי
       const listenForNFC = async () => {
         if (!mounted) return;
@@ -462,7 +512,7 @@ export default function PunchCard() {
       }
       stopReading();
     };
-  }, [localBusiness?.nfc_string, initNFC, startReading, stopReading, parseBusinessId, nfcModalVisible]);
+  }, [localBusiness?.nfc_string, initNFC, startReading, stopReading, parseBusinessId, checkLaunchTag, checkBackgroundTag, nfcModalVisible]);
 
   // --- REALTIME START ---
   // חיבור ל-Realtime לעדכונים מיידיים
