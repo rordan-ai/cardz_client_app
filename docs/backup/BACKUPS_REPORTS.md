@@ -1,6 +1,45 @@
 # דו״ח גיבוי - restore_checkpoints
 
-## גיבוי אחרון: 2025-12-15 15:31
+## גיבוי אחרון: 2025-12-16 18:00
+**הערה:** גיבוי מלא לפי `backup_rules_1611.md` - תיקוני NFC ומניעת לופ בקשות ניקוב
+
+### סיכום
+- ✅ SHA local = remote: `f27d0413118b4be7c28d16158396c443b7c44ef7`
+- ✅ קומיטים: main=199, restore_checkpoints=199 (זהה!)
+- ✅ Diff main↔restore_checkpoints: ריק (`git diff` → ריק)
+- ✅ Working directory: נקי (`git status --porcelain` → ריק)
+- ✅ סנכרון remote: מושלם (main, restore_checkpoints, origin/* - כולם SHA זהה)
+
+### ענפי ביטחון / Snapshots שנוצרו והועלו ל-origin
+- `safety_snapshot_20251216_180000` (SHA: `f27d041`)
+- `safety_backup_20251216_180000` (SHA: `f27d041`)
+- `restorepoint_snapshot_20251216_180000` (SHA: `f27d041`)
+
+### בדיקות איכות שבוצעו
+- `git fetch origin` ✅
+- `git status --porcelain` → ריק ✅
+- `git rev-list --count`: main=199, restore_checkpoints=199 ✅
+- `git diff main restore_checkpoints --name-only` → ריק ✅
+- `git rev-parse` local=remote לשני הענפים ✅
+
+### אבטחה (סריקה מהירה)
+- בוצע חיפוש `eyJhbGciOiJI` → נמצאו רק בקבצי תיעוד (placeholders) ✅
+- בוצע חיפוש `SUPABASE.*KEY` → קבצי קונפיג ו-example בלבד ✅
+- `supabaseClient.ts` משתמש ב-`process.env` בלבד ✅
+- `.env.example` מכיל placeholders בלבד ✅
+
+### שינויים עיקריים שנכללו בגיבוי
+- `fix: add NFC modal cooldown to prevent punch request loops` - תיקון לופ בקשות ניקוב
+- `feat: check NFC launch/background tag when app opens from background` - זיהוי NFC מרקע
+- `fix: always show card selection when multiple cards exist on NFC tap` - הצגת בחירת כרטיסייה
+- ארגון מחדש של תיעוד לתת-תיקיות (nfc, fixes, firebase, legal, backup, logs)
+- ניקוי קבצים זמניים וקבצי צ'אט ישנים
+- הוספת Edge Function `punch-card-renew`
+- הסרת קבצי google-services.json והמרה ל-example
+
+---
+
+## גיבוי קודם: 2025-12-15 15:31
 **הערה:** גיבוי לפי `backup_rules_1611.md` לפני ניקיון פרה-ייצור.
 
 ### סיכום
