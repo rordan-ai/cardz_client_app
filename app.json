@@ -105,7 +105,10 @@
     },
     "owner": "rordan",
     "updates": {
-      "url": "https://u.expo.dev/fc85016d-22a6-4ff7-93c0-3a7768e8a859"
+      "url": "https://u.expo.dev/fc85016d-22a6-4ff7-93c0-3a7768e8a859",
+      "enabled": true,
+      "checkAutomatically": "ON_ERROR_RECOVERY",
+      "fallbackToCacheTimeout": 0
     }
   }
 }
