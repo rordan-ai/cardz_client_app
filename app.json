@@ -15,7 +15,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cardz.app",
+      "bundleIdentifier": "com.mycompany.mycard",
       "googleServicesFile": ".\/GoogleService-Info\.plist",
       "infoPlist": {
         "UIBackgroundModes": [
