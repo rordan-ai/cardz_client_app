@@ -372,6 +372,7 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
               isLooping={false}
               resizeMode={ResizeMode.CONTAIN}
               style={[styles.confettiFullScreen, styles.confettiScaled]}
+              onError={(e) => console.log('[Video] Non-critical error:', e)}
             />
           </View>
         );
