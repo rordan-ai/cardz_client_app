@@ -44,7 +44,8 @@
 #### 1.2 EAS Secret ל-iOS Firebase
 ```bash
 # להמיר את הקובץ ל-Base64 ולהעלות ל-EAS:
-eas secret:create --scope project --name GOOGLE_SERVICE_INFO_PLIST_BASE64 --value "$(base64 -i GoogleService-Info.plist)" --type string
+# macOS/Linux:
+eas secret:create --scope project --name GOOGLE_SERVICE_INFO_PLIST_BASE64 --value "$(cat GoogleService-Info.plist | base64)" --type string
 ```
 
 #### 1.3 חשבון Apple Developer
