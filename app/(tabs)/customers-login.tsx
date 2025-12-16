@@ -9,6 +9,7 @@ import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, Scrol
 import { useBusiness } from '../../components/BusinessContext';
 import MarketingPopup from '../../components/MarketingPopup';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
+import { BackButton } from '../../components/BackButton';
 
 // מפתח לשמירה מאובטחת - מספר טלפון בלבד (לא קשור לעסק ספציפי)
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
@@ -344,6 +345,10 @@ export default function CustomersLogin() {
 
   return (
     <View style={styles(brandColor).container} accessible={false} importantForAccessibility="yes">
+      {/* כפתור חזרה ל-iOS */}
+      <View style={{ position: 'absolute', top: 10, left: 10, zIndex: 100 }}>
+        <BackButton fallbackRoute="/(tabs)/business_selector" color={brandColor} />
+      </View>
       {/* אייקון המבורגר ממורכז בראש הדף */}
       <TouchableOpacity 
         onPress={openMenu} 

@@ -20,6 +20,7 @@ import { NFCPunchModal } from '../../components/NFCPunch';
 import { supabase } from '../../components/supabaseClient';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
 import { useNFC } from '../../hooks/useNFC';
+import { BackButton } from '../../components/BackButton';
 
 const { width, height } = Dimensions.get('window');
 
@@ -1674,6 +1675,10 @@ export default function PunchCard() {
   return (
     <>
     <ScrollView contentContainerStyle={styles.container}>
+      {/* כפתור חזרה ל-iOS */}
+      <View style={{ position: 'absolute', top: 10, left: 10, zIndex: 100 }}>
+        <BackButton fallbackRoute="/(tabs)/customers-login" color={brandColor} />
+      </View>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
         style={[styles.hamburgerContainer, styles.topIconOffsetClean]}
