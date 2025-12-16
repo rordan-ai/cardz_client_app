@@ -3416,7 +3416,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 8,
-    marginTop: 60,
+    marginTop: Platform.OS === 'ios' ? 120 : 60, // iOS: הורדת שם הלקוח וכל מה שמתחתיו (כ-1/3 מהגובה)
     textAlign: 'center',
     // transform: [{ translateY: -40 }], // NEUTRALIZED - conflicts with spacing adjustments
     fontFamily: 'Rubik',
