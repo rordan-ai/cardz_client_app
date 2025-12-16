@@ -513,27 +513,14 @@ export default function PunchCard() {
     const setupNFC = async () => {
       if (!expectedNfcString) return;
       
-      // ב-iOS - הצגת דיאלוג אישור לסריקה
+      // ב-iOS - לא מתחילים NFC אוטומטית! המשתמש ילחץ על כפתור "סרוק לניקוב"
       if (Platform.OS === 'ios') {
-        Alert.alert(
-          'ברוכים הבאים לסריקה אוטומטית של קארדז',
-          'האם לאפשר סריקת NFC?',
-          [
-            {
-              text: 'בטל',
-              style: 'cancel',
-              onPress: () => console.log('[NFC] User cancelled iOS NFC permission'),
-            },
-            {
-              text: 'אשר',
-              onPress: () => startNFCListening(),
-            },
-          ]
-        );
-      } else {
-        // באנדרואיד - התחלה אוטומטית
-        startNFCListening();
+        console.log('[NFC] iOS detected - NFC will be triggered by user button only');
+        return;
       }
+      
+      // באנדרואיד - התחלה אוטומטית
+      startNFCListening();
     };
     
     setupNFC();
