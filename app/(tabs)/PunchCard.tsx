@@ -3106,7 +3106,7 @@ export default function PunchCard() {
           businessName={localBusiness.business_name || localBusiness.name}
           nfcString={localBusiness.nfc_string}
           customerPhone={phoneStr || phoneIntl || ''} // הלקוח כבר מזוהה!
-          selectedCardNumber={punchCard?.card_number} // הכרטיסייה שכבר נבחרה - לא יציג מודאל בחירה!
+          // לא שולחים selectedCardNumber - תמיד יוצג מסך בחירה אם יש יותר מכרטיסייה אחת
           brandColor={localBusiness.login_brand_color}
           onClose={() => setNfcModalVisible(false)}
           onCardRenewed={(newCardNumber) => {

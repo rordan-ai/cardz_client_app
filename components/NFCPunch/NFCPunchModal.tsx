@@ -196,8 +196,8 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
         <View style={styles.content}>
           <Text style={styles.title}>הכרטיסייה מלאה!</Text>
           <Text style={styles.message}>
-            סיימת למלא את כל הניקובים בכרטיסייה זו.{'\n'}
-            האם לפתוח כרטיסייה חדשה?
+            מזל טוב על השלמת הכרטיסייה וקבלת {selectedCard?.product_name || 'ההטבה'}!{'\n'}
+            האם תרצה לפתוח כרטיסייה חדשה?
           </Text>
           <View style={styles.buttonRow}>
             <TouchableOpacity
