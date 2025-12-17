@@ -74,6 +74,16 @@ export default function BusinessSelector() {
   const [locationAsked, setLocationAsked] = useState(false);
   const [sortByDistance, setSortByDistance] = useState(false);
 
+  const closeAllOverlays = useCallback(() => {
+    setModalVisible(false);
+    setMenuVisible(false);
+    setTutorialVisible(false);
+    setAccessibilityVisible(false);
+    setPrivacyVisible(false);
+    setLocationExplanationVisible(false);
+    setLocationLoading(false);
+  }, []);
+
   // טעינת עסקים עם כתובות
   useEffect(() => {
     (async () => {
@@ -212,10 +222,19 @@ export default function BusinessSelector() {
 
   const selectBusiness = async (businessItem: { id: string; name: string; logo?: string }) => {
     await setBusinessCode(businessItem.id);
-    setModalVisible(false);
+    // חשוב: לסגור כל overlay לפני ניווט, אחרת ב-iOS/Router המסך הקודם יכול להישאר mounted
+    // ומודל שקוף עלול לחסום לחיצות במסך הבא.
+    closeAllOverlays();
     setSearchBusiness('');
     router.push('/(tabs)/customers-login');
   };
+
+  // ניקוי overlays בעת יציאה מהמסך
+  useEffect(() => {
+    return () => {
+      closeAllOverlays();
+    };
+  }, [closeAllOverlays]);
 
   const handleMenuOption = (option: string) => {
     setMenuVisible(false);

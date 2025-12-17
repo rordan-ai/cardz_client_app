@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
+import * as Application from 'expo-application';
+import * as Updates from 'expo-updates';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 import { useBusiness } from '../../components/BusinessContext';
@@ -20,6 +22,7 @@ const WhatsappIcon = require('../../assets/images/whatsapp.png');
 const ClickIcon = require('../../assets/images/5.png');
 const HamburgerIcon = require('../../assets/images/hamburger_menu.png');
 const BiometricIcon = require('../../assets/icons/biometric.png');
+const FaceRecognitionIcon = require('../../assets/icons/face_recognition.png');
 
 const windowWidth = Dimensions.get('window').width;
 
@@ -29,6 +32,7 @@ export default function CustomersLogin() {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const nfcAutoLoginAttempted = useRef(false);
+  const pendingLoginPhoneRef = useRef<string | null>(null);
 
   const [backgroundImageError, setBackgroundImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0);
@@ -44,6 +48,34 @@ export default function CustomersLogin() {
   const [biometricAuthInProgress, setBiometricAuthInProgress] = useState(false);
 
   const brandColor = business?.login_brand_color || '#9747FF';
+
+  const updateStatusText = (() => {
+    const v = Application.nativeApplicationVersion ?? '';
+    const build = Application.nativeBuildVersion ?? '';
+    const channel = (Updates as any)?.channel ?? '';
+    const updateId = Updates.updateId ?? '';
+    const embedded = Updates.isEmbeddedLaunch ? 'embedded' : '';
+    const effectiveUpdate = updateId || embedded || 'unknown';
+    return `Version: ${v} (${build}) | Channel: ${channel} | Update: ${effectiveUpdate}`;
+  })();
+
+  // פונקציה לאימות ביומטרי (מוגדרת לפני שימוש ב-useEffect כדי לא ליצור ReferenceError)
+  const authenticateBiometric = useCallback(async (): Promise<boolean> => {
+    try {
+      setBiometricAuthInProgress(true);
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'אמת את זהותך לכניסה מהירה',
+        cancelLabel: 'ביטול',
+        disableDeviceFallback: false,
+      });
+      setBiometricAuthInProgress(false);
+      return result.success;
+    } catch (error) {
+      setBiometricAuthInProgress(false);
+      if (__DEV__) console.error('[Biometric] Auth error:', error);
+      return false;
+    }
+  }, []);
 
   // בדיקה אם ביומטריה זמינה במכשיר
   useEffect(() => {
@@ -106,24 +138,6 @@ export default function CustomersLogin() {
     const timer = setTimeout(handleNfcAutoLogin, 300);
     return () => clearTimeout(timer);
   }, [nfcLaunch, nfcBusinessCode, biometricAvailable, authenticateBiometric, router]);
-
-  // פונקציה לאימות ביומטרי
-  const authenticateBiometric = useCallback(async (): Promise<boolean> => {
-    try {
-      setBiometricAuthInProgress(true);
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'אמת את זהותך לכניסה מהירה',
-        cancelLabel: 'ביטול',
-        disableDeviceFallback: false,
-      });
-      setBiometricAuthInProgress(false);
-      return result.success;
-    } catch (error) {
-      setBiometricAuthInProgress(false);
-      if (__DEV__) console.error('[Biometric] Auth error:', error);
-      return false;
-    }
-  }, []);
 
   // לחיצה על כפתור ביומטרי
   const handleBiometricPress = useCallback(async () => {
@@ -226,9 +240,25 @@ export default function CustomersLogin() {
     } catch (error) {
       console.error('שגיאה בשמירת מספר טלפון:', error);
     }
-    
+
+    // הצעה להפעלת FaceID/ביומטרי לכניסה הבאה (פעם ראשונה אחרי הזנת טלפון)
+    if (biometricAvailable && !biometricSetupDone) {
+      pendingLoginPhoneRef.current = phone;
+      setBiometricSetupModalVisible(true);
+      return;
+    }
+
     router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}`);
   };
+
+  const continueLoginWithoutBiometric = useCallback(() => {
+    setBiometricSetupModalVisible(false);
+    const p = pendingLoginPhoneRef.current || phone;
+    pendingLoginPhoneRef.current = null;
+    if (p && p.match(/^05\\d{8}$/)) {
+      router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(p)}`);
+    }
+  }, [phone, router]);
 
   const openMenu = () => {
     if (__DEV__) {
@@ -534,20 +564,21 @@ export default function CustomersLogin() {
                 </Text>
               );
             })()}
-            {/* אייקון כניסה ביומטרית - מוסתר כשמודאל ההגדרה או האימות פתוחים */}
+            {/* אייקון כניסה ביומטרית (iOS: FaceID) - מוסתר כשמודאל ההגדרה או האימות פתוחים */}
             {biometricAvailable && !biometricSetupModalVisible && !biometricAuthInProgress && (
               <TouchableOpacity
                 style={styles(brandColor).biometricButton}
                 onPress={handleBiometricPress}
                 accessibilityLabel={biometricSetupDone ? "כניסה מהירה עם זיהוי ביומטרי" : "הגדרת כניסה ביומטרית"}
                 accessibilityRole="button"
-                accessibilityHint={biometricSetupDone ? "לחץ לכניסה מהירה באמצעות טביעת אצבע או זיהוי פנים" : "לחץ להגדרת כניסה מהירה עם זיהוי ביומטרי"}
+                accessibilityHint={biometricSetupDone ? "לחץ לכניסה מהירה באמצעות זיהוי פנים" : "לחץ להגדרת כניסה מהירה עם זיהוי פנים"}
               >
                 <Image 
-                  source={BiometricIcon} 
+                  source={Platform.OS === 'ios' ? FaceRecognitionIcon : BiometricIcon}
                   style={[
-                    styles(brandColor).biometricIcon, 
-                    { tintColor: brandColor, opacity: biometricSetupDone ? 1 : 0.5 }
+                    styles(brandColor).biometricIcon,
+                    Platform.OS === 'ios' ? null : { tintColor: brandColor },
+                    { opacity: biometricSetupDone ? 1 : 0.6 }
                   ]} 
                   resizeMode="contain"
                 />
@@ -556,6 +587,11 @@ export default function CustomersLogin() {
                 )}
               </TouchableOpacity>
             )}
+
+            {/* חיווי עדכון (כדי לדעת בוודאות אם נכנס EAS Update) */}
+            <Text style={styles(brandColor).updateStatusText} accessibilityLabel={updateStatusText}>
+              {updateStatusText}
+            </Text>
           </View>
         </View>
       </View>
@@ -601,7 +637,7 @@ export default function CustomersLogin() {
             
             <TouchableOpacity
               style={biometricStyles.cancelButton}
-              onPress={() => setBiometricSetupModalVisible(false)}
+              onPress={continueLoginWithoutBiometric}
             >
               <Text style={biometricStyles.cancelButtonText}>לא עכשיו</Text>
             </TouchableOpacity>
@@ -938,19 +974,27 @@ const styles = (brandColor: string) => StyleSheet.create({
   },
   biometricButton: {
     position: 'absolute',
-    bottom: -85,
+    bottom: Platform.OS === 'ios' ? 20 : -85,
     alignSelf: 'center',
     padding: 10,
     alignItems: 'center',
   },
   biometricIcon: {
-    width: 91,
-    height: 91,
+    width: Platform.OS === 'ios' ? 120 : 91,
+    height: Platform.OS === 'ios' ? 120 : 91,
   },
   biometricHint: {
     fontSize: 12,
     fontWeight: '600',
     marginTop: -10,
+    fontFamily: 'Rubik',
+  },
+  updateStatusText: {
+    marginTop: 10,
+    fontSize: 10,
+    color: '#A39393',
+    textAlign: 'center',
+    opacity: 0.6,
     fontFamily: 'Rubik',
   },
   errorText: {
