@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   arrow: {
-    fontSize: 36,
+    fontSize: 47, // 36 * 1.3 = 46.8 ≈ 47
     fontWeight: '300',
     marginRight: 0,
   },

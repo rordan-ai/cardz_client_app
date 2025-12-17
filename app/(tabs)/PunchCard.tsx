@@ -1684,7 +1684,7 @@ export default function PunchCard() {
     <>
     <ScrollView contentContainerStyle={styles.container}>
       {/* כפתור חזרה ל-iOS */}
-      <View style={{ position: 'absolute', top: 20, left: 10, zIndex: 100 }}>
+      <View style={{ position: 'absolute', top: 30, left: 10, zIndex: 100 }}>
         <BackButton fallbackRoute="/(tabs)/customers-login" color={brandColor} />
       </View>
       {/* תפריט המבורגר */}

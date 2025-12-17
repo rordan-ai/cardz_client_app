@@ -380,7 +380,7 @@ export default function CustomersLogin() {
   return (
     <View style={styles(brandColor).container} accessible={false} importantForAccessibility="yes">
       {/* כפתור חזרה ל-iOS */}
-      <View style={{ position: 'absolute', top: 20, left: 10, zIndex: 100 }}>
+      <View style={{ position: 'absolute', top: 30, left: 10, zIndex: 100 }}>
         <BackButton fallbackRoute="/(tabs)/business_selector" color={brandColor} />
       </View>
       {/* אייקון המבורגר ממורכז בראש הדף */}
@@ -978,7 +978,7 @@ const styles = (brandColor: string) => StyleSheet.create({
   },
   biometricButton: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? -40 : -85, // iOS: הורדה של 60px (מ-20 ל--40)
+    bottom: Platform.OS === 'ios' ? -10 : -85, // iOS: הורדה של 30px (מ-20 ל--10)
     alignSelf: 'center',
     padding: 10,
     alignItems: 'center',

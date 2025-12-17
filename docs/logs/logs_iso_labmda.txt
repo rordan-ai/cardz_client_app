@@ -1,0 +1,88 @@
+[connected]
+Dec 17 23:06:14 rapportd(CoreUtils)[92] <Error>: ### MeDevice check failed: FMFErrorNoAccount
+Dec 17 23:06:15 assistantd(CoreUtils)[36] <Error>: ### MeDevice check failed: FMFErrorNoAccount
+Dec 17 23:06:18 powerexperienced[122] <Error>: Failed to get current nfc status
+Dec 17 23:06:20 backboardd[68] <Error>: *** already have a main display digitizer
+Dec 17 23:06:20 backboardd[68] <Error>: touch down without previous range event: 2
+Dec 17 23:06:20 Cardz(UIKitCore)[1792] <Error>: UIKeyboardLayoutStar implements focusItemsInRect: - caching for linear focus movement is limited as long as this view is on screen.
+Dec 17 23:06:20 backboardd(IOKit)[68] <Error>: 4CAED8C2-FB61-4BC4-8C1D-3F337BD9C4B0: HIDVS ID:9b53e6e0007d2 iohideventsystem_client_dispatch_virtual_service_notification:10000003
+Dec 17 23:06:20 backboardd(IOKit)[68] <Error>: 4CAED8C2-FB61-4BC4-8C1D-3F337BD9C4B0: HIDVS ID:9b53e6e0007d2 iohideventsystem_client_dispatch_virtual_service_notification:10000003
+Dec 17 23:06:20 InputUI(RemoteTextInput)[555] <Error>: -[RTIInputSystemServiceSession dealloc]  Connection is nil in session dealloc
+Dec 17 23:06:20 Cardz(GenerativeModels)[1792] <Error>: Can't find or decode reasons
+Dec 17 23:06:20 Cardz(GenerativeModels)[1792] <Error>: Failed to get or decode unavailable reasons
+Dec 17 23:06:20 SpringBoard(FrontBoardServices)[34] <Error>: [(FBSceneManager):com.apple.UIKit.remote-keyboard] updated client settings were not derived from the scene's previous client settings
+Dec 17 23:06:20 kernel(Sandbox)[0] <Error>: Sandbox: Cardz(1792) deny(1) sysctl-read kern.bootargs
+Dec 17 23:06:21 Cardz(UIKitCore)[1792] <Error>: Attempt to present <RCTFabricModalHostViewController: 0x103cd5800> on <UIViewController: 0x103cd4c00> (from <RNSScreen: 0x103d65400>) which is already presenting <RCTFabricModalHostViewController: 0x103cd4400>.
+Dec 17 23:06:22 SpringBoard(SpringBoard)[34] <Error>: attention client lost event tag is not a number: (null)
+Dec 17 23:06:25 powerexperienced[122] <Error>: Failed to get current nfc status
+Dec 17 23:06:25 backboardd[68] <Error>: *** already have a main display digitizer
+Dec 17 23:06:25 backboardd[68] <Error>: touch down without previous range event: 2
+Dec 17 23:06:25 kbd(TextInputCore)[365] <Error>: +[HCHuffmanCoder coderMatchingName:locale:]  Couldn't find a Huffman coder for locale: '<private>'
+Dec 17 23:06:25 backboardd(IOKit)[68] <Error>: 92BC9837-2FE8-46C9-BD8A-4D00E1DB110D: HIDVS ID:9b53e580007d3 iohideventsystem_client_dispatch_virtual_service_notification:10000003
+Dec 17 23:06:25 backboardd(IOKit)[68] <Error>: 92BC9837-2FE8-46C9-BD8A-4D00E1DB110D: HIDVS ID:9b53e580007d3 iohideventsystem_client_dispatch_virtual_service_notification:10000003
+Dec 17 23:06:26 SpringBoard(FrontBoardServices)[34] <Error>: [(FBSceneManager):com.apple.UIKit.remote-keyboard] updated client settings were not derived from the scene's previous client settings
+Dec 17 23:06:27 sharingd(CoreUtils)[1125] <Error>: ### MeDevice check failed: FMFErrorNoAccount
+Dec 17 23:06:27 SpringBoard(SpringBoard)[34] <Error>: attention client lost event tag is not a number: (null)
+Dec 17 23:06:29 backboardd[68] <Error>: *** already have a main display digitizer
+Dec 17 23:06:29 backboardd[68] <Error>: touch down without previous range event: 2
+Dec 17 23:06:29 backboardd(IOKit)[68] <Error>: 150111BD-0788-4785-BD2B-465AB1CC6EE1: HIDVS ID:9b53e6c0007d4 iohideventsystem_client_dispatch_virtual_service_notification:10000003
+Dec 17 23:06:29 backboardd(IOKit)[68] <Error>: 150111BD-0788-4785-BD2B-465AB1CC6EE1: HIDVS ID:9b53e6c0007d4 iohideventsystem_client_dispatch_virtual_service_notification:10000003
+Dec 17 23:06:29 Cardz(UIKitCore)[1792] <Error>: Snapshotting a view (0x10c589880, UIView) that has not been rendered at least once requires afterScreenUpdates:YES.
+Dec 17 23:06:31 SpringBoard(SpringBoard)[34] <Error>: attention client lost event tag is not a number: (null)
+Dec 17 23:06:32 powerexperienced[122] <Error>: Failed to get current nfc status
+Dec 17 23:06:33 wifid(WiFiPolicy)[50] <Error>: WiFiManagerHelperInsertWiFiServiceToNetworkSetsIfNotPresent: FOUND network service 3A918FE6-4E65-4AAF-8078-3D8680D624C1 with matching BSD name en0 and interface type IEEE80211
+Dec 17 23:06:36 backboardd[68] <Error>: *** already have a main display digitizer
+Dec 17 23:06:36 backboardd[68] <Error>: touch down without previous range event: 2
+Dec 17 23:06:36 backboardd(IOKit)[68] <Error>: 262EDCFC-30E3-4F08-994C-D94F342F6633: HIDVS ID:9b53e6c0007d5 iohideventsystem_client_dispatch_virtual_service_notification:10000003
+Dec 17 23:06:36 backboardd(IOKit)[68] <Error>: 262EDCFC-30E3-4F08-994C-D94F342F6633: HIDVS ID:9b53e6c0007d5 iohideventsystem_client_dispatch_virtual_service_notification:10000003
+Dec 17 23:06:37 Cardz(React)[1792] <Error>: { [ReferenceError: Property 'brandColor' doesn't exist]
+  componentStack: '\134n    at PunchCard (/Users/expo/Library/Developer/Xcode/DerivedData/Cardz-bogiajwzpjwqviadnjfkcojeazhf/Build/Intermediates.noindex/ArchiveIntermediates/Cardz/BuildProductsPath/Release-iphoneos/main.jsbundle:67921:44)\134n    at Suspense (<anonymous>)\134n    at Route (/Users/expo/Library/Developer/Xcode/DerivedData/Cardz-bogiajwzpjwqviadnjfkcojeazhf/Build/Intermediates.noindex/ArchiveIntermediates/Cardz/BuildProductsPath/Release-iphoneos/main.jsbundle:121775:24)\134n    at BaseRoute (/Users/expo/Library/Developer/Xcode/DerivedData/Cardz-bogiajwzpjwqviadnjfkcojeazhf/Build/Intermediates.noindex/ArchiveIntermediates/Cardz/BuildProductsPath/Release-iphoneos/main.jsbundle:122607:24)\134n    at StaticContainer (/Users/expo/Library/Developer/Xcode/DerivedData/Cardz-bogiajwzpjwqviadnjfkcojeazhf/Build/Intermediates.noindex/ArchiveIntermediates/Cardz/BuildProductsPath/Release-iphoneos/main.jsbundle:119010:17)\134n    at EnsureSingleNavigator (/Users/e<\M-b\M^@\M-&>
+Dec 17 23:06:37 Cardz(React)[1792] <Error>: Unhandled JS Exception: ReferenceError: Property 'brandColor' doesn't exist
+This error is located at:
+    at PunchCard (/Users/expo/Library/Developer/Xcode/DerivedData/Cardz-bogiajwzpjwqviadnjfkcojeazhf/Build/Intermediates.noindex/ArchiveIntermediates/Cardz/BuildProductsPath/Release-iphoneos/main.jsbundle:67921:44)
+    at Suspense (<anonymous>)
+    at Route (/Users/expo/Library/Developer/Xcode/DerivedData/Cardz-bogiajwzpjwqviadnjfkcojeazhf/Build/Intermediates.noindex/ArchiveIntermediates/Cardz/BuildProductsPath/Release-iphoneos/main.jsbundle:121775:24)
+    at BaseRoute (/Users/expo/Library/Developer/Xcode/DerivedData/Cardz-bogiajwzpjwqviadnjfkcojeazhf/Build/Intermediates.noindex/ArchiveIntermediates/Cardz/BuildProductsPath/Release-iphoneos/main.jsbundle:122607:24)
+    at StaticContainer (/Users/expo/Library/Developer/Xcode/DerivedData/Cardz-bogiajwzpjwqviadnjfkcojeazhf/Build/Intermediates.noindex/ArchiveIntermediates/Cardz/BuildProductsPath/Release-iphoneos/main.jsbundle:119010:17)
+    at EnsureSing<\M-b\M^@\M-&>
+Dec 17 23:06:37 SpringBoard(KeyboardArbiter)[34] <Error>: Advisor: No handle found for currently focused PID: 1792; sceneIdentity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.mycompany.mycard-default
+Dec 17 23:06:37 backboardd(BackBoardHIDEventFoundation)[68] <Error>: invalidated connection <BSProcessHandle: 0x9b5130690; Cardz:1792; valid: YES>
+Dec 17 23:06:37 backboardd(BackBoardHIDEventFoundation)[68] <Error>: invalidated connection <BSProcessHandle: 0x9b5130690; Cardz:1792; valid: YES>
+Dec 17 23:06:37 backboardd(BackBoardHIDEventFoundation)[68] <Error>: invalidated connection <BSProcessHandle: 0x9b5130690; Cardz:1792; valid: YES>
+Dec 17 23:06:37 SpringBoard(BiomeStorage)[34] <Error>: Data type not yet set for stream blendingUIHomeScreen, please switch to APIs that take eventDataClass as a parameter.
+Dec 17 23:06:37 SpringBoard(BiomeStorage)[34] <Error>: Event class '<private>' missing from NSKeyedUnarchiver allowedClasses
+Dec 17 23:06:37 SpringBoard(RunningBoardServices)[34] <Error>: Error acquiring assertion: <Error Domain=RBSAssertionErrorDomain Code=2 "Specified target process does not exist" UserInfo={NSLocalizedFailureReason=Specified target process does not exist}>
+Dec 17 23:06:37 wifid(WiFiPolicy)[50] <Error>: -[WiFiTimeDeferredNetworksAJManager setScanResultsWithAutoJoinSessionCompletion:complete:]: no scan results
+Dec 17 23:06:37 wifid(WiFiPolicy)[50] <Error>: -[WiFiTimeDeferredNetworksAJManager setScanResultsWithAutoJoinSessionCompletion:complete:]: no scan results
+Dec 17 23:06:37 backboardd(BackBoardHIDEventFoundation)[68] <Error>: cycle detected between [34-3C5] -> [34-3]
+Dec 17 23:06:37 backboardd(BackBoardHIDEventFoundation)[68] <Error>: cycle detected between [34-3C5] -> [34-3]
+Dec 17 23:06:37 sharingd[1125] <Error>: SDAirDropNearFieldService.startNearFieldController SKIP - AirDrop is restricted
+Dec 17 23:06:37 sharingd[1125] <Error>: SDAirDropNearFieldService: Near field Controller is not available.
+Dec 17 23:06:37 SpringBoard(UIKitCore)[34] <Error>: Error creating the CFMessagePort needed to communicate with PPT.
+Dec 17 23:06:37 SpringBoard(FrontBoard)[34] <Error>: Ignoring update for invalidated scene: (FBSceneManager):sceneID:com.mycompany.mycard-default
+Dec 17 23:06:37 SpringBoard(FrontBoard)[34] <Error>: [(FBSceneManager):sceneID:com.mycompany.mycard-default] Update failed: <NSError: 0x300cbe8e0; domain: FBSceneErrorDomain; code: 1 ("operation-failed"); "Scene update failed."> {
+    NSUnderlyingError = <NSError: 0x300f04030; domain: FBWorkspace; code: 1; "Scene client is invalid.">;
+}
+Dec 17 23:06:37 symptomsd(SymptomEvaluator)[192] <Error>: Process state is unknown (null)
+Dec 17 23:06:37 dasd(BiomeStorage)[80] <Error>: Data type not yet set for stream APRSBiomeAppKillEvent, please switch to APIs that take eventDataClass as a parameter.
+Dec 17 23:06:37 dasd(BiomeStorage)[80] <Error>: Event class '<private>' missing from NSKeyedUnarchiver allowedClasses
+Dec 17 23:06:37 symptomsd(SymptomEvaluator)[192] <Error>: COSMCtrl _foregroundAppActivity incoming bundle com.mycompany.mycard has nil supplied UUID, finds existing 5E3EF517-B6C3-37D8-A9C5-6D8716191D5D
+Dec 17 23:06:37 SpringBoard(XCTAutomationSupport)[34] <Error>: Unexpectedly received animationDidStop without a matching animationDidStart. Monitoring for idle animations may no longer function correctly.
+Dec 17 23:06:37 SpringBoard(XCTAutomationSupport)[34] <Error>: Unexpectedly received animationDidStop without a matching animationDidStart. Monitoring for idle animations may no longer function correctly.
+Dec 17 23:06:37 runningboardd(RunningBoard)[33] <Error>: RBSStateCapture remove item called for untracked item <RBConnectionClient| 1792 name:app<com.mycompany.mycard(D27D1C78-A8F2-432E-A69C-C4061C82D84E)> entitlements:<RBEntitlements| [
+			
+			]> inheritanceManager:<RBClientInheritanceManager|  inheritances:[
+	<RBSInheritance| environment:UIScene:com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.mycompany.mycard-default name:com.apple.frontboard.visibility origID:33-34-16123 payload 7382995072951839080>,
+	<RBSInheritance| environment:(none) name:com.apple.frontboard.visibility origID:33-34-16130 0>
+	]>>
+Dec 17 23:06:37 ReportCrash[145] <Error>: Unable to extract info plist from binary
+Dec 17 23:06:37 contextstored(CoreDuet)[65] <Error>: Simulating crash. Reason: <private>
+Dec 17 23:06:37 contextstored(CoreDuet)[65] <Error>: Simulating crash. Reason: <private>
+Dec 17 23:06:37 SpringBoard(PaperBoardUI)[34] <Error>: [lock]	Snapshot attempt failed because preconditions failed:
+Dec 17 23:06:37 SpringBoard(PaperBoardUI)[34] <Error>: [lock]	--> 'Lock variant needs to be fully locked ((null)/(null))'
+Dec 17 23:06:37 ReportCrash(MetricKitSource)[145] <Error>: Failed to create bundle record for bundleID <private> and error <private>
+Dec 17 23:06:38 SpringBoard(SpringBoard)[34] <Error>: attention client lost event tag is not a number: (null)
+Dec 17 23:06:39 powerexperienced[122] <Error>: Failed to get current nfc status
+Dec 17 23:06:42 kernel(Sandbox)[0] <Error>: 1 duplicate report for Sandbox: Cardz(1792) deny(1) sysctl-read kern.bootargs
+Dec 17 23:06:42 kernel(Sandbox)[0] <Error>: System Policy: duetexpertd(210) deny(1) file-read-metadata /private/var/mobile/Library/Biome/FlexibleStorage
+Dec 17 23:06:42 kernel(Sandbox)[0] <Error>: System Policy: duetexpertd(210) deny(1) file-read-metadata /private/var/mobile/Library/Biome/FlexibleStorage/registrations.db
