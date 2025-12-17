@@ -1677,13 +1677,21 @@ export default function PunchCard() {
     <>
     <ScrollView contentContainerStyle={styles.container}>
       {/* כפתור חזרה ל-iOS */}
-      <View style={{ position: 'absolute', top: 10, left: 10, zIndex: 100 }}>
+      {/* חשוב: wrapper לא צריך לחסום טאצ'ים של כפתורים סמוכים */}
+      <View pointerEvents="box-none" style={{ position: 'absolute', top: 10, left: 10, zIndex: 100 }}>
         <BackButton fallbackRoute="/(tabs)/customers-login" color={brandColor} />
       </View>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
-        style={[styles.hamburgerContainer, styles.topIconOffsetClean]}
+        style={[
+          styles.hamburgerContainer,
+          // ב-iOS: הימנעות מ-transform שיכול "להזיז" את אזור המגע מהאייקון
+          Platform.OS === 'ios'
+            ? { top: styles.hamburgerContainer.top + height * 0.05 }
+            : styles.topIconOffsetClean,
+        ]}
         onPress={() => setMenuVisible(true)}
+        hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
         accessibilityLabel="אפשרויות נוספות"
         accessibilityRole="button"
         accessibilityHint="לחץ לפתיחת תפריט עם אפשרויות נוספות כמו העדפות, פעילות ומחיקת משתמש"
@@ -1700,7 +1708,12 @@ export default function PunchCard() {
 
       {/* אייקון הודעות דואר */}
       <TouchableOpacity 
-        style={[styles.mailIconContainer, styles.topIconOffsetClean]}
+        style={[
+          styles.mailIconContainer,
+          Platform.OS === 'ios'
+            ? { top: styles.mailIconContainer.top + height * 0.05 }
+            : styles.topIconOffsetClean,
+        ]}
         accessibilityLabel={`הדואר שלי${unreadMessages > 0 ? `, ${unreadMessages} הודעות שלא נקראו` : ''}`}
         accessibilityRole="button"
         accessibilityHint="לחץ לצפייה בהודעות שהתקבלו מהעסק"
@@ -1768,7 +1781,12 @@ export default function PunchCard() {
 
       {/* אייקון קבוצה באמצע */}
       <TouchableOpacity 
-        style={[styles.communityIconContainer, styles.topIconOffsetClean]}
+        style={[
+          styles.communityIconContainer,
+          Platform.OS === 'ios'
+            ? { top: styles.communityIconContainer.top + height * 0.05 }
+            : styles.topIconOffsetClean,
+        ]}
         onPress={() => setReferralVisible(true)}
         accessibilityLabel="הזמן חבר"
         accessibilityRole="button"
