@@ -37,7 +37,6 @@ export const BackButton: React.FC<BackButtonProps> = ({
       accessibilityRole="button"
     >
       <Text style={[styles.arrow, { color }]}>‹</Text>
-      <Text style={[styles.text, { color }]}>חזרה</Text>
     </TouchableOpacity>
   );
 };
@@ -50,9 +49,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   arrow: {
-    fontSize: 28,
+    fontSize: 36,
     fontWeight: '300',
-    marginRight: 2,
+    marginRight: 0,
   },
   text: {
     fontSize: 17,

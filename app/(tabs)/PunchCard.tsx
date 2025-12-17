@@ -98,14 +98,18 @@ export default function PunchCard() {
   const activityChannelRef = useRef<any>(null);
 
   const updateStatusText = (() => {
-    const v = Application.nativeApplicationVersion ?? '';
-    const build = Application.nativeBuildVersion ?? '';
-    const runtime = (Updates as any)?.runtimeVersion ?? '';
-    const channel = (Updates as any)?.channel ?? '';
-    const updateId = Updates.updateId ?? '';
-    const embedded = Updates.isEmbeddedLaunch ? 'embedded' : '';
-    const effectiveUpdate = updateId || embedded || 'unknown';
-    return `Version: ${v} (${build})\nRuntime: ${runtime}\nChannel: ${channel}\nUpdate: ${effectiveUpdate}`;
+    try {
+      const v = Application.nativeApplicationVersion ?? '';
+      const build = Application.nativeBuildVersion ?? '';
+      const runtime = (Updates as any)?.runtimeVersion ?? '';
+      const channel = (Updates as any)?.channel ?? '';
+      const updateId = Updates.updateId ?? '';
+      const embedded = Updates.isEmbeddedLaunch ? 'embedded' : '';
+      const effectiveUpdate = updateId || embedded || 'unknown';
+      return `Version: ${v} (${build})\nRuntime: ${runtime}\nChannel: ${channel}\nUpdate: ${effectiveUpdate}`;
+    } catch (e) {
+      return 'Version info unavailable';
+    }
   })();
 
   const [localBusiness, setLocalBusiness] = useState<{
@@ -1677,7 +1681,7 @@ export default function PunchCard() {
     <>
     <ScrollView contentContainerStyle={styles.container}>
       {/* כפתור חזרה ל-iOS */}
-      <View style={{ position: 'absolute', top: 10, left: 10, zIndex: 100 }}>
+      <View style={{ position: 'absolute', top: 20, left: 10, zIndex: 100 }}>
         <BackButton fallbackRoute="/(tabs)/customers-login" color={brandColor} />
       </View>
       {/* תפריט המבורגר */}

@@ -50,13 +50,17 @@ export default function CustomersLogin() {
   const brandColor = business?.login_brand_color || '#9747FF';
 
   const updateStatusText = (() => {
-    const v = Application.nativeApplicationVersion ?? '';
-    const build = Application.nativeBuildVersion ?? '';
-    const channel = (Updates as any)?.channel ?? '';
-    const updateId = Updates.updateId ?? '';
-    const embedded = Updates.isEmbeddedLaunch ? 'embedded' : '';
-    const effectiveUpdate = updateId || embedded || 'unknown';
-    return `Version: ${v} (${build}) | Channel: ${channel} | Update: ${effectiveUpdate}`;
+    try {
+      const v = Application.nativeApplicationVersion ?? '';
+      const build = Application.nativeBuildVersion ?? '';
+      const channel = (Updates as any)?.channel ?? '';
+      const updateId = Updates.updateId ?? '';
+      const embedded = Updates.isEmbeddedLaunch ? 'embedded' : '';
+      const effectiveUpdate = updateId || embedded || 'unknown';
+      return `Version: ${v} (${build}) | Channel: ${channel} | Update: ${effectiveUpdate}`;
+    } catch (e) {
+      return 'Version info unavailable';
+    }
   })();
 
   // פונקציה לאימות ביומטרי (מוגדרת לפני שימוש ב-useEffect כדי לא ליצור ReferenceError)
@@ -376,7 +380,7 @@ export default function CustomersLogin() {
   return (
     <View style={styles(brandColor).container} accessible={false} importantForAccessibility="yes">
       {/* כפתור חזרה ל-iOS */}
-      <View style={{ position: 'absolute', top: 10, left: 10, zIndex: 100 }}>
+      <View style={{ position: 'absolute', top: 20, left: 10, zIndex: 100 }}>
         <BackButton fallbackRoute="/(tabs)/business_selector" color={brandColor} />
       </View>
       {/* אייקון המבורגר ממורכז בראש הדף */}
@@ -577,7 +581,7 @@ export default function CustomersLogin() {
                   source={Platform.OS === 'ios' ? FaceRecognitionIcon : BiometricIcon}
                   style={[
                     styles(brandColor).biometricIcon,
-                    Platform.OS === 'ios' ? null : { tintColor: brandColor },
+                    { tintColor: brandColor }, // צבע brand לשני הפלטפורמות
                     { opacity: biometricSetupDone ? 1 : 0.6 }
                   ]} 
                   resizeMode="contain"
@@ -974,7 +978,7 @@ const styles = (brandColor: string) => StyleSheet.create({
   },
   biometricButton: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 20 : -85,
+    bottom: Platform.OS === 'ios' ? -40 : -85, // iOS: הורדה של 60px (מ-20 ל--40)
     alignSelf: 'center',
     padding: 10,
     alignItems: 'center',
