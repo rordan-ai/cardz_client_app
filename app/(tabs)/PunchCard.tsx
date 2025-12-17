@@ -95,6 +95,22 @@ export default function PunchCard() {
   const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const activityChannelRef = useRef<any>(null);
 
+  const [localBusiness, setLocalBusiness] = useState<{
+    id?: number;
+    business_code: string;
+    name: string;
+    business_name?: string;
+    logo?: string;
+    max_punches: number;
+    punched_icon?: string;
+    unpunched_icon?: string;
+    card_text_color?: string;
+    expiration_date?: string;
+    nfc_string?: string;
+    login_brand_color?: string;
+    punch_mode?: string;
+  } | null>(null);
+
   // NFC state
   const [nfcModalVisible, setNfcModalVisible] = useState(false);
   const { isSupported: nfcSupported, initNFC, startReading, stopReading, parseBusinessId, checkLaunchTag, checkBackgroundTag } = useNFC();
@@ -183,21 +199,6 @@ export default function PunchCard() {
     total_punches: number;
     products?: { product_name: string }[];
   }>>([]);
-  const [localBusiness, setLocalBusiness] = useState<{
-    id?: number;
-    business_code: string;
-    name: string;
-    business_name?: string;
-    logo?: string;
-    max_punches: number;
-    punched_icon?: string;
-    unpunched_icon?: string;
-    card_text_color?: string;
-    expiration_date?: string;
-    nfc_string?: string;
-    login_brand_color?: string;
-    punch_mode?: string;
-  } | null>(null);
 
   // פונקציה ליצירת קוד הזמנה מספרי חדש
   const generateReferralCode = (businessCode: string, customerPhone: string): string => {
