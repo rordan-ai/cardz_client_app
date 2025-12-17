@@ -1,5 +1,5 @@
 
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import * as Location from 'expo-location';
 import { useEffect, useState, useCallback } from 'react';
 import {
@@ -66,6 +66,7 @@ export default function BusinessSelector() {
   const [searchBusiness, setSearchBusiness] = useState('');
   const { setBusinessCode } = useBusiness();
   const router = useRouter();
+  const navigation = useNavigation();
 
   // מצבי מיקום
   const [locationExplanationVisible, setLocationExplanationVisible] = useState(false);
@@ -235,6 +236,14 @@ export default function BusinessSelector() {
       closeAllOverlays();
     };
   }, [closeAllOverlays]);
+
+  // איפוס overlays כשחוזרים למסך (iOS focus issue)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      closeAllOverlays();
+    });
+    return unsubscribe;
+  }, [navigation, closeAllOverlays]);
 
   const handleMenuOption = (option: string) => {
     setMenuVisible(false);
