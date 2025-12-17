@@ -6,6 +6,8 @@ import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
+import * as Application from 'expo-application';
+import * as Updates from 'expo-updates';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, DeviceEventEmitter, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
@@ -94,6 +96,17 @@ export default function PunchCard() {
   const [activityNextCursor, setActivityNextCursor] = useState<string | null>(null);
   const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const activityChannelRef = useRef<any>(null);
+
+  const updateStatusText = (() => {
+    const v = Application.nativeApplicationVersion ?? '';
+    const build = Application.nativeBuildVersion ?? '';
+    const runtime = (Updates as any)?.runtimeVersion ?? '';
+    const channel = (Updates as any)?.channel ?? '';
+    const updateId = Updates.updateId ?? '';
+    const embedded = Updates.isEmbeddedLaunch ? 'embedded' : '';
+    const effectiveUpdate = updateId || embedded || 'unknown';
+    return `Version: ${v} (${build})\nRuntime: ${runtime}\nChannel: ${channel}\nUpdate: ${effectiveUpdate}`;
+  })();
 
   const [localBusiness, setLocalBusiness] = useState<{
     id?: number;
@@ -3201,6 +3214,11 @@ export default function PunchCard() {
               >
                 <Text style={[accessibilityStyles.contactItemClickable, { fontSize: 20 }]}>💬 בוואטסאפ: 055-248-2442</Text>
               </TouchableOpacity>
+
+              {/* סטטוס עדכון (כדי לוודא שהתקבל EAS Update) */}
+              <Text style={[accessibilityStyles.paragraph, { marginTop: 24, opacity: 0.75 }]}>
+                {updateStatusText}
+              </Text>
 
               <View style={{ height: 100 }} />
             </ScrollView>
