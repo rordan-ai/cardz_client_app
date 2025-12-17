@@ -128,6 +128,9 @@ export default function PunchCard() {
     punch_mode?: string;
   } | null>(null);
 
+  // צבע brand מהאדמין (ברירת מחדל סגול אם אין)
+  const brandColor = localBusiness?.login_brand_color || '#9747FF';
+
   // NFC state
   const [nfcModalVisible, setNfcModalVisible] = useState(false);
   const { isSupported: nfcSupported, initNFC, startReading, stopReading, parseBusinessId, checkLaunchTag, checkBackgroundTag } = useNFC();
