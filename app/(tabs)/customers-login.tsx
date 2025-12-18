@@ -494,7 +494,7 @@ export default function CustomersLogin() {
               />
             </View>
             <TouchableOpacity
-              style={[styles(brandColor).clickBtn, { backgroundColor: brandColor }, __DEV__ && { borderWidth: 2, borderColor: 'red' }]}
+              style={[styles(brandColor).clickBtn, { backgroundColor: brandColor }, { borderWidth: 2, borderColor: 'red' }]}
               onPress={handleLogin}
               accessibilityLabel="כניסה לכרטיסייה"
               accessibilityRole="button"
@@ -557,7 +557,7 @@ export default function CustomersLogin() {
             {/* אייקון כניסה ביומטרית (iOS: FaceID) - מוסתר כשמודאל ההגדרה או האימות פתוחים */}
             {biometricAvailable && !biometricSetupModalVisible && !biometricAuthInProgress && (
               <TouchableOpacity
-                style={[styles(brandColor).biometricButton, __DEV__ && { borderWidth: 2, borderColor: 'red' }]}
+                style={[styles(brandColor).biometricButton, { borderWidth: 2, borderColor: 'red' }]}
                 onPress={handleBiometricPress}
                 accessibilityLabel={biometricSetupDone ? "כניסה מהירה עם זיהוי ביומטרי" : "הגדרת כניסה ביומטרית"}
                 accessibilityRole="button"

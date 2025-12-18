@@ -1676,7 +1676,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={styles.container}>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
-        style={[styles.hamburgerContainer, styles.topIconOffsetClean, __DEV__ && { borderWidth: 2, borderColor: 'red' }]}
+        style={[styles.hamburgerContainer, styles.topIconOffsetClean, { borderWidth: 2, borderColor: 'red' }]}
         onPress={() => setMenuVisible(true)}
         accessibilityLabel="אפשרויות נוספות"
         accessibilityRole="button"
@@ -1694,7 +1694,7 @@ export default function PunchCard() {
 
       {/* אייקון הודעות דואר */}
       <TouchableOpacity 
-        style={[styles.mailIconContainer, styles.topIconOffsetClean, __DEV__ && { borderWidth: 2, borderColor: 'red' }]}
+        style={[styles.mailIconContainer, styles.topIconOffsetClean, { borderWidth: 2, borderColor: 'red' }]}
         accessibilityLabel={`הדואר שלי${unreadMessages > 0 ? `, ${unreadMessages} הודעות שלא נקראו` : ''}`}
         accessibilityRole="button"
         accessibilityHint="לחץ לצפייה בהודעות שהתקבלו מהעסק"
@@ -1762,7 +1762,7 @@ export default function PunchCard() {
 
       {/* אייקון קבוצה באמצע */}
       <TouchableOpacity 
-        style={[styles.communityIconContainer, styles.topIconOffsetClean, __DEV__ && { borderWidth: 2, borderColor: 'red' }]}
+        style={[styles.communityIconContainer, styles.topIconOffsetClean, { borderWidth: 2, borderColor: 'red' }]}
         onPress={() => setReferralVisible(true)}
         accessibilityLabel="הזמן חבר"
         accessibilityRole="button"
@@ -1920,7 +1920,8 @@ export default function PunchCard() {
               marginTop: 20,
               alignItems: 'center',
               justifyContent: 'center',
-              ...(__DEV__ && { borderWidth: 2, borderColor: 'red' }),
+              borderWidth: 2,
+              borderColor: 'red',
             }}
             onPress={async () => {
               try {
