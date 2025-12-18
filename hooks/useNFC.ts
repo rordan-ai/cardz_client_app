@@ -30,9 +30,6 @@ interface UseNFCReturn extends NFCState {
 // נעילה גלובלית למניעת קריאות NFC מקבילות
 let isNfcLocked = false;
 
-// Callback גלובלי לטיפול בתג שנקרא
-let onTagDiscoveredCallback: ((tagData: string | null) => void) | null = null;
-
 export const useNFC = (): UseNFCReturn => {
   const [state, setState] = useState<NFCState>({
     isSupported: false,
@@ -76,7 +73,7 @@ export const useNFC = (): UseNFCReturn => {
       console.log('[NFC] Enabled:', enabled);
 
       if (enabled) {
-        // רישום Event Listener לקבלת תגי NFC
+        // רישום Event Listener לקבלת תגי NFC (Android)
         NfcManager.setEventListener(NfcEvents.DiscoverTag, (tag: any) => {
           console.log('[NFC] Tag discovered via event:', tag);
           const tagData = parseTag(tag);
@@ -119,34 +116,68 @@ export const useNFC = (): UseNFCReturn => {
     }
   }, []);
 
-  // התחלת קריאה - מחכה לאירוע מה-event listener
+  // התחלת קריאה
   const startReading = useCallback(async (): Promise<string | null> => {
-    // בדיקת נעילה - אם כבר יש קריאה פעילה, לא מתחילים חדשה
+    // בדיקת נעילה
     if (isNfcLocked) {
+      console.log('[NFC] Already reading, skipping');
       return null;
     }
     
     isNfcLocked = true;
     setState(prev => ({ ...prev, isReading: true, error: null }));
 
-    return new Promise((resolve) => {
-      // שמירת ה-resolve callback
-      resolveRef.current = (tagData) => {
-        console.log('[NFC] Tag read via listener:', tagData);
+    try {
+      if (Platform.OS === 'ios') {
+        // iOS: צריך להתחיל session מפורש עם requestTechnology
+        console.log('[NFC] iOS: Starting NFC session');
+        await NfcManager.requestTechnology(NfcTech.Ndef, {
+          alertMessage: 'קרב את התג לסריקה'
+        });
+        
+        const tag = await NfcManager.getTag();
+        console.log('[NFC] iOS: Tag received:', tag);
+        
+        const tagData = parseTag(tag);
+        setState(prev => ({ ...prev, lastTag: tagData, isReading: false }));
+        
+        await NfcManager.cancelTechnologyRequest();
         isNfcLocked = false;
-        resolve(tagData);
-      };
+        return tagData;
+        
+      } else {
+        // Android: מחכה לאירוע מה-event listener
+        return new Promise((resolve) => {
+          resolveRef.current = (tagData) => {
+            console.log('[NFC] Android: Tag read via listener:', tagData);
+            isNfcLocked = false;
+            resolve(tagData);
+          };
 
-      // Timeout של 30 שניות
-      setTimeout(() => {
-        if (resolveRef.current) {
-          resolveRef.current = null;
-          isNfcLocked = false;
-          setState(prev => ({ ...prev, isReading: false }));
-          resolve(null);
-        }
-      }, 30000);
-    });
+          setTimeout(() => {
+            if (resolveRef.current) {
+              resolveRef.current = null;
+              isNfcLocked = false;
+              setState(prev => ({ ...prev, isReading: false }));
+              resolve(null);
+            }
+          }, 30000);
+        });
+      }
+    } catch (error) {
+      console.log('[NFC] Error:', 'startReading', error);
+      setState(prev => ({ ...prev, isReading: false, error: 'Failed to read tag' }));
+      isNfcLocked = false;
+      
+      // ניקוי iOS session
+      if (Platform.OS === 'ios') {
+        try {
+          await NfcManager.cancelTechnologyRequest();
+        } catch {}
+      }
+      
+      return null;
+    }
   }, []);
 
   // עצירת קריאה ושחרור נעילה
