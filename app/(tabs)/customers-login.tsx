@@ -49,20 +49,6 @@ export default function CustomersLogin() {
 
   const brandColor = business?.login_brand_color || '#9747FF';
 
-  const updateStatusText = (() => {
-    try {
-      const v = Application.nativeApplicationVersion ?? '';
-      const build = Application.nativeBuildVersion ?? '';
-      const channel = (Updates as any)?.channel ?? '';
-      const updateId = Updates.updateId ?? '';
-      const embedded = Updates.isEmbeddedLaunch ? 'embedded' : '';
-      const effectiveUpdate = updateId || embedded || 'unknown';
-      return `Version: ${v} (${build}) | Channel: ${channel} | Update: ${effectiveUpdate}`;
-    } catch (e) {
-      return 'Version info unavailable';
-    }
-  })();
-
   // פונקציה לאימות ביומטרי (מוגדרת לפני שימוש ב-useEffect כדי לא ליצור ReferenceError)
   const authenticateBiometric = useCallback(async (): Promise<boolean> => {
     try {
@@ -380,7 +366,7 @@ export default function CustomersLogin() {
   return (
     <View style={styles(brandColor).container} accessible={false} importantForAccessibility="yes">
       {/* כפתור חזרה ל-iOS */}
-      <View style={{ position: 'absolute', top: 30, left: 10, zIndex: 100 }}>
+      <View style={{ position: 'absolute', bottom: 30, left: 10, zIndex: 100 }}>
         <BackButton fallbackRoute="/(tabs)/business_selector" color={brandColor} />
       </View>
       {/* אייקון המבורגר ממורכז בראש הדף */}
@@ -591,11 +577,6 @@ export default function CustomersLogin() {
                 )}
               </TouchableOpacity>
             )}
-
-            {/* חיווי עדכון (כדי לדעת בוודאות אם נכנס EAS Update) */}
-            <Text style={styles(brandColor).updateStatusText} accessibilityLabel={updateStatusText}>
-              {updateStatusText}
-            </Text>
           </View>
         </View>
       </View>
@@ -991,14 +972,6 @@ const styles = (brandColor: string) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: -10,
-    fontFamily: 'Rubik',
-  },
-  updateStatusText: {
-    marginTop: 10,
-    fontSize: 10,
-    color: '#A39393',
-    textAlign: 'center',
-    opacity: 0.6,
     fontFamily: 'Rubik',
   },
   errorText: {

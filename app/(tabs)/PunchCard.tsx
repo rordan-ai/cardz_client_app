@@ -97,21 +97,6 @@ export default function PunchCard() {
   const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const activityChannelRef = useRef<any>(null);
 
-  const updateStatusText = (() => {
-    try {
-      const v = Application.nativeApplicationVersion ?? '';
-      const build = Application.nativeBuildVersion ?? '';
-      const runtime = (Updates as any)?.runtimeVersion ?? '';
-      const channel = (Updates as any)?.channel ?? '';
-      const updateId = Updates.updateId ?? '';
-      const embedded = Updates.isEmbeddedLaunch ? 'embedded' : '';
-      const effectiveUpdate = updateId || embedded || 'unknown';
-      return `Version: ${v} (${build})\nRuntime: ${runtime}\nChannel: ${channel}\nUpdate: ${effectiveUpdate}`;
-    } catch (e) {
-      return 'Version info unavailable';
-    }
-  })();
-
   const [localBusiness, setLocalBusiness] = useState<{
     id?: number;
     business_code: string;
@@ -1684,7 +1669,7 @@ export default function PunchCard() {
     <>
     <ScrollView contentContainerStyle={styles.container}>
       {/* כפתור חזרה ל-iOS */}
-      <View style={{ position: 'absolute', top: 30, left: 10, zIndex: 100 }}>
+      <View style={{ position: 'absolute', bottom: 30, left: 10, zIndex: 100 }}>
         <BackButton fallbackRoute="/(tabs)/customers-login" color={brandColor} />
       </View>
       {/* תפריט המבורגר */}
@@ -1790,6 +1775,9 @@ export default function PunchCard() {
           <Text style={[styles.communityIconLabel, { color: cardTextColor }]}>הזמן חבר</Text>
         </View>
       </TouchableOpacity>
+      
+      {/* עטיפה להגדלת כל התוכן ב-25% (חוץ מאייקוני תפריט עליון) */}
+      <View style={{ transform: [{ scale: 1.25 }], width: '80%', alignSelf: 'center' }}>
       
       {/* מקשה אחת - לוגו, שם עסק ושם לקוח */}
       <View style={styles.topElementsGroup}>
@@ -1965,6 +1953,8 @@ export default function PunchCard() {
         <Text style={styles.cardCode}>#{cardCode}</Text>
       </View>
       )}
+      
+      </View>{/* סגירת עטיפת הגדלה 25% */}
       
              {/* מודאל תפריט המבורגר */}
        <Modal 
@@ -3215,11 +3205,6 @@ export default function PunchCard() {
               >
                 <Text style={[accessibilityStyles.contactItemClickable, { fontSize: 20 }]}>💬 בוואטסאפ: 055-248-2442</Text>
               </TouchableOpacity>
-
-              {/* סטטוס עדכון (כדי לוודא שהתקבל EAS Update) */}
-              <Text style={[accessibilityStyles.paragraph, { marginTop: 24, opacity: 0.75 }]}>
-                {updateStatusText}
-              </Text>
 
               <View style={{ height: 100 }} />
             </ScrollView>
