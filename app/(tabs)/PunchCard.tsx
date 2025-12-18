@@ -1924,24 +1924,16 @@ export default function PunchCard() {
         </Text>
 
         {/* כפתור NFC ל-iOS בלבד - באנדרואיד הסריקה אוטומטית */}
-        {Platform.OS === 'ios' && nfcSupported && (
+        {Platform.OS === 'ios' && (
           <TouchableOpacity
             style={{
               marginTop: 20,
-              backgroundColor: brandColor,
-              paddingVertical: 14,
-              paddingHorizontal: 32,
-              borderRadius: 25,
-              flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 4,
             }}
             onPress={async () => {
               try {
+                await initNFC();
                 const tagData = await startReading();
                 if (tagData) {
                   setNfcModalVisible(true);
@@ -1953,9 +1945,11 @@ export default function PunchCard() {
             accessibilityLabel="סרוק תג NFC לניקוב"
             accessibilityRole="button"
           >
-            <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600', fontFamily: 'Rubik' }}>
-              📱 סרוק לניקוב
-            </Text>
+            <Image 
+              source={require('../../assets/icons/NFC_ISO_BOTTEN.png')}
+              style={{ width: 80, height: 80 }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         )}
       </View>
