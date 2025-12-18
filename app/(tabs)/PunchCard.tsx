@@ -1667,14 +1667,16 @@ export default function PunchCard() {
 
   return (
     <>
+      {/* כפתור חזרה ל-iOS - מחוץ ל-ScrollView */}
+      {Platform.OS === 'ios' && (
+        <View style={{ position: 'absolute', top: 50, left: 10, zIndex: 100 }}>
+          <BackButton fallbackRoute="/(tabs)/customers-login" color={brandColor} />
+        </View>
+      )}
     <ScrollView contentContainerStyle={styles.container}>
-      {/* כפתור חזרה ל-iOS */}
-      <View style={{ position: 'absolute', bottom: 30, left: 10, zIndex: 100 }}>
-        <BackButton fallbackRoute="/(tabs)/customers-login" color={brandColor} />
-      </View>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
-        style={[styles.hamburgerContainer, styles.topIconOffsetClean]}
+        style={[styles.hamburgerContainer, styles.topIconOffsetClean, __DEV__ && { borderWidth: 2, borderColor: 'red' }]}
         onPress={() => setMenuVisible(true)}
         accessibilityLabel="אפשרויות נוספות"
         accessibilityRole="button"
@@ -1692,7 +1694,7 @@ export default function PunchCard() {
 
       {/* אייקון הודעות דואר */}
       <TouchableOpacity 
-        style={[styles.mailIconContainer, styles.topIconOffsetClean]}
+        style={[styles.mailIconContainer, styles.topIconOffsetClean, __DEV__ && { borderWidth: 2, borderColor: 'red' }]}
         accessibilityLabel={`הדואר שלי${unreadMessages > 0 ? `, ${unreadMessages} הודעות שלא נקראו` : ''}`}
         accessibilityRole="button"
         accessibilityHint="לחץ לצפייה בהודעות שהתקבלו מהעסק"
@@ -1760,7 +1762,7 @@ export default function PunchCard() {
 
       {/* אייקון קבוצה באמצע */}
       <TouchableOpacity 
-        style={[styles.communityIconContainer, styles.topIconOffsetClean]}
+        style={[styles.communityIconContainer, styles.topIconOffsetClean, __DEV__ && { borderWidth: 2, borderColor: 'red' }]}
         onPress={() => setReferralVisible(true)}
         accessibilityLabel="הזמן חבר"
         accessibilityRole="button"
@@ -1918,6 +1920,7 @@ export default function PunchCard() {
               marginTop: 20,
               alignItems: 'center',
               justifyContent: 'center',
+              ...(__DEV__ && { borderWidth: 2, borderColor: 'red' }),
             }}
             onPress={async () => {
               try {
