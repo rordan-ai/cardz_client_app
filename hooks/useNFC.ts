@@ -192,12 +192,21 @@ export const useNFC = (): UseNFCReturn => {
   }, []);
 
   // פענוח מזהה עסק מהמחרוזת
+  // תומך בשני פורמטים:
+  // 1. Text Record: "0002" (תאימות לאחור)
+  // 2. URI Record: "mycardz://business/0002" (חדש - עובד ברקע ב-iOS)
   const parseBusinessId = useCallback((tagData: string): string | null => {
     if (!tagData) return null;
     
-    // המחרוזת צריכה להיות בפורמט שהאדמין הגדיר
-    // פשוט מחזירים את המחרוזת כמות שהיא - ההתאמה תתבצע מול DB
-    console.log('[NFC] Business identified:', tagData);
+    // אם זה URI עם scheme שלנו - חילוץ business code
+    if (tagData.startsWith('mycardz://business/')) {
+      const businessCode = tagData.replace('mycardz://business/', '');
+      console.log('[NFC] Business identified from URI:', businessCode);
+      return businessCode;
+    }
+    
+    // אחרת - מחרוזת פשוטה (תאימות לאחור לתגים ישנים)
+    console.log('[NFC] Business identified from text:', tagData);
     return tagData;
   }, []);
 
