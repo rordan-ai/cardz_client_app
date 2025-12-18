@@ -830,14 +830,16 @@ const styles = StyleSheet.create({
   // New touchable areas
   hamburgerArea: {
     position: 'absolute',
-    top: 171,
-    right: 138,
+    top: 177, // 171 + 6 (למטה)
+    right: 128, // 138 - 10 (שמאלה)
     width: 47,
     height: 47,
     backgroundColor: 'transparent',
     borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'red', // debug
   },
   hamburgerIcon: {
     width: 28,
@@ -848,13 +850,15 @@ const styles = StyleSheet.create({
   },
   selectBusinessArea: {
     position: 'absolute',
-    bottom: 85,
+    bottom: 95, // 85 + 10 (למעלה)
     left: '50%',
     marginLeft: -82.5,
     width: 160,
     height: 50,
     backgroundColor: 'transparent',
     borderRadius: 25,
+    borderWidth: 2,
+    borderColor: 'red', // debug
   },
   creditsArea: {
     position: 'absolute',
