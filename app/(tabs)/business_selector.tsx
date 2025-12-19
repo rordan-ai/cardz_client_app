@@ -266,8 +266,8 @@ export default function BusinessSelector() {
 
   return (
     <View style={styles.container}>
-      {/* גרסה לבדיקה - V13 */}
-      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V13</Text>
+      {/* גרסה לבדיקה - V14 */}
+      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V14</Text>
       {/* התמונה הסופית שלך עם שטחי מגע */}
       <ImageBackground
         source={require('../../assets/images/new_entry.png')}
@@ -375,7 +375,6 @@ export default function BusinessSelector() {
                 value={searchBusiness}
                 onChangeText={setSearchBusiness}
                 textAlign="right"
-                autoFocus
                 accessibilityLabel="חיפוש עסק"
                 accessibilityHint="הקלד שם עסק לחיפוש ברשימה"
               />
