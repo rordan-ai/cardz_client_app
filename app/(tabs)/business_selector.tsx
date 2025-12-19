@@ -191,24 +191,30 @@ export default function BusinessSelector() {
 
   // כשהמודאל נפתח - בדיקה אם להציג הסבר מיקום
   const handleOpenModal = useCallback(() => {
-    setModalVisible(true);
-    
-    // אם עוד לא שאלנו על מיקום ויש עסקים
+    // אם עוד לא שאלנו על מיקום ויש עסקים - קודם מציגים מודאל מיקום
     if (!locationAsked && businesses.length > 0) {
       setLocationExplanationVisible(true);
+    } else {
+      // אחרת - ישר פותחים את רשימת העסקים
+      setModalVisible(true);
     }
   }, [locationAsked, businesses.length]);
 
   // המשתמש אישר שימוש במיקום
   const handleLocationAccept = useCallback(() => {
     setLocationExplanationVisible(false);
+    setLocationAsked(true);
     requestLocationAndSort();
+    // פותחים את מודאל בחירת העסקים
+    setModalVisible(true);
   }, [requestLocationAndSort]);
 
   // המשתמש דחה שימוש במיקום
   const handleLocationDecline = useCallback(() => {
     setLocationExplanationVisible(false);
     setLocationAsked(true);
+    // פותחים את מודאל בחירת העסקים
+    setModalVisible(true);
   }, []);
 
   // פילטור עסקים לפי חיפוש
@@ -266,8 +272,8 @@ export default function BusinessSelector() {
 
   return (
     <View style={styles.container}>
-      {/* גרסה לבדיקה - V14 */}
-      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V14</Text>
+      {/* גרסה לבדיקה - V15 */}
+      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V15</Text>
       {/* התמונה הסופית שלך עם שטחי מגע */}
       <ImageBackground
         source={require('../../assets/images/new_entry.png')}
