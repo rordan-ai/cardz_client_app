@@ -266,8 +266,8 @@ export default function BusinessSelector() {
 
   return (
     <View style={styles.container}>
-      {/* גרסה לבדיקה - V7 */}
-      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V7</Text>
+      {/* גרסה לבדיקה - V8 */}
+      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V8</Text>
       {/* התמונה הסופית שלך עם שטחי מגע */}
       <ImageBackground
         source={require('../../assets/images/new_entry.png')}
@@ -832,8 +832,8 @@ const styles = StyleSheet.create({
   // New touchable areas
   hamburgerArea: {
     position: 'absolute',
-    top: 213, // +10 למטה
-    right: 148, // +10 ימינה
+    top: 223, // +10 למטה
+    right: 168, // +20 שמאלה
     width: 47,
     height: 47,
     backgroundColor: 'transparent',
@@ -852,10 +852,10 @@ const styles = StyleSheet.create({
   },
   selectBusinessArea: {
     position: 'absolute',
-    bottom: 122, // +13 למעלה
+    bottom: 119, // -3 למטה
     left: '50%',
-    marginLeft: -82.5,
-    width: 160,
+    marginLeft: -92,
+    width: 184, // +15% רוחב
     height: 50,
     backgroundColor: 'transparent',
     borderRadius: 25,
