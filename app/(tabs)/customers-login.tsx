@@ -959,7 +959,7 @@ const styles = (brandColor: string) => StyleSheet.create({
   },
   biometricButton: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 20 : -85, // iOS: הורד 60px למטה
+    bottom: Platform.OS === 'ios' ? -130 : -85, // iOS: הורד 150 נוספים למטה
     alignSelf: 'center',
     padding: 10,
     alignItems: 'center',
