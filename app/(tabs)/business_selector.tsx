@@ -266,8 +266,8 @@ export default function BusinessSelector() {
 
   return (
     <View style={styles.container}>
-      {/* גרסה לבדיקה - V10 */}
-      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V10</Text>
+      {/* גרסה לבדיקה - V11 */}
+      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V11</Text>
       {/* התמונה הסופית שלך עם שטחי מגע */}
       <ImageBackground
         source={require('../../assets/images/new_entry.png')}
@@ -833,9 +833,9 @@ const styles = StyleSheet.create({
   hamburgerArea: {
     position: 'absolute',
     top: 230,
-    right: 188, // +10 ימינה
-    width: 54, // +15% רוחב
-    height: 47,
+    right: 191, // +3 שמאלה
+    width: 59, // +10% (שמירת יחס)
+    height: 52, // +10% (שמירת יחס)
     backgroundColor: 'transparent',
     borderRadius: 5,
     alignItems: 'center',
