@@ -266,6 +266,8 @@ export default function BusinessSelector() {
 
   return (
     <View style={styles.container}>
+      {/* גרסה לבדיקה - V7 */}
+      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V7</Text>
       {/* התמונה הסופית שלך עם שטחי מגע */}
       <ImageBackground
         source={require('../../assets/images/new_entry.png')}
