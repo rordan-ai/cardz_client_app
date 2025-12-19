@@ -567,7 +567,7 @@ export default function CustomersLogin() {
                   source={Platform.OS === 'ios' ? FaceRecognitionIcon : BiometricIcon}
                   style={[
                     styles(brandColor).biometricIcon,
-                    { tintColor: brandColor }, // צבע brand לשני הפלטפורמות
+                    Platform.OS === 'android' && { tintColor: brandColor }, // tintColor רק לאנדרואיד
                     { opacity: biometricSetupDone ? 1 : 0.6 }
                   ]} 
                   resizeMode="contain"
@@ -959,7 +959,7 @@ const styles = (brandColor: string) => StyleSheet.create({
   },
   biometricButton: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? -130 : -85, // iOS: הורד 150 נוספים למטה
+    bottom: Platform.OS === 'ios' ? -190 : -85, // iOS: הורד 60 נוספים למטה
     alignSelf: 'center',
     padding: 10,
     alignItems: 'center',
