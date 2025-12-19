@@ -22,7 +22,7 @@ const WhatsappIcon = require('../../assets/images/whatsapp.png');
 const ClickIcon = require('../../assets/images/5.png');
 const HamburgerIcon = require('../../assets/images/hamburger_menu.png');
 const BiometricIcon = require('../../assets/icons/biometric.png');
-const FaceRecognitionIcon = require('../../assets/icons/face_recognition.png');
+const FaceRecognitionIcon = require('../../assets/icons/Face ID.png');
 
 const windowWidth = Dimensions.get('window').width;
 
@@ -494,7 +494,7 @@ export default function CustomersLogin() {
               />
             </View>
             <TouchableOpacity
-              style={[styles(brandColor).clickBtn, { backgroundColor: brandColor }, { borderWidth: 2, borderColor: 'red' }]}
+              style={[styles(brandColor).clickBtn, { backgroundColor: brandColor }]}
               onPress={handleLogin}
               accessibilityLabel="כניסה לכרטיסייה"
               accessibilityRole="button"
@@ -557,7 +557,7 @@ export default function CustomersLogin() {
             {/* אייקון כניסה ביומטרית (iOS: FaceID) - מוסתר כשמודאל ההגדרה או האימות פתוחים */}
             {biometricAvailable && !biometricSetupModalVisible && !biometricAuthInProgress && (
               <TouchableOpacity
-                style={[styles(brandColor).biometricButton, { borderWidth: 2, borderColor: 'red' }]}
+                style={styles(brandColor).biometricButton}
                 onPress={handleBiometricPress}
                 accessibilityLabel={biometricSetupDone ? "כניסה מהירה עם זיהוי ביומטרי" : "הגדרת כניסה ביומטרית"}
                 accessibilityRole="button"
@@ -567,7 +567,7 @@ export default function CustomersLogin() {
                   source={Platform.OS === 'ios' ? FaceRecognitionIcon : BiometricIcon}
                   style={[
                     styles(brandColor).biometricIcon,
-                    Platform.OS === 'android' && { tintColor: brandColor }, // tintColor רק לאנדרואיד
+                    { tintColor: brandColor }, // צבע המותג לשני הפלטפורמות
                     { opacity: biometricSetupDone ? 1 : 0.6 }
                   ]} 
                   resizeMode="contain"
