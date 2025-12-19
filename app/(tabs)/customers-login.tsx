@@ -22,7 +22,7 @@ const WhatsappIcon = require('../../assets/images/whatsapp.png');
 const ClickIcon = require('../../assets/images/5.png');
 const HamburgerIcon = require('../../assets/images/hamburger_menu.png');
 const BiometricIcon = require('../../assets/icons/biometric.png');
-const FaceRecognitionIcon = require('../../assets/icons/Face ID.png');
+const FaceRecognitionIcon = require('../../assets/icons/Face ID (1).png');
 
 const windowWidth = Dimensions.get('window').width;
 
