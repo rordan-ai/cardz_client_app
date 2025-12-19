@@ -830,8 +830,8 @@ const styles = StyleSheet.create({
   // New touchable areas
   hamburgerArea: {
     position: 'absolute',
-    top: 203, // +6 למטה
-    right: 158, // +10 שמאלה
+    top: 213, // +10 למטה
+    right: 148, // +10 ימינה
     width: 47,
     height: 47,
     backgroundColor: 'transparent',
@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
   },
   selectBusinessArea: {
     position: 'absolute',
-    bottom: 109, // +2 למעלה
+    bottom: 122, // +13 למעלה
     left: '50%',
     marginLeft: -82.5,
     width: 160,
