@@ -272,8 +272,8 @@ export default function BusinessSelector() {
 
   return (
     <View style={styles.container}>
-      {/* גרסה לבדיקה - V15 */}
-      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V15</Text>
+      {/* גרסה לבדיקה - V16 */}
+      <Text style={{ position: 'absolute', top: 50, left: 10, zIndex: 9999, color: 'red', fontSize: 16, fontWeight: 'bold' }}>V16</Text>
       {/* התמונה הסופית שלך עם שטחי מגע */}
       <ImageBackground
         source={require('../../assets/images/new_entry.png')}
