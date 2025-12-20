@@ -1897,9 +1897,9 @@ export default function PunchCard() {
         ))}
         </View>
       </View>
-      {/* 4 הטקסטים התחתונים - מוזחים דינמית רק ב-4 שורות */}
+      {/* 4 הטקסטים התחתונים - מוזחים דינמית */}
       <View style={[styles.bottomTextsUpOffset, { 
-        marginTop: rows.length === 4 ? -80 : 0 
+        marginTop: rows.length === 3 ? -30 : rows.length === 4 ? -80 : 0 
       }]}>
         {/* עטיפה ל-4 הטקסטים בלבד - ב-4 שורות יורדים 10px */}
         <View style={[{ alignItems: 'center' }, rows.length === 4 ? { marginTop: 10 } : {}]}>
@@ -1955,7 +1955,7 @@ export default function PunchCard() {
       
       {/* ברקוד - מוסתר מתחת לקיפול, מתגלה בגלילה */}
       {cardCode && (
-      <View style={{ marginTop: 200, alignItems: 'center', width: '100%', paddingBottom: 10 }}>
+      <View style={{ marginTop: rows.length === 3 ? 170 : 200, alignItems: 'center', width: '100%', paddingBottom: 10 }}>
         <View style={{ maxWidth: 250, width: '70%' }}>
           <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
         </View>
