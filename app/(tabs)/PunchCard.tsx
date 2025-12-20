@@ -1922,7 +1922,7 @@ export default function PunchCard() {
         {Platform.OS === 'ios' && (
           <TouchableOpacity
             style={{
-              marginTop: 20,
+              marginTop: rows.length === 3 ? 10 : 20,
               alignItems: 'center',
               justifyContent: 'center',
             }}
