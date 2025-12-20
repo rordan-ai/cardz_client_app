@@ -1827,14 +1827,12 @@ export default function PunchCard() {
       </View>
       {/* עטיפה מבודדת ל-2 ו-3 שורות */}
       <View style={{ marginTop: rows.length === 2 ? 90 : rows.length === 3 ? 60 : 0 }}>
-        {/* עטיפה פנימית לשם לקוח + גריד - ב-3 שורות בלבד יורד עוד 30px */}
-        <View style={{ marginTop: rows.length === 3 ? 30 : 0 }}>
-                 {/* שם הלקוח - ב-4 שורות עולה 20px */}
-         <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 4 ? (Platform.OS === 'ios' ? 100 : 40) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
+                 {/* שם הלקוח - ב-3 שורות יורד עוד 30px, ב-4 שורות עולה */}
+         <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 3 ? 30 : rows.length === 4 ? (Platform.OS === 'ios' ? 100 : 40) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
       {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
       <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-        {/* אייקונים - מוזחים 5% למעלה, ב-4 שורות יורד 20px */}
-        <View style={[styles.iconsUpOffset, rows.length === 4 ? { marginTop: 20 } : {}]}>
+        {/* אייקונים - ב-3 שורות יורד עוד 30px, ב-4 שורות יורד 20px */}
+        <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: 30 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
         <View style={styles.iconsBoxTight}>
         {rows.map((row, idx) => (
           <View key={idx} style={styles.iconsRow}>
@@ -1899,7 +1897,6 @@ export default function PunchCard() {
         ))}
         </View>
       </View>
-        </View>{/* סגירת עטיפה פנימית לשם לקוח + גריד */}
       {/* 4 הטקסטים התחתונים - מוזחים דינמית רק ב-4 שורות */}
       <View style={[styles.bottomTextsUpOffset, { 
         marginTop: rows.length === 4 ? -80 : 0 
