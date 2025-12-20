@@ -525,8 +525,8 @@ export default function PunchCard() {
         return;
       }
       
-      // באנדרואיד - התחלה אוטומטית
-      startNFCListening();
+        // באנדרואיד - התחלה אוטומטית
+        startNFCListening();
     };
     
     setupNFC();
@@ -563,8 +563,8 @@ export default function PunchCard() {
           table: 'PunchCards',
           filter: `card_number=eq.${cardNumber}`
         },
-        (payload: { new?: Record<string, any>; old?: Record<string, any> }) => {
-          if (payload.new) {
+                 (payload: { new?: Record<string, any>; old?: Record<string, any> }) => {
+           if (payload.new) {
             // לשמור על product_name (שמגיע מטבלת products) גם לאחר עדכוני Realtime
             setPunchCard((prev) => ({
               ...(prev || {}),
@@ -1829,8 +1829,8 @@ export default function PunchCard() {
       </View>
       {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
       <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-        {/* אייקונים - מוזחים 5% למעלה */}
-        <View style={styles.iconsUpOffset}>
+        {/* אייקונים - מוזחים 5% למעלה, ב-4 שורות יורד 10px */}
+        <View style={[styles.iconsUpOffset, rows.length === 4 ? { marginTop: 10 } : {}]}>
         <View style={styles.iconsBoxTight}>
         {rows.map((row, idx) => (
           <View key={idx} style={styles.iconsRow}>
@@ -1897,7 +1897,7 @@ export default function PunchCard() {
       </View>
       {/* 4 הטקסטים התחתונים - מוזחים דינמית לפי מספר שורות הגריד */}
       <View style={[styles.bottomTextsUpOffset, { 
-        marginTop: rows.length <= 2 ? 0 : -60 
+        marginTop: rows.length <= 2 ? 0 : rows.length === 3 ? -60 : -70 
       }]}>
         {/* ניקובים */}
         <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
