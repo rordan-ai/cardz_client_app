@@ -42,12 +42,17 @@ export const useBusiness = () => useContext(BusinessContext);
 
 export const BusinessProvider = ({ children }: { children: React.ReactNode }) => {
   const [business, setBusiness] = useState<Business | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // מתחיל כ-false כי אין עסק לטעון בהתחלה
   const [currentBusinessCode, setCurrentBusinessCode] = useState<string | null>(null);
 
   const fetchBusiness = async (businessCode?: string) => {
-    setLoading(true);
     const codeToFetch = businessCode || currentBusinessCode;
+    if (!codeToFetch) {
+      console.log('[BusinessContext] No business code to fetch');
+      setLoading(false);
+      return null;
+    }
+    setLoading(true);
     const { data, error } = await supabase
       .from('businesses')
       .select('*')
