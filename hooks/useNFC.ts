@@ -41,18 +41,61 @@ export const useNFC = (): UseNFCReturn => {
 
   const resolveRef = useRef<((value: string | null) => void) | null>(null);
 
-  // פענוח תג NFC
+  // פענוח תג NFC - תומך ב-Text Records וגם URI Records
   const parseTag = (tag: any): string | null => {
     if (!tag) return null;
     
     if (tag.ndefMessage && tag.ndefMessage.length > 0) {
       const ndefRecord = tag.ndefMessage[0];
-      if (ndefRecord.payload) {
-        const payload = ndefRecord.payload;
+      
+      // בדיקת סוג הרשומה: TNF (Type Name Format)
+      // TNF=1 עם RTD="T" = Text Record
+      // TNF=1 עם RTD="U" = URI Record
+      const tnf = ndefRecord.tnf;
+      const type = ndefRecord.type;
+      const payload = ndefRecord.payload;
+      
+      if (!payload || payload.length === 0) return null;
+      
+      // זיהוי סוג הרשומה לפי type
+      const typeString = type ? String.fromCharCode(...type) : '';
+      console.log('[NFC] Record type:', typeString, 'TNF:', tnf);
+      
+      // URI Record (type = "U" או 0x55)
+      if (typeString === 'U' || (type && type[0] === 0x55)) {
+        // URI Record: בית ראשון = prefix code, שאר = URI
+        const prefixCode = payload[0];
+        const uriBytes = payload.slice(1);
+        const uriPath = String.fromCharCode(...uriBytes);
+        
+        // Prefix codes נפוצים (לפי NDEF spec)
+        const prefixes: { [key: number]: string } = {
+          0x00: '',           // No prefix
+          0x01: 'http://www.',
+          0x02: 'https://www.',
+          0x03: 'http://',
+          0x04: 'https://',
+        };
+        
+        const prefix = prefixes[prefixCode] || '';
+        const fullUri = prefix + uriPath;
+        console.log('[NFC] URI Record parsed:', fullUri);
+        return fullUri;
+      }
+      
+      // Text Record (type = "T" או 0x54) - פורמט ישן
+      if (typeString === 'T' || (type && type[0] === 0x54) || !typeString) {
+        // Text Record: בית ראשון = אורך קוד שפה, אחריו טקסט
         const langCodeLength = payload[0] & 0x3f;
         const textBytes = payload.slice(1 + langCodeLength);
-        return String.fromCharCode(...textBytes);
+        const text = String.fromCharCode(...textBytes);
+        console.log('[NFC] Text Record parsed:', text);
+        return text;
       }
+      
+      // Fallback - נסה לקרוא כטקסט רגיל
+      console.log('[NFC] Unknown record type, trying raw text');
+      return String.fromCharCode(...payload);
     }
     return null;
   };
