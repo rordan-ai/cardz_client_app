@@ -1824,9 +1824,11 @@ export default function PunchCard() {
             )}
           </View>
         </View>
+      </View>
+      {/* עטיפה מבודדת ל-2 ו-3 שורות - ירידה של 60px */}
+      <View style={{ marginTop: rows.length <= 3 ? 60 : 0 }}>
                  {/* שם הלקוח - ב-4 שורות עולה 20px */}
          <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 4 ? (Platform.OS === 'ios' ? 100 : 40) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
-      </View>
       {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
       <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
         {/* אייקונים - מוזחים 5% למעלה, ב-4 שורות יורד 20px */}
@@ -1901,21 +1903,21 @@ export default function PunchCard() {
       }]}>
         {/* עטיפה ל-4 הטקסטים בלבד - ב-4 שורות יורדים 10px */}
         <View style={[{ alignItems: 'center' }, rows.length === 4 ? { marginTop: 10 } : {}]}>
-          {/* ניקובים */}
-          <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
-          {/* טקסט מתחת לאייקונים */}
-          <Text style={[styles.benefitText, { color: cardTextColor }]} accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefit}`}>
-            נותרו {unpunched} ניקובים לקבלת {benefit}
-          </Text>
-          {/* סטטוס תשלום מראש */}
-          <Text style={[styles.prepaidText, { color: cardTextColor }]}>תשלום מראש: {prepaid}</Text>
-          
-          {/* תאריך תפוגה */}
-          <Text style={[styles.expirationText, { color: cardTextColor }]}>
-            בתוקף עד: {business?.expiration_date 
-              ? new Date(business.expiration_date).toLocaleDateString('he-IL') 
-              : 'ללא זמן תפוגה'}
-          </Text>
+        {/* ניקובים */}
+        <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
+        {/* טקסט מתחת לאייקונים */}
+        <Text style={[styles.benefitText, { color: cardTextColor }]} accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefit}`}>
+          נותרו {unpunched} ניקובים לקבלת {benefit}
+        </Text>
+        {/* סטטוס תשלום מראש */}
+        <Text style={[styles.prepaidText, { color: cardTextColor }]}>תשלום מראש: {prepaid}</Text>
+        
+        {/* תאריך תפוגה */}
+        <Text style={[styles.expirationText, { color: cardTextColor }]}>
+          בתוקף עד: {business?.expiration_date 
+            ? new Date(business.expiration_date).toLocaleDateString('he-IL') 
+            : 'ללא זמן תפוגה'}
+        </Text>
         </View>
 
         {/* כפתור NFC ל-iOS בלבד - באנדרואיד הסריקה אוטומטית */}
@@ -1961,6 +1963,7 @@ export default function PunchCard() {
       </View>
       )}
       
+      </View>{/* סגירת עטיפת 2/3 שורות */}
       </View>{/* סגירת עטיפת הגדלה 25% */}
       
              {/* מודאל תפריט המבורגר */}
