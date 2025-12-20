@@ -1667,9 +1667,9 @@ export default function PunchCard() {
 
   return (
     <>
-      {/* כפתור חזרה ל-iOS - מחוץ ל-ScrollView */}
+      {/* כפתור חזרה ל-iOS - בתחתית המסך */}
       {Platform.OS === 'ios' && (
-        <View style={{ position: 'absolute', top: 50, left: 10, zIndex: 100 }}>
+        <View style={{ position: 'absolute', bottom: 40, left: 10, zIndex: 100 }}>
           <BackButton fallbackRoute="/(tabs)/customers-login" color={brandColor} />
         </View>
       )}
