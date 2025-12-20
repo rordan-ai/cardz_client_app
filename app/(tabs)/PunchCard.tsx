@@ -1899,7 +1899,7 @@ export default function PunchCard() {
       </View>
       {/* 4 הטקסטים התחתונים - מוזחים דינמית */}
       <View style={[styles.bottomTextsUpOffset, { 
-        marginTop: rows.length === 3 ? -30 : rows.length === 4 ? -80 : 0 
+        marginTop: rows.length === 3 ? -70 : rows.length === 4 ? -80 : 0 
       }]}>
         {/* עטיפה ל-4 הטקסטים בלבד - ב-4 שורות יורדים 10px */}
         <View style={[{ alignItems: 'center' }, rows.length === 4 ? { marginTop: 10 } : {}]}>
