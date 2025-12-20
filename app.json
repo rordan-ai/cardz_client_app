@@ -24,7 +24,12 @@
         "NSUserNotificationUsageDescription": "האפליקציה שולחת התראות על שוברים והטבות חדשות.",
         "NSLocationWhenInUseUsageDescription": "האפליקציה משתמשת במיקום שלך כדי להציג עסקים קרובים אליך ראשונים ברשימה. המיקום לא נשמר ולא משותף.",
         "NFCReaderUsageDescription": "האפליקציה משתמשת ב-NFC לניקוב כרטיסיות בעסקים",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["mycardz"]
+          }
+        ]
       },
       "runtimeVersion": {
         "policy": "appVersion"
