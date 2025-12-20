@@ -1824,11 +1824,11 @@ export default function PunchCard() {
             )}
           </View>
         </View>
-                 {/* שם הלקוח - ב-4 שורות עולה 60px */}
-         <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 4 ? (Platform.OS === 'ios' ? 60 : 0) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
+                 {/* שם הלקוח - ב-4 שורות עולה 30px */}
+         <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 4 ? (Platform.OS === 'ios' ? 90 : 30) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
       </View>
-      {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 60px */}
-      <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -60 } : {}]}>
+      {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 30px */}
+      <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -30 } : {}]}>
         {/* אייקונים - מוזחים 5% למעלה */}
         <View style={styles.iconsUpOffset}>
         <View style={styles.iconsBoxTight}>
