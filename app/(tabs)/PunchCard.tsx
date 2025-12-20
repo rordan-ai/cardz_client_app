@@ -1895,9 +1895,9 @@ export default function PunchCard() {
         ))}
         </View>
       </View>
-      {/* 4 הטקסטים התחתונים - מוזחים דינמית לפי מספר שורות הגריד */}
+      {/* 4 הטקסטים התחתונים - מוזחים דינמית רק ב-4 שורות */}
       <View style={[styles.bottomTextsUpOffset, { 
-        marginTop: rows.length <= 2 ? 0 : rows.length === 3 ? -60 : -80 
+        marginTop: rows.length === 4 ? -80 : 0 
       }]}>
         {/* עטיפה ל-4 הטקסטים בלבד - ב-4 שורות יורדים 10px */}
         <View style={[{ alignItems: 'center' }, rows.length === 4 ? { marginTop: 10 } : {}]}>
