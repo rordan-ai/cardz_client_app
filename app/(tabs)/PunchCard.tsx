@@ -1779,7 +1779,7 @@ export default function PunchCard() {
       </TouchableOpacity>
       
       {/* עטיפה להגדלת כל התוכן ב-25% (חוץ מאייקוני תפריט עליון) */}
-      <View style={{ transform: [{ scale: 1.25 }], width: '80%', alignSelf: 'center', marginTop: 20 }}>
+      <View style={{ transform: [{ scale: 1.25 }], width: '80%', alignSelf: 'center', marginTop: 80 }}>
       
       {/* מקשה אחת - לוגו, שם עסק ושם לקוח */}
       <View style={styles.topElementsGroup}>
