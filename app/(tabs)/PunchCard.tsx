@@ -1829,8 +1829,8 @@ export default function PunchCard() {
       </View>
       {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
       <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-        {/* אייקונים - מוזחים 5% למעלה, ב-4 שורות יורד 10px */}
-        <View style={[styles.iconsUpOffset, rows.length === 4 ? { marginTop: 10 } : {}]}>
+        {/* אייקונים - מוזחים 5% למעלה, ב-4 שורות יורד 20px */}
+        <View style={[styles.iconsUpOffset, rows.length === 4 ? { marginTop: 20 } : {}]}>
         <View style={styles.iconsBoxTight}>
         {rows.map((row, idx) => (
           <View key={idx} style={styles.iconsRow}>
@@ -1897,7 +1897,7 @@ export default function PunchCard() {
       </View>
       {/* 4 הטקסטים התחתונים - מוזחים דינמית לפי מספר שורות הגריד */}
       <View style={[styles.bottomTextsUpOffset, { 
-        marginTop: rows.length <= 2 ? 0 : rows.length === 3 ? -60 : -70 
+        marginTop: rows.length <= 2 ? 0 : rows.length === 3 ? -60 : -80 
       }]}>
         {/* ניקובים */}
         <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
