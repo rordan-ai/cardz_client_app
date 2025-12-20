@@ -65,11 +65,6 @@ export default function RootLayout() {
             return;
           }
 
-          // המרת טלפון לפורמט בינלאומי
-          const phoneIntl = savedPhone.startsWith('05') 
-            ? `972${savedPhone.slice(1)}` 
-            : savedPhone;
-
           // בדיקה 2: שליפת פרטי עסק ומצב ניקוב
           const { data: businessData } = await supabase
             .from('businesses')
@@ -83,7 +78,7 @@ export default function RootLayout() {
           const { data: cards } = await supabase
             .from('PunchCards')
             .select('card_number')
-            .eq('customer_phone', phoneIntl)
+            .eq('customer_phone', savedPhone)
             .eq('business_code', businessCode)
             .eq('status', 'active');
 
