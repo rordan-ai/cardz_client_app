@@ -4,7 +4,7 @@ import { Platform, Linking } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { useBusiness } from '../components/BusinessContext';
 import * as SecureStore from 'expo-secure-store';
-import { supabase } from '../utils/supabase';
+import { supabase } from '../components/supabaseClient';
 
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
 
