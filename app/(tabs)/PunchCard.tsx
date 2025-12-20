@@ -1900,7 +1900,7 @@ export default function PunchCard() {
         marginTop: rows.length <= 2 ? 0 : rows.length === 3 ? -60 : -80 
       }]}>
         {/* עטיפה ל-4 הטקסטים בלבד - ב-4 שורות יורדים 10px */}
-        <View style={rows.length === 4 ? { marginTop: 10 } : {}}>
+        <View style={[{ alignItems: 'center' }, rows.length === 4 ? { marginTop: 10 } : {}]}>
           {/* ניקובים */}
           <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
           {/* טקסט מתחת לאייקונים */}
