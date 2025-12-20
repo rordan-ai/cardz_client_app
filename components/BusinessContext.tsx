@@ -43,7 +43,7 @@ export const useBusiness = () => useContext(BusinessContext);
 export const BusinessProvider = ({ children }: { children: React.ReactNode }) => {
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentBusinessCode, setCurrentBusinessCode] = useState<string | null>('0001');
+  const [currentBusinessCode, setCurrentBusinessCode] = useState<string | null>(null);
 
   const fetchBusiness = async (businessCode?: string) => {
     setLoading(true);
@@ -73,9 +73,12 @@ export const BusinessProvider = ({ children }: { children: React.ReactNode }) =>
     await fetchBusiness(code);
   };
 
+  // לא טוען עסק אוטומטית - רק כשמגדירים business code מפורש
   useEffect(() => {
-    fetchBusiness();
-  }, []);
+    if (currentBusinessCode) {
+      fetchBusiness(currentBusinessCode);
+    }
+  }, [currentBusinessCode]);
 
   return (
     <BusinessContext.Provider value={{ 
