@@ -1831,8 +1831,8 @@ export default function PunchCard() {
          <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 3 ? 30 : rows.length === 4 ? (Platform.OS === 'ios' ? 100 : 40) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
       {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
       <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-        {/* אייקונים - ב-3 שורות יורד עוד 30px, ב-4 שורות יורד 20px */}
-        <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: 30 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
+        {/* אייקונים - ב-3 שורות עולה, ב-4 שורות יורד 20px */}
+        <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: 0 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
         <View style={styles.iconsBoxTight}>
         {rows.map((row, idx) => (
           <View key={idx} style={styles.iconsRow}>
