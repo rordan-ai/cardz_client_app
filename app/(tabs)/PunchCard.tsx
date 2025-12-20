@@ -1825,10 +1825,10 @@ export default function PunchCard() {
           </View>
         </View>
                  {/* שם הלקוח */}
-         <Text style={[styles.customerName, { color: cardTextColor }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
+         <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 4 ? (Platform.OS === 'ios' ? 60 : 0) : (Platform.OS === 'ios' ? 120 : 60) }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
       </View>
-      {/* כל התוכן מתחת לשם הלקוח - מוזח 10% למטה */}
-      <View style={styles.bottomContentOffset}>
+      {/* כל התוכן מתחת לשם הלקוח - מוזח 10% למטה, ב-4 שורות עולה 60px */}
+      <View style={[styles.bottomContentOffset, rows.length === 4 ? { transform: [{ translateY: height * 0.095 + 67 - 60 }] } : {}]}>
         {/* אייקונים - מוזחים 5% למעלה */}
         <View style={styles.iconsUpOffset}>
         <View style={styles.iconsBoxTight}>
@@ -1897,7 +1897,7 @@ export default function PunchCard() {
       </View>
       {/* 4 הטקסטים התחתונים - מוזחים דינמית לפי מספר שורות הגריד */}
       <View style={[styles.bottomTextsUpOffset, { 
-        marginTop: rows.length <= 2 ? 0 : rows.length === 3 ? -60 : -120 
+        marginTop: rows.length <= 2 ? 0 : rows.length === 3 ? -60 : -90 
       }]}>
         {/* ניקובים */}
         <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
