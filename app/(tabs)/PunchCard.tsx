@@ -123,29 +123,129 @@ export default function PunchCard() {
   const nfcLaunchHandled = useRef(false);
   const nfcCooldownRef = useRef(false); // מניעת פתיחה כפולה של מודאל NFC
 
-  // פתיחת מודאל NFC אוטומטית כשהאפליקציה נפתחה מתג NFC
+  // State לניקוב ישיר (autoPunch)
+  const [directPunchStatus, setDirectPunchStatus] = useState<'idle' | 'punching' | 'success' | 'error'>('idle');
+  const [directPunchMessage, setDirectPunchMessage] = useState<string>('');
+
+  // פתיחת מודאל NFC אוטומטית או ניקוב ישיר כשהאפליקציה נפתחה מתג NFC
   useEffect(() => {
-    // תנאים לפתיחת מודאל NFC אוטומטית:
+    // תנאים בסיסיים:
     // 1. nfcLaunch או autoPunch פעילים
     // 2. יש nfc_string לעסק
     // 3. לא כבר טיפלנו
     // 4. אין cooldown
-    // 5. במצב autoPunch - ממתינים גם לטעינת punchCard
-    const shouldAutoOpen = (isNfcLaunch || isAutoPunch) && 
+    const shouldProcess = (isNfcLaunch || isAutoPunch) && 
                            !nfcLaunchHandled.current && 
                            localBusiness?.nfc_string && 
                            !nfcCooldownRef.current;
     
-    // אם זה autoPunch, ממתינים לטעינת הכרטיסייה
-    const isReady = isAutoPunch ? (shouldAutoOpen && punchCard?.card_number) : shouldAutoOpen;
-    
-    if (isReady) {
-      nfcLaunchHandled.current = true;
-      console.log('[NFC PunchCard] Auto-opening NFC modal', { isNfcLaunch, isAutoPunch, cardNumber: punchCard?.card_number });
-      // המתנה קצרה לטעינת נתונים
+    if (!shouldProcess) return;
+
+    // במצב autoPunch - ממתינים לטעינת הכרטיסייה
+    if (isAutoPunch && !punchCard?.card_number) return;
+
+    // בדיקת תנאים לניקוב ישיר (בלי מודאל):
+    // 1. autoPunch פעיל
+    // 2. כרטיסייה prepaid
+    // 3. מצב auto
+    const isPrepaid = punchCard?.prepaid === 'כן';
+    const isAutoMode = localBusiness?.punch_mode === 'auto';
+    const canDirectPunch = isAutoPunch && isPrepaid && isAutoMode && punchCard?.card_number;
+
+    nfcLaunchHandled.current = true;
+
+    if (canDirectPunch) {
+      // ניקוב ישיר ללא פתיחת מודאל!
+      console.log('[NFC PunchCard] Direct punch - no modal needed!', { 
+        cardNumber: punchCard.card_number, 
+        isPrepaid, 
+        isAutoMode 
+      });
+      
+      // ביצוע ניקוב ישיר
+      const executeDirectPunch = async () => {
+        setDirectPunchStatus('punching');
+        setDirectPunchMessage('מבצע ניקוב...');
+        
+        try {
+          // בדיקת מצב נוכחי של הכרטיסייה
+          const { data: currentCard } = await supabase
+            .from('PunchCards')
+            .select('used_punches, total_punches')
+            .eq('card_number', punchCard.card_number)
+            .single();
+
+          if (!currentCard) {
+            setDirectPunchStatus('error');
+            setDirectPunchMessage('כרטיסייה לא נמצאה');
+            return;
+          }
+
+          const usedPunches = currentCard.used_punches;
+          const totalPunches = currentCard.total_punches;
+
+          // בדיקה אם הכרטיסייה מלאה
+          if (usedPunches >= totalPunches) {
+            setDirectPunchStatus('error');
+            setDirectPunchMessage('הכרטיסייה מלאה - פנה לקופאי לחידוש');
+            return;
+          }
+
+          // ביצוע הניקוב
+          const newPunches = usedPunches + 1;
+          const { error: updateError } = await supabase
+            .from('PunchCards')
+            .update({ used_punches: newPunches })
+            .eq('card_number', punchCard.card_number)
+            .lt('used_punches', totalPunches);
+
+          if (updateError) {
+            console.log('[NFC] Direct punch error:', updateError);
+            setDirectPunchStatus('error');
+            setDirectPunchMessage('שגיאה בביצוע ניקוב');
+            return;
+          }
+
+          // הוספה ללוג פעילות
+          await supabase.from('activity_logs').insert({
+            business_code: localBusiness?.business_code,
+            customer_phone: phoneIntl,
+            action: 'punch',
+            source: 'nfc_auto',
+            details: `ניקוב אוטומטי מ-NFC: ${newPunches}/${totalPunches}`
+          });
+
+          // עדכון state מקומי
+          setPunchCard(prev => prev ? { ...prev, used_punches: newPunches } : null);
+
+          // בדיקה אם זה ניקוב מזכה
+          const isRewardingPunch = newPunches >= totalPunches;
+          
+          setDirectPunchStatus('success');
+          setDirectPunchMessage(isRewardingPunch 
+            ? `🎉 מזל טוב! הגעת להטבה: ${punchCard.benefit}` 
+            : `✅ ניקוב ${newPunches}/${totalPunches} בוצע בהצלחה!`);
+
+          // איפוס אחרי 3 שניות
+          setTimeout(() => {
+            setDirectPunchStatus('idle');
+            setDirectPunchMessage('');
+          }, 3000);
+
+        } catch (err) {
+          console.log('[NFC] Direct punch exception:', err);
+          setDirectPunchStatus('error');
+          setDirectPunchMessage('שגיאה בביצוע ניקוב');
+        }
+      };
+
+      setTimeout(executeDirectPunch, 300);
+    } else {
+      // לא עומד בתנאים לניקוב ישיר - פתיחת מודאל
+      console.log('[NFC PunchCard] Opening NFC modal', { isNfcLaunch, isAutoPunch, cardNumber: punchCard?.card_number });
       setTimeout(() => setNfcModalVisible(true), 300);
     }
-  }, [isNfcLaunch, isAutoPunch, localBusiness?.nfc_string, punchCard?.card_number]);
+  }, [isNfcLaunch, isAutoPunch, localBusiness?.nfc_string, localBusiness?.punch_mode, punchCard?.card_number, punchCard?.prepaid, punchCard?.benefit, phoneIntl]);
 
   // פונקציה לסגירת מודאל NFC עם cooldown
   const closeNfcModalWithCooldown = () => {
@@ -3238,6 +3338,42 @@ export default function PunchCard() {
       </Modal>
 
     </ScrollView>
+
+      {/* הודעת סטטוס ניקוב ישיר (autoPunch) */}
+      {directPunchStatus !== 'idle' && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+        }}>
+          <View style={{
+            backgroundColor: directPunchStatus === 'success' ? '#4CAF50' : directPunchStatus === 'error' ? '#f44336' : brandColor,
+            padding: 30,
+            borderRadius: 20,
+            alignItems: 'center',
+            maxWidth: '80%',
+          }}>
+            {directPunchStatus === 'punching' && (
+              <ActivityIndicator size="large" color="#fff" style={{ marginBottom: 15 }} />
+            )}
+            <Text style={{
+              color: '#fff',
+              fontSize: 18,
+              fontFamily: 'Rubik',
+              textAlign: 'center',
+              fontWeight: 'bold',
+            }}>
+              {directPunchMessage}
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* מודאל ניקוב NFC */}
       {localBusiness && localBusiness.nfc_string && (

@@ -14,6 +14,7 @@ export default function RootLayout() {
   const deepLinkHandled = useRef(false);
   const isRouterReady = useRef(false);
   const pendingDeepLink = useRef<string | null>(null);
+  const lastDeepLinkTime = useRef<number>(0);
 
   // Deep Link Handler - מטפל ב-NFC URI מברקע (iOS + Android)
   useEffect(() => {
@@ -28,9 +29,19 @@ export default function RootLayout() {
     }, 500);
 
     const processDeepLink = async (url: string) => {
-      // מניעת טיפול כפול
-      if (deepLinkHandled.current) return;
+      // מניעת טיפול כפול - עם cooldown של 5 שניות
+      const now = Date.now();
+      if (deepLinkHandled.current && (now - lastDeepLinkTime.current) < 5000) {
+        console.log('[Deep Link] Ignored - cooldown active');
+        return;
+      }
       deepLinkHandled.current = true;
+      lastDeepLinkTime.current = now;
+      
+      // איפוס הדגל אחרי 5 שניות לאפשר deep links חדשים
+      setTimeout(() => {
+        deepLinkHandled.current = false;
+      }, 5000);
 
       console.log('[Deep Link] Processing URL:', url);
 
