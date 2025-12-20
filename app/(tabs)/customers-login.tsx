@@ -965,8 +965,8 @@ const styles = (brandColor: string) => StyleSheet.create({
     alignItems: 'center',
   },
   biometricIcon: {
-    width: Platform.OS === 'ios' ? 144 : 91, // +20% לiOS
-    height: Platform.OS === 'ios' ? 144 : 91, // +20% לiOS
+    width: Platform.OS === 'ios' ? 122 : 91, // iOS: 144 * 0.85 = 122 (הקטנה ב-15%)
+    height: Platform.OS === 'ios' ? 122 : 91, // iOS: 144 * 0.85 = 122 (הקטנה ב-15%)
   },
   biometricHint: {
     fontSize: 12,
