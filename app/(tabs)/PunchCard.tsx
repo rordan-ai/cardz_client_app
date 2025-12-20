@@ -36,7 +36,8 @@ export default function PunchCard() {
   const isAutoPunch = autoPunch === 'true';
   const phoneIntl = phoneStr && /^05\d{8}$/.test(phoneStr) ? `972${phoneStr.slice(1)}` : phoneStr;
   // קוד עסק: מפרמטר URL (לניקוב ישיר מ-NFC) או מהקונטקסט
-  const resolvedBusinessCode = (typeof businessCodeParam === 'string' ? businessCodeParam : null) || business?.business_code;
+  const businessCodeStr = typeof businessCodeParam === 'string' ? businessCodeParam : Array.isArray(businessCodeParam) ? businessCodeParam[0] : null;
+  const resolvedBusinessCode = businessCodeStr || business?.business_code;
   const [customer, setCustomer] = useState<{ 
     business_code: string; 
     name: string; 
