@@ -30,9 +30,10 @@ export default function PunchCard() {
   const router = useRouter();
   const navigation = useNavigation();
   const { business, refresh: refreshBusiness } = useBusiness();
-  const { phone, nfcLaunch } = useLocalSearchParams();
+  const { phone, nfcLaunch, autoPunch } = useLocalSearchParams();
   const phoneStr = typeof phone === 'string' ? phone.trim() : Array.isArray(phone) ? phone[0].trim() : '';
   const isNfcLaunch = nfcLaunch === 'true';
+  const isAutoPunch = autoPunch === 'true';
   const phoneIntl = phoneStr && /^05\d{8}$/.test(phoneStr) ? `972${phoneStr.slice(1)}` : phoneStr;
   const [customer, setCustomer] = useState<{ 
     business_code: string; 
@@ -124,13 +125,27 @@ export default function PunchCard() {
 
   // פתיחת מודאל NFC אוטומטית כשהאפליקציה נפתחה מתג NFC
   useEffect(() => {
-    if (isNfcLaunch && !nfcLaunchHandled.current && localBusiness?.nfc_string && !nfcCooldownRef.current) {
+    // תנאים לפתיחת מודאל NFC אוטומטית:
+    // 1. nfcLaunch או autoPunch פעילים
+    // 2. יש nfc_string לעסק
+    // 3. לא כבר טיפלנו
+    // 4. אין cooldown
+    // 5. במצב autoPunch - ממתינים גם לטעינת punchCard
+    const shouldAutoOpen = (isNfcLaunch || isAutoPunch) && 
+                           !nfcLaunchHandled.current && 
+                           localBusiness?.nfc_string && 
+                           !nfcCooldownRef.current;
+    
+    // אם זה autoPunch, ממתינים לטעינת הכרטיסייה
+    const isReady = isAutoPunch ? (shouldAutoOpen && punchCard?.card_number) : shouldAutoOpen;
+    
+    if (isReady) {
       nfcLaunchHandled.current = true;
-      console.log('[NFC PunchCard] Auto-opening NFC modal from NFC launch');
+      console.log('[NFC PunchCard] Auto-opening NFC modal', { isNfcLaunch, isAutoPunch, cardNumber: punchCard?.card_number });
       // המתנה קצרה לטעינת נתונים
-      setTimeout(() => setNfcModalVisible(true), 500);
+      setTimeout(() => setNfcModalVisible(true), 300);
     }
-  }, [isNfcLaunch, localBusiness?.nfc_string]);
+  }, [isNfcLaunch, isAutoPunch, localBusiness?.nfc_string, punchCard?.card_number]);
 
   // פונקציה לסגירת מודאל NFC עם cooldown
   const closeNfcModalWithCooldown = () => {
