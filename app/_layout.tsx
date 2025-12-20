@@ -99,6 +99,7 @@ export default function RootLayout() {
               pathname: '/(tabs)/PunchCard',
               params: { 
                 phone: savedPhone, 
+                businessCode, // העברת קוד העסק ישירות
                 nfcLaunch: 'true',
                 autoPunch: 'true' // פרמטר חדש לניקוב אוטומטי
               }

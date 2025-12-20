@@ -30,11 +30,13 @@ export default function PunchCard() {
   const router = useRouter();
   const navigation = useNavigation();
   const { business, refresh: refreshBusiness } = useBusiness();
-  const { phone, nfcLaunch, autoPunch } = useLocalSearchParams();
+  const { phone, nfcLaunch, autoPunch, businessCode: businessCodeParam } = useLocalSearchParams();
   const phoneStr = typeof phone === 'string' ? phone.trim() : Array.isArray(phone) ? phone[0].trim() : '';
   const isNfcLaunch = nfcLaunch === 'true';
   const isAutoPunch = autoPunch === 'true';
   const phoneIntl = phoneStr && /^05\d{8}$/.test(phoneStr) ? `972${phoneStr.slice(1)}` : phoneStr;
+  // קוד עסק: מפרמטר URL (לניקוב ישיר מ-NFC) או מהקונטקסט
+  const resolvedBusinessCode = (typeof businessCodeParam === 'string' ? businessCodeParam : null) || business?.business_code;
   const [customer, setCustomer] = useState<{ 
     business_code: string; 
     name: string; 
@@ -346,8 +348,7 @@ export default function PunchCard() {
       setLoading(true);
       setErrorMessage(null);
       // שליפת לקוח לפי customer_phone ו-business_code
-      const businessCode = business?.business_code;
-      if (!businessCode) {
+      if (!resolvedBusinessCode) {
         setErrorMessage('לא נמצא קוד עסק. נא לחזור למסך הראשי.');
         setLoading(false);
         return;
@@ -357,7 +358,7 @@ export default function PunchCard() {
         .from('customers')
         .select('*')
         .eq('customer_phone', phoneStr)
-        .eq('business_code', businessCode)
+        .eq('business_code', resolvedBusinessCode)
         .is('deleted_at', null) // מניעת כניסה של לקוח שנמחק (soft delete)
         .limit(1);
       if (customerError) {
@@ -383,7 +384,7 @@ export default function PunchCard() {
         .from('PunchCards')
         .select('product_code, card_number, used_punches, total_punches')
         .eq('customer_phone', phoneStr)
-        .eq('business_code', businessCode)
+        .eq('business_code', resolvedBusinessCode)
         .eq('status', 'active');
       
       // שליפת שמות המוצרים
@@ -394,7 +395,7 @@ export default function PunchCard() {
           .from('products')
           .select('product_code, product_name')
           .in('product_code', productCodes)
-          .eq('business_code', businessCode);
+          .eq('business_code', resolvedBusinessCode);
         
         // חיבור שמות המוצרים לכרטיסיות
         if (products) {
@@ -441,7 +442,7 @@ export default function PunchCard() {
       const { data: businessData, error: businessError } = await supabase
         .from('businesses')
         .select('*')
-        .eq('business_code', businessCode)
+        .eq('business_code', resolvedBusinessCode)
         .limit(1);
       
       if (businessData && businessData.length > 0) {
@@ -486,7 +487,7 @@ export default function PunchCard() {
           const { data: prodRow } = await supabase
             .from('products')
             .select('product_name')
-            .eq('business_code', businessCode)
+            .eq('business_code', resolvedBusinessCode)
             .eq('product_code', pc)
             .maybeSingle();
           productNameForCard = String((prodRow as any)?.product_name || '').trim();
@@ -502,7 +503,7 @@ export default function PunchCard() {
     if (phoneStr) {
       fetchData();
     }
-  }, [phoneStr, business?.business_code]); // תלות רק בקוד העסק, לא בכל האובייקט
+  }, [phoneStr, resolvedBusinessCode]); // תלות בקוד העסק (מפרמטר או מקונטקסט)
 
   // --- NFC INIT ---
   // אתחול NFC והאזנה
