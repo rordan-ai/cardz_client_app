@@ -1908,8 +1908,8 @@ export default function PunchCard() {
       
       {/* מקשה אחת - לוגו, שם עסק ושם לקוח */}
       <View style={styles.topElementsGroup}>
-        {/* לוגו ושם עסק - מוזחים ב-5% | ב-3 שורות: עולה 20px מבודד */}
-        <View style={[styles.logoBusinessOffset, rows.length === 3 ? { marginTop: -20 } : {}]}>
+        {/* לוגו ושם עסק - מיקום קבוע לכל המצבים (2/3/4 שורות). אנדרואיד בלבד: עולה 30px. */}
+        <View style={styles.logoBusinessOffset}>
           {/* לוגו העסק */}
           <View style={styles.logoContainer}>
             {business?.logo && (
@@ -3596,7 +3596,8 @@ const styles = StyleSheet.create({
     transform: [{ translateY: height * 0.05 }],
   },
   logoBusinessOffset: {
-    transform: [{ translateY: height * 0.10 }],
+    // בסיס המיקום נשמר (רפרנס = מצב 4 שורות). אנדרואיד בלבד: הזזה מבודדת 30px למעלה.
+    transform: [{ translateY: height * 0.10 + (Platform.OS === 'android' ? -30 : 0) }],
   },
   iconsUpOffset: {
     transform: [{ translateY: height * -0.10 }],
