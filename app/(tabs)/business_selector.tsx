@@ -1,23 +1,23 @@
 
-import { useRouter, useNavigation } from 'expo-router';
 import * as Location from 'expo-location';
-import { useEffect, useState, useCallback } from 'react';
+import { useNavigation, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    Image,
-    ImageBackground,
-    Linking,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  ImageBackground,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 import { useBusiness } from '../../components/BusinessContext';
 import { supabase } from '../../components/supabaseClient';
@@ -308,9 +308,9 @@ export default function BusinessSelector() {
           accessibilityHint="לחץ לפתיחת אתר החברה המפתחת"
         />
         
-        {/* סימון גרסה לבדיקת עדכונים */}
+        {/* סימון גרסה לבדיקת עדכונים (Android בלבד כדי לא לשנות iOS) */}
         <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
-          V6
+          {Platform.OS === 'android' ? 'V7' : 'V6'}
         </Text>
       </ImageBackground>
 

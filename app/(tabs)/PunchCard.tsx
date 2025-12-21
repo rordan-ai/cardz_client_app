@@ -1917,10 +1917,10 @@ export default function PunchCard() {
                 {logoLoading && (
                   <View style={{ 
                     position: 'absolute',
-                    width: 170, 
-                    height: 170,
+                    width: Platform.OS === 'android' ? 153 : 170,
+                    height: Platform.OS === 'android' ? 153 : 170,
                     backgroundColor: '#f0f0f0',
-                    borderRadius: 85,
+                    borderRadius: Platform.OS === 'android' ? 76.5 : 85,
                     justifyContent: 'center',
                     alignItems: 'center',
                     transform: [{ scale: getCurrentLogoScale() }]
@@ -1932,8 +1932,8 @@ export default function PunchCard() {
                   key={`logo-${business.business_code}-${business.logo}`}
                   source={{ uri: business.logo }} 
                   style={{ 
-                    width: 170, 
-                    height: 170,
+                    width: Platform.OS === 'android' ? 153 : 170,
+                    height: Platform.OS === 'android' ? 153 : 170,
                     transform: [{ scale: getCurrentLogoScale() }],
                     opacity: logoLoading ? 0 : 1
                   }} 
@@ -1954,139 +1954,142 @@ export default function PunchCard() {
       <View style={{ marginTop: rows.length === 2 ? 90 : rows.length === 3 ? 60 : 0 }}>
                  {/* שם הלקוח - מבודד מגובה הגריד | ב-3 שורות: עולה 50px מבודד */}
          <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 3 ? -50 : rows.length === 4 ? (Platform.OS === 'ios' ? 100 : 40) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
-      {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
-      <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-        {/* אייקונים - ב-3 שורות: עולה 60px מבודד | ב-4 שורות יורד 20px */}
-        <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: -60 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
-        <View style={styles.iconsBoxTight}>
-        {rows.map((row, idx) => (
-          <View key={idx} style={styles.iconsRow}>
-            {row.map((icon, j) => {
-              const iconIndex = idx * iconsPerRow + j;
-              const isIconLoading = iconsLoading[iconIndex] !== false;
-              const isPunched = iconIndex < usedPunches;
-              
-              return (
-                <View key={j} style={{ position: 'relative' }}>
-                  {isIconLoading && (
-                    <View style={{
-                      position: 'absolute',
-                      width: 55,
-                      height: 55,
-                      backgroundColor: '#f0f0f0',
-                      borderRadius: 27.5,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      zIndex: 1
-                    }}>
-                      <Text style={{ color: '#999', fontSize: 7, fontFamily: 'Rubik' }}>טוען...</Text>
-                    </View>
-                  )}
-                  {isPunched ? (
-                    <>
-                      {/* כוס קפה בתור בסיס */}
-                      <Image
-                        source={{ uri: unpunchedIcon }}
-                        style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
-                        resizeMode="contain"
-                        onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                        onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                      />
-                      {/* חור ניקוב מעל הכוס - מוקטן ל-80% מהגודל הקודם */}
-                      <Image
-                        source={{ uri: 'https://noqfwkxzmvpkorcaymcb.supabase.co/storage/v1/object/public/icons/punched_icones/punch_overlay.png' }}
-                        style={[styles.icon, { 
-                          position: 'absolute', 
-                          top: -5.5, 
-                          left: -5.5, 
-                          width: 66, 
-                          height: 66, 
-                          opacity: isIconLoading ? 0 : 1 
-                        }]}
-                        resizeMode="contain"
-                      />
-                    </>
-                  ) : (
-                  <Image
-                    source={{ uri: icon }}
-                    style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
-                    resizeMode="contain"
-                    onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                    onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
-                  />
-                  )}
-                </View>
-              );
-            })}
+      {/* מקשה אחת (Android בלבד וב-3 שורות): גריד + טקסטים + ברקוד יורדים 80px, בלי להזיז לוגו/שם עסק/תפריטים */}
+      <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 80 }] } : undefined}>
+        {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
+        <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
+          {/* אייקונים - ב-3 שורות: עולה 60px מבודד | ב-4 שורות יורד 20px */}
+          <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: -60 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
+          <View style={styles.iconsBoxTight}>
+          {rows.map((row, idx) => (
+            <View key={idx} style={styles.iconsRow}>
+              {row.map((icon, j) => {
+                const iconIndex = idx * iconsPerRow + j;
+                const isIconLoading = iconsLoading[iconIndex] !== false;
+                const isPunched = iconIndex < usedPunches;
+                
+                return (
+                  <View key={j} style={{ position: 'relative' }}>
+                    {isIconLoading && (
+                      <View style={{
+                        position: 'absolute',
+                        width: 55,
+                        height: 55,
+                        backgroundColor: '#f0f0f0',
+                        borderRadius: 27.5,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 1
+                      }}>
+                        <Text style={{ color: '#999', fontSize: 7, fontFamily: 'Rubik' }}>טוען...</Text>
+                      </View>
+                    )}
+                    {isPunched ? (
+                      <>
+                        {/* כוס קפה בתור בסיס */}
+                        <Image
+                          source={{ uri: unpunchedIcon }}
+                          style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
+                          resizeMode="contain"
+                          onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                          onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                        />
+                        {/* חור ניקוב מעל הכוס - מוקטן ל-80% מהגודל הקודם */}
+                        <Image
+                          source={{ uri: 'https://noqfwkxzmvpkorcaymcb.supabase.co/storage/v1/object/public/icons/punched_icones/punch_overlay.png' }}
+                          style={[styles.icon, { 
+                            position: 'absolute', 
+                            top: -5.5, 
+                            left: -5.5, 
+                            width: 66, 
+                            height: 66, 
+                            opacity: isIconLoading ? 0 : 1 
+                          }]}
+                          resizeMode="contain"
+                        />
+                      </>
+                    ) : (
+                    <Image
+                      source={{ uri: icon }}
+                      style={[styles.icon, { opacity: isIconLoading ? 0 : 1 }]}
+                      resizeMode="contain"
+                      onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                      onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
+                    />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          ))}
           </View>
-        ))}
         </View>
-      </View>
-      {/* 4 הטקסטים התחתונים - מוזחים דינמית */}
-      <View style={[styles.bottomTextsUpOffset, { 
-        marginTop: rows.length === 3 ? -70 : rows.length === 4 ? -80 : 0 
-      }]}>
-        {/* עטיפה ל-4 הטקסטים בלבד - ב-4 שורות יורדים 10px */}
-        <View style={[{ alignItems: 'center' }, rows.length === 4 ? { marginTop: 10 } : {}]}>
-        {/* ניקובים */}
-        <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
-        {/* טקסט מתחת לאייקונים */}
-        <Text style={[styles.benefitText, { color: cardTextColor }]} accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefit}`}>
-          נותרו {unpunched} ניקובים לקבלת {benefit}
-        </Text>
-        {/* סטטוס תשלום מראש */}
-        <Text style={[styles.prepaidText, { color: cardTextColor }]}>תשלום מראש: {prepaid}</Text>
+        {/* 4 הטקסטים התחתונים - מוזחים דינמית */}
+        <View style={[styles.bottomTextsUpOffset, { 
+          marginTop: rows.length === 3 ? -70 : rows.length === 4 ? -80 : 0 
+        }]}>
+          {/* עטיפה ל-4 הטקסטים בלבד - ב-4 שורות יורדים 10px */}
+          <View style={[{ alignItems: 'center' }, rows.length === 4 ? { marginTop: 10 } : {}]}>
+          {/* ניקובים */}
+          <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
+          {/* טקסט מתחת לאייקונים */}
+          <Text style={[styles.benefitText, { color: cardTextColor }]} accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefit}`}>
+            נותרו {unpunched} ניקובים לקבלת {benefit}
+          </Text>
+          {/* סטטוס תשלום מראש */}
+          <Text style={[styles.prepaidText, { color: cardTextColor }]}>תשלום מראש: {prepaid}</Text>
+          
+          {/* תאריך תפוגה */}
+          <Text style={[styles.expirationText, { color: cardTextColor }]}>
+            בתוקף עד: {business?.expiration_date 
+              ? new Date(business.expiration_date).toLocaleDateString('he-IL') 
+              : 'ללא זמן תפוגה'}
+          </Text>
+          </View>
+
+          {/* כפתור NFC ל-iOS בלבד - באנדרואיד הסריקה אוטומטית */}
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={{
+                marginTop: 20,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onPress={async () => {
+                try {
+                  await initNFC();
+                  const tagData = await startReading();
+                  if (tagData) {
+                    setNfcModalVisible(true);
+                  }
+                } catch (err) {
+                  console.log('[iOS NFC] Scan error:', err);
+                }
+              }}
+              accessibilityLabel="סרוק תג NFC לניקוב"
+              accessibilityRole="button"
+            >
+              <Image 
+                source={require('../../assets/icons/NFC_ISO_BOTTEN.png')}
+                style={{ width: 80, height: 80 }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          )}
+        </View>
         
-        {/* תאריך תפוגה */}
-        <Text style={[styles.expirationText, { color: cardTextColor }]}>
-          בתוקף עד: {business?.expiration_date 
-            ? new Date(business.expiration_date).toLocaleDateString('he-IL') 
-            : 'ללא זמן תפוגה'}
-        </Text>
         </View>
 
-        {/* כפתור NFC ל-iOS בלבד - באנדרואיד הסריקה אוטומטית */}
-        {Platform.OS === 'ios' && (
-          <TouchableOpacity
-            style={{
-              marginTop: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            onPress={async () => {
-              try {
-                await initNFC();
-                const tagData = await startReading();
-                if (tagData) {
-                  setNfcModalVisible(true);
-                }
-              } catch (err) {
-                console.log('[iOS NFC] Scan error:', err);
-              }
-            }}
-            accessibilityLabel="סרוק תג NFC לניקוב"
-            accessibilityRole="button"
-          >
-            <Image 
-              source={require('../../assets/icons/NFC_ISO_BOTTEN.png')}
-              style={{ width: 80, height: 80 }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
+        {/* ברקוד - מוסתר מתחת לקיפול, מתגלה בגלילה */}
+        {cardCode && (
+        <View style={{ marginTop: rows.length === 3 ? 170 : 200, alignItems: 'center', width: '100%', paddingBottom: 10 }}>
+          <View style={{ maxWidth: 250, width: '70%' }}>
+            <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
+          </View>
+          <Text style={styles.cardCode}>#{cardCode}</Text>
+        </View>
         )}
       </View>
-      
-      </View>
-      
-      {/* ברקוד - מוסתר מתחת לקיפול, מתגלה בגלילה */}
-      {cardCode && (
-      <View style={{ marginTop: rows.length === 3 ? 170 : 200, alignItems: 'center', width: '100%', paddingBottom: 10 }}>
-        <View style={{ maxWidth: 250, width: '70%' }}>
-          <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
-        </View>
-        <Text style={styles.cardCode}>#{cardCode}</Text>
-      </View>
-      )}
       
       </View>{/* סגירת עטיפת 2/3 שורות */}
       </View>{/* סגירת עטיפת הגדלה 25% */}
