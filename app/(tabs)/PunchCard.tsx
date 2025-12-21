@@ -1797,7 +1797,7 @@ export default function PunchCard() {
       {/* סימון גרסה (Android בלבד) */}
       {Platform.OS === 'android' && (
         <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-          V9
+          V10
         </Text>
       )}
       {/* תפריט המבורגר */}
@@ -2126,7 +2126,24 @@ export default function PunchCard() {
 
         {/* ברקוד - Android בלבד: "עמוד שני" שמתגלה מיד עם תחילת גלילה, ואין גלילה מעבר לסוף הברקוד */}
         {Platform.OS === 'android' && cardCode && (
-          <View style={{ marginTop: -175, paddingTop: 0, alignItems: 'center', width: '100%', paddingBottom: 20 }}>
+          <View
+            style={{
+              // התאמה לפי מספר שורות כדי לאחד מיקום בין מצבים:
+              // 4 שורות: עולה 10px
+              // 3 שורות: עולה 25px
+              // 2 שורות: עולה 60px
+              marginTop:
+                rows.length === 4 ? -185 :
+                rows.length === 3 ? -200 :
+                rows.length === 2 ? -235 :
+                -175,
+              paddingTop: 0,
+              alignItems: 'center',
+              width: '100%',
+              // עצירת גלילה 50px אחרי ספרות הברקוד
+              paddingBottom: 50,
+            }}
+          >
             <View style={{ maxWidth: 250, width: '70%' }}>
               <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
             </View>
