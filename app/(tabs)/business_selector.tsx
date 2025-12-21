@@ -10,6 +10,7 @@ import {
     ImageBackground,
     Linking,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -832,13 +833,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // New touchable areas
+  // New touchable areas - עם הפרדה בין iOS לאנדרואיד
   hamburgerArea: {
     position: 'absolute',
-    top: 230,
-    right: 185, // +4 ימינה
-    width: 65, // +10%
-    height: 57, // +10%
+    ...Platform.select({
+      ios: {
+        top: 230,
+        right: 185,
+        width: 65,
+        height: 57,
+      },
+      android: {
+        top: 230,    // ← ערך אנדרואיד - ניתן לכוונן
+        right: 185,  // ← ערך אנדרואיד - ניתן לכוונן
+        width: 65,   // ← ערך אנדרואיד - ניתן לכוונן
+        height: 57,  // ← ערך אנדרואיד - ניתן לכוונן
+      },
+    }),
     backgroundColor: 'transparent',
     borderRadius: 5,
     alignItems: 'center',
@@ -853,21 +864,41 @@ const styles = StyleSheet.create({
   },
   selectBusinessArea: {
     position: 'absolute',
-    bottom: 119,
     left: '50%',
-    marginLeft: -104, // -3 שמאלה + התאמה לרוחב חדש
-    width: 202, // +10% רוחב
-    height: 50,
+    ...Platform.select({
+      ios: {
+        bottom: 119,
+        marginLeft: -104,
+        width: 202,
+        height: 50,
+      },
+      android: {
+        bottom: 119,     // ← ערך אנדרואיד - ניתן לכוונן
+        marginLeft: -104, // ← ערך אנדרואיד - ניתן לכוונן
+        width: 202,       // ← ערך אנדרואיד - ניתן לכוונן
+        height: 50,       // ← ערך אנדרואיד - ניתן לכוונן
+      },
+    }),
     backgroundColor: 'transparent',
     borderRadius: 25,
   },
   creditsArea: {
     position: 'absolute',
-    bottom: 20,
     left: '50%',
-    marginLeft: -120,
-    width: 240,
-    height: 30,
+    ...Platform.select({
+      ios: {
+        bottom: 20,
+        marginLeft: -120,
+        width: 240,
+        height: 30,
+      },
+      android: {
+        bottom: 20,      // ← ערך אנדרואיד - ניתן לכוונן
+        marginLeft: -120, // ← ערך אנדרואיד - ניתן לכוונן
+        width: 240,       // ← ערך אנדרואיד - ניתן לכוונן
+        height: 30,       // ← ערך אנדרואיד - ניתן לכוונן
+      },
+    }),
     backgroundColor: 'transparent',
     borderRadius: 5,
   },
