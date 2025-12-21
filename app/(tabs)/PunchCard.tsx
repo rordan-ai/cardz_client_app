@@ -1898,8 +1898,13 @@ export default function PunchCard() {
         </View>
       </TouchableOpacity>
       
-      {/* עטיפה להגדלת כל התוכן ב-25% (חוץ מאייקוני תפריט עליון) */}
-      <View style={{ transform: [{ scale: 1.25 }], width: '80%', alignSelf: 'center', marginTop: 80 }}>
+      {/* עטיפה להגדלת כל התוכן - עם הפרדה בין iOS לאנדרואיד */}
+      <View style={{ 
+        transform: [{ scale: Platform.OS === 'ios' ? 1.25 : 1.0625 }], // אנדרואיד 15% קטן יותר
+        width: '80%', 
+        alignSelf: 'center', 
+        marginTop: Platform.OS === 'ios' ? 80 : 60 
+      }}>
       
       {/* מקשה אחת - לוגו, שם עסק ושם לקוח */}
       <View style={styles.topElementsGroup}>

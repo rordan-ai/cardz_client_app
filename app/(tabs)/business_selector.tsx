@@ -310,7 +310,7 @@ export default function BusinessSelector() {
         
         {/* סימון גרסה לבדיקת עדכונים */}
         <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
-          V4
+          V5
         </Text>
       </ImageBackground>
 
@@ -850,11 +850,11 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
       },
       android: {
-        top: 164,    // ← +9 למטה (155+9)
-        right: 130,  // ← +10 שמאלה (120+10)
+        top: 164,
+        right: 130,
         width: 65,
         height: 57,
-        backgroundColor: 'rgba(255, 0, 0, 0.3)',
+        backgroundColor: 'transparent',
       },
     }),
     borderRadius: 5,
@@ -880,11 +880,11 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
       },
       android: {
-        bottom: 83,      // ← +7 למעלה (76+7)
+        bottom: 83,
         marginLeft: -104,
         width: 202,
         height: 50,
-        backgroundColor: 'rgba(255, 0, 0, 0.3)',
+        backgroundColor: 'transparent',
       },
     }),
     borderRadius: 25,
@@ -901,11 +901,11 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
       },
       android: {
-        bottom: 20,      // ← ערך אנדרואיד - ניתן לכוונן
-        marginLeft: -120, // ← ערך אנדרואיד - ניתן לכוונן
-        width: 240,       // ← ערך אנדרואיד - ניתן לכוונן
-        height: 30,       // ← ערך אנדרואיד - ניתן לכוונן
-        backgroundColor: 'rgba(255, 0, 0, 0.3)', // אדום חצי שקוף לכיוונון
+        bottom: 20,
+        marginLeft: -120,
+        width: 240,
+        height: 30,
+        backgroundColor: 'transparent',
       },
     }),
     borderRadius: 5,
