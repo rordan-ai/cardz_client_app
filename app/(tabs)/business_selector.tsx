@@ -842,15 +842,16 @@ const styles = StyleSheet.create({
         right: 185,
         width: 65,
         height: 57,
+        backgroundColor: 'transparent',
       },
       android: {
         top: 230,    // ← ערך אנדרואיד - ניתן לכוונן
         right: 185,  // ← ערך אנדרואיד - ניתן לכוונן
         width: 65,   // ← ערך אנדרואיד - ניתן לכוונן
         height: 57,  // ← ערך אנדרואיד - ניתן לכוונן
+        backgroundColor: 'rgba(255, 0, 0, 0.3)', // אדום חצי שקוף לכיוונון
       },
     }),
-    backgroundColor: 'transparent',
     borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -871,15 +872,16 @@ const styles = StyleSheet.create({
         marginLeft: -104,
         width: 202,
         height: 50,
+        backgroundColor: 'transparent',
       },
       android: {
         bottom: 119,     // ← ערך אנדרואיד - ניתן לכוונן
         marginLeft: -104, // ← ערך אנדרואיד - ניתן לכוונן
         width: 202,       // ← ערך אנדרואיד - ניתן לכוונן
         height: 50,       // ← ערך אנדרואיד - ניתן לכוונן
+        backgroundColor: 'rgba(255, 0, 0, 0.3)', // אדום חצי שקוף לכיוונון
       },
     }),
-    backgroundColor: 'transparent',
     borderRadius: 25,
   },
   creditsArea: {
@@ -891,15 +893,16 @@ const styles = StyleSheet.create({
         marginLeft: -120,
         width: 240,
         height: 30,
+        backgroundColor: 'transparent',
       },
       android: {
         bottom: 20,      // ← ערך אנדרואיד - ניתן לכוונן
         marginLeft: -120, // ← ערך אנדרואיד - ניתן לכוונן
         width: 240,       // ← ערך אנדרואיד - ניתן לכוונן
         height: 30,       // ← ערך אנדרואיד - ניתן לכוונן
+        backgroundColor: 'rgba(255, 0, 0, 0.3)', // אדום חצי שקוף לכיוונון
       },
     }),
-    backgroundColor: 'transparent',
     borderRadius: 5,
   },
 
