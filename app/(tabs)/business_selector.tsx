@@ -310,7 +310,7 @@ export default function BusinessSelector() {
         
         {/* סימון גרסה לבדיקת עדכונים */}
         <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
-          V3
+          V4
         </Text>
       </ImageBackground>
 
@@ -850,8 +850,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
       },
       android: {
-        top: 155,    // ← +15 למעלה (170-15)
-        right: 120,  // ← +25 ימינה (145-25)
+        top: 164,    // ← +9 למטה (155+9)
+        right: 130,  // ← +10 שמאלה (120+10)
         width: 65,
         height: 57,
         backgroundColor: 'rgba(255, 0, 0, 0.3)',
@@ -880,7 +880,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
       },
       android: {
-        bottom: 76,      // ← +13 למטה (89-13)
+        bottom: 83,      // ← +7 למעלה (76+7)
         marginLeft: -104,
         width: 202,
         height: 50,
