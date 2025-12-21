@@ -1,6 +1,44 @@
 # דו״ח גיבוי - restore_checkpoints
 
-## גיבוי אחרון: 2025-12-16 18:00
+## גיבוי אחרון: 2025-12-21 22:45
+**הערה:** גיבוי מלא לפי `backup_rules_1611.md` - V10 Android UI adjustments + Platform separation rules
+
+### סיכום
+- ✅ SHA local = remote: `a567f9cde1325c40c274903cf210d1aed67744b5`
+- ✅ קומיטים: main=305, restore_checkpoints=305 (זהה מושלם!)
+- ✅ Diff main↔restore_checkpoints: **ריק** (`git diff` → ריק)
+- ✅ Working directory: **נקי** (`git status --porcelain` → ריק)
+- ✅ סנכרון remote: **מושלם** (main, restore_checkpoints, origin/* - כולם SHA זהה)
+
+### ענפי ביטחון / Snapshots שנוצרו והועלו ל-origin
+- `safety_snapshot_20251221_224500` (SHA: `a567f9c`)
+- `safety_backup_20251221_224500` (SHA: `a567f9c`)
+- `restorepoint_snapshot_20251221_224500` (SHA: `a567f9c`)
+
+### בדיקות איכות שבוצעו
+- `git fetch origin` ✅
+- `git status --porcelain` → ריק ✅
+- `git rev-list --count`: main=305, restore_checkpoints=305 ✅
+- `git diff main restore_checkpoints --name-only` → **ריק** ✅
+- `git rev-parse` local=remote לשני הענפים (SHA זהה) ✅
+- `git show-branch origin/restore_checkpoints restore_checkpoints` → זהות מושלמת ✅
+
+### אבטחה (סריקה מהירה)
+- בוצע חיפוש `eyJhbGciOiJI` → נמצא רק ב-`backup_rules_1611.md` (placeholder/דוגמה) ✅
+- בוצע חיפוש `SUPABASE.*KEY` → 2 התאמות ב-`UNIFIED_AGENT_RULES.md` (הנחיות בלבד, לא מפתחות) ✅
+- אין סודות בקוד - **בטוח לגיבוי** ✅
+
+### שינויים עיקריים שנכללו בגיבוי
+- **V10 Android UI**: התאמות מיקום ברקוד לפי 2/3/4 שורות (ברקוד עולה +60/+25/+10px בהתאמה)
+- **V10 Android UI**: גריד אייקונים עולה +40px (3 שורות), +5px (4 שורות) - Android בלבד
+- **V10 Android UI**: 4 שורות טקסט יורדות +7px (4 שורות) - Android בלבד
+- **V10 Android UI**: עצירת גלילה 50px אחרי ספרות הברקוד בכל מצבי שורות
+- **Platform Separation Rules**: הוספת סעיף חובה ב-`UNIFIED_AGENT_RULES.md` להפרדת `eas update` בין Android/iOS
+- **Version Labels**: עדכון תווית גרסה ל-V10 (Android בלבד; iOS נשאר V6)
+
+---
+
+## גיבוי קודם: 2025-12-16 18:00
 **הערה:** גיבוי מלא לפי `backup_rules_1611.md` - תיקוני NFC ומניעת לופ בקשות ניקוב
 
 ### סיכום
