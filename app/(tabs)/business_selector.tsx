@@ -307,6 +307,11 @@ export default function BusinessSelector() {
           accessibilityRole="link"
           accessibilityHint="לחץ לפתיחת אתר החברה המפתחת"
         />
+        
+        {/* סימון גרסה לבדיקת עדכונים */}
+        <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
+          V1
+        </Text>
       </ImageBackground>
 
       {/* דיאלוג תפריט המבורגר */}
