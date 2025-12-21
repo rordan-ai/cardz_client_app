@@ -1908,8 +1908,8 @@ export default function PunchCard() {
       
       {/* מקשה אחת - לוגו, שם עסק ושם לקוח */}
       <View style={styles.topElementsGroup}>
-        {/* לוגו ושם עסק - מוזחים ב-5% */}
-        <View style={styles.logoBusinessOffset}>
+        {/* לוגו ושם עסק - מוזחים ב-5% | ב-3 שורות: עולה 20px מבודד */}
+        <View style={[styles.logoBusinessOffset, rows.length === 3 ? { marginTop: -20 } : {}]}>
           {/* לוגו העסק */}
           <View style={styles.logoContainer}>
             {business?.logo && (
@@ -1952,12 +1952,12 @@ export default function PunchCard() {
       </View>
       {/* עטיפה מבודדת ל-2 ו-3 שורות */}
       <View style={{ marginTop: rows.length === 2 ? 90 : rows.length === 3 ? 60 : 0 }}>
-                 {/* שם הלקוח - ב-3 שורות יורד עוד 30px, ב-4 שורות עולה */}
-         <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 3 ? 30 : rows.length === 4 ? (Platform.OS === 'ios' ? 100 : 40) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
+                 {/* שם הלקוח - מבודד מגובה הגריד | ב-3 שורות: עולה 50px מבודד */}
+         <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 3 ? -50 : rows.length === 4 ? (Platform.OS === 'ios' ? 100 : 40) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
       {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
       <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-        {/* אייקונים - ב-3 שורות עולה, ב-4 שורות יורד 20px */}
-        <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: 0 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
+        {/* אייקונים - ב-3 שורות: עולה 60px מבודד | ב-4 שורות יורד 20px */}
+        <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: -60 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
         <View style={styles.iconsBoxTight}>
         {rows.map((row, idx) => (
           <View key={idx} style={styles.iconsRow}>
