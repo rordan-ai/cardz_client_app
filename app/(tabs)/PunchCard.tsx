@@ -1797,7 +1797,7 @@ export default function PunchCard() {
       {/* סימון גרסה (Android בלבד) */}
       {Platform.OS === 'android' && (
         <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-          V8
+          V9
         </Text>
       )}
       {/* תפריט המבורגר */}
@@ -1984,8 +1984,16 @@ export default function PunchCard() {
           <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 130 }] } : undefined}>
             {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
             <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-              {/* אייקונים - ב-3 שורות: הזזה מבודדת של הגריד בלבד 40px למעלה (Android בלבד) */}
-              <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: -40 }] } : undefined}>
+              {/* אייקונים - הזזה מבודדת (Android בלבד):
+                  - 3 שורות: 40px למעלה
+                  - 4 שורות: 5px למעלה */}
+              <View
+                style={
+                  Platform.OS === 'android'
+                    ? (rows.length === 3 ? { transform: [{ translateY: -40 }] } : rows.length === 4 ? { transform: [{ translateY: -5 }] } : undefined)
+                    : undefined
+                }
+              >
                 <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: -60 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
                   <View style={styles.iconsBoxTight}>
           {rows.map((row, idx) => (
@@ -2056,8 +2064,13 @@ export default function PunchCard() {
         <View style={[styles.bottomTextsUpOffset, { 
           marginTop: rows.length === 3 ? -70 : rows.length === 4 ? -80 : 0 
         }]}>
-          {/* עטיפה ל-4 הטקסטים בלבד - ב-4 שורות יורדים 10px */}
-          <View style={[{ alignItems: 'center' }, rows.length === 4 ? { marginTop: 10 } : {}]}>
+          {/* עטיפה ל-4 הטקסטים בלבד - ב-4 שורות: Android בלבד יורדים 7px (מבודד) */}
+          <View
+            style={[
+              { alignItems: 'center' },
+              Platform.OS === 'android' && rows.length === 4 ? { transform: [{ translateY: 7 }] } : {},
+            ]}
+          >
           {/* ניקובים */}
           <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
           {/* טקסט מתחת לאייקונים */}
@@ -2113,7 +2126,7 @@ export default function PunchCard() {
 
         {/* ברקוד - Android בלבד: "עמוד שני" שמתגלה מיד עם תחילת גלילה, ואין גלילה מעבר לסוף הברקוד */}
         {Platform.OS === 'android' && cardCode && (
-          <View style={{ marginTop: -140, paddingTop: 0, alignItems: 'center', width: '100%', paddingBottom: 20 }}>
+          <View style={{ marginTop: -175, paddingTop: 0, alignItems: 'center', width: '100%', paddingBottom: 20 }}>
             <View style={{ maxWidth: 250, width: '70%' }}>
               <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
             </View>
