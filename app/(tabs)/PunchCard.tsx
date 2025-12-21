@@ -1984,8 +1984,8 @@ export default function PunchCard() {
           <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 130 }] } : undefined}>
             {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
             <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-              {/* אייקונים - ב-3 שורות: הזזה מבודדת של הגריד בלבד 30px למעלה (Android בלבד) */}
-              <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: -30 }] } : undefined}>
+              {/* אייקונים - ב-3 שורות: הזזה מבודדת של הגריד בלבד 40px למעלה (Android בלבד) */}
+              <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: -40 }] } : undefined}>
                 <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: -60 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
                   <View style={styles.iconsBoxTight}>
           {rows.map((row, idx) => (
@@ -2113,7 +2113,7 @@ export default function PunchCard() {
 
         {/* ברקוד - Android בלבד: "עמוד שני" שמתגלה מיד עם תחילת גלילה, ואין גלילה מעבר לסוף הברקוד */}
         {Platform.OS === 'android' && cardCode && (
-          <View style={{ paddingTop: 8, alignItems: 'center', width: '100%', paddingBottom: 0 }}>
+          <View style={{ marginTop: -140, paddingTop: 0, alignItems: 'center', width: '100%', paddingBottom: 20 }}>
             <View style={{ maxWidth: 250, width: '70%' }}>
               <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
             </View>
