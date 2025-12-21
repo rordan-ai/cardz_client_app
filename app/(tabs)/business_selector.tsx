@@ -310,7 +310,7 @@ export default function BusinessSelector() {
         
         {/* סימון גרסה לבדיקת עדכונים */}
         <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
-          V1
+          V2
         </Text>
       </ImageBackground>
 
@@ -850,10 +850,10 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
       },
       android: {
-        top: 230,    // ← ערך אנדרואיד - ניתן לכוונן
-        right: 185,  // ← ערך אנדרואיד - ניתן לכוונן
-        width: 65,   // ← ערך אנדרואיד - ניתן לכוונן
-        height: 57,  // ← ערך אנדרואיד - ניתן לכוונן
+        top: 170,    // ← 60 פיקסל למעלה (230-60)
+        right: 145,  // ← 40 פיקסל ימינה (185-40)
+        width: 65,
+        height: 57,
         backgroundColor: 'rgba(255, 0, 0, 0.3)', // אדום חצי שקוף לכיוונון
       },
     }),
@@ -880,10 +880,10 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
       },
       android: {
-        bottom: 119,     // ← ערך אנדרואיד - ניתן לכוונן
-        marginLeft: -104, // ← ערך אנדרואיד - ניתן לכוונן
-        width: 202,       // ← ערך אנדרואיד - ניתן לכוונן
-        height: 50,       // ← ערך אנדרואיד - ניתן לכוונן
+        bottom: 89,      // ← 30 פיקסל למטה (119-30)
+        marginLeft: -104,
+        width: 202,
+        height: 50,
         backgroundColor: 'rgba(255, 0, 0, 0.3)', // אדום חצי שקוף לכיוונון
       },
     }),
