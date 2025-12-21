@@ -1793,7 +1793,13 @@ export default function PunchCard() {
           <BackButton fallbackRoute="/(tabs)/customers-login" color={brandColor} />
         </View>
       )}
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={[styles.container, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
+      {/* סימון גרסה (Android בלבד) */}
+      {Platform.OS === 'android' && (
+        <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
+          V8
+        </Text>
+      )}
       {/* תפריט המבורגר */}
       <TouchableOpacity 
         style={[styles.hamburgerContainer, styles.topIconOffsetClean]}
@@ -1952,32 +1958,36 @@ export default function PunchCard() {
       </View>
       {/* עטיפה מבודדת ל-2 ו-3 שורות */}
       <View style={{ marginTop: rows.length === 2 ? 90 : rows.length === 3 ? 60 : 0 }}>
-                 {/* שם הלקוח - מקובע באנדרואיד למיקום של מצב 4 שורות (לא תלוי במספר שורות/הזזות אחרות) */}
-         <Text
-           style={[
-             styles.customerName,
-             {
-               color: cardTextColor,
-               // Android: משמר מיקום סופי זהה ל-4 שורות ע"י פיצוי על marginTop של העטיפה (2/3 שורות).
-               // iOS: נשאר בדיוק כמו לפני.
-               marginTop:
-                 Platform.OS === 'android'
-                   ? (rows.length === 2 ? -50 : rows.length === 3 ? -20 : 40)
-                   : (rows.length === 3 ? -50 : rows.length === 4 ? 100 : undefined),
-             },
-           ]}
-           accessibilityRole="text"
-           accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}
-         >
-           {customer?.name || ''}
-         </Text>
-      {/* מקשה אחת (Android בלבד וב-3 שורות): גריד + טקסטים + ברקוד יורדים 130px, בלי להזיז לוגו/שם עסק/תפריטים */}
-      <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 130 }] } : undefined}>
-        {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
-        <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-          {/* אייקונים - ב-3 שורות: עולה 60px מבודד | ב-4 שורות יורד 20px */}
-          <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: -60 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
-          <View style={styles.iconsBoxTight}>
+        {/* Android: עמוד ראשון בגובה המסך כדי שהברקוד יהיה "עמוד שני" ויתגלה מיד בתחילת גלילה */}
+        <View style={Platform.OS === 'android' ? { minHeight: height } : undefined}>
+          {/* שם הלקוח - מקובע באנדרואיד למיקום של מצב 4 שורות (לא תלוי במספר שורות/הזזות אחרות) */}
+          <Text
+            style={[
+              styles.customerName,
+              {
+                color: cardTextColor,
+                // Android: משמר מיקום סופי זהה ל-4 שורות ע"י פיצוי על marginTop של העטיפה (2/3 שורות).
+                // iOS: נשאר בדיוק כמו לפני.
+                marginTop:
+                  Platform.OS === 'android'
+                    ? (rows.length === 2 ? -50 : rows.length === 3 ? -20 : 40)
+                    : (rows.length === 3 ? -50 : rows.length === 4 ? 100 : undefined),
+              },
+            ]}
+            accessibilityRole="text"
+            accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}
+          >
+            {customer?.name || ''}
+          </Text>
+
+          {/* מקשה אחת (Android בלבד וב-3 שורות): גריד + טקסטים יורדים 130px, בלי להזיז לוגו/שם עסק/תפריטים */}
+          <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 130 }] } : undefined}>
+            {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
+            <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
+              {/* אייקונים - ב-3 שורות: הזזה מבודדת של הגריד בלבד 30px למעלה (Android בלבד) */}
+              <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: -30 }] } : undefined}>
+                <View style={[styles.iconsUpOffset, rows.length === 3 ? { marginTop: -60 } : rows.length === 4 ? { marginTop: 20 } : {}]}>
+                  <View style={styles.iconsBoxTight}>
           {rows.map((row, idx) => (
             <View key={idx} style={styles.iconsRow}>
               {row.map((icon, j) => {
@@ -2039,8 +2049,9 @@ export default function PunchCard() {
               })}
             </View>
           ))}
-          </View>
-        </View>
+                  </View>
+                </View>
+              </View>
         {/* 4 הטקסטים התחתונים - מוזחים דינמית */}
         <View style={[styles.bottomTextsUpOffset, { 
           marginTop: rows.length === 3 ? -70 : rows.length === 4 ? -80 : 0 
@@ -2093,21 +2104,33 @@ export default function PunchCard() {
               />
             </TouchableOpacity>
           )}
-        </View>
-        
+            </View>
+          </View>
         </View>
 
-        {/* ברקוד - מוסתר מתחת לקיפול, מתגלה בגלילה */}
-        {cardCode && (
-        <View style={{ marginTop: rows.length === 3 ? 170 : 200, alignItems: 'center', width: '100%', paddingBottom: 10 }}>
-          <View style={{ maxWidth: 250, width: '70%' }}>
-            <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
-          </View>
-          <Text style={styles.cardCode}>#{cardCode}</Text>
+        {/* סגירת "עמוד ראשון" (Android בלבד) */}
         </View>
+
+        {/* ברקוד - Android בלבד: "עמוד שני" שמתגלה מיד עם תחילת גלילה, ואין גלילה מעבר לסוף הברקוד */}
+        {Platform.OS === 'android' && cardCode && (
+          <View style={{ paddingTop: 8, alignItems: 'center', width: '100%', paddingBottom: 0 }}>
+            <View style={{ maxWidth: 250, width: '70%' }}>
+              <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
+            </View>
+            <Text style={styles.cardCode}>#{cardCode}</Text>
+          </View>
         )}
-      </View>
-      
+
+        {/* iOS: שימור התנהגות קיימת */}
+        {Platform.OS !== 'android' && cardCode && (
+          <View style={{ marginTop: rows.length === 3 ? 170 : 200, alignItems: 'center', width: '100%', paddingBottom: 10 }}>
+            <View style={{ maxWidth: 250, width: '70%' }}>
+              <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
+            </View>
+            <Text style={styles.cardCode}>#{cardCode}</Text>
+          </View>
+        )}
+
       </View>{/* סגירת עטיפת 2/3 שורות */}
       </View>{/* סגירת עטיפת הגדלה 25% */}
       
