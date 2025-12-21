@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // AsyncStorage no longer used for inbox; messages loaded from Supabase inbox table
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+import { Audio, Video, ResizeMode } from 'expo-av';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
@@ -129,6 +129,7 @@ export default function PunchCard() {
   // State לניקוב ישיר (autoPunch)
   const [directPunchStatus, setDirectPunchStatus] = useState<'idle' | 'punching' | 'success' | 'error'>('idle');
   const [directPunchMessage, setDirectPunchMessage] = useState<string>('');
+  const [isDirectRewardingPunch, setIsDirectRewardingPunch] = useState(false);
 
   // פתיחת מודאל NFC אוטומטית או ניקוב ישיר כשהאפליקציה נפתחה מתג NFC
   useEffect(() => {
@@ -223,17 +224,19 @@ export default function PunchCard() {
 
           // בדיקה אם זה ניקוב מזכה
           const isRewardingPunch = newPunches >= totalPunches;
+          setIsDirectRewardingPunch(isRewardingPunch);
           
           setDirectPunchStatus('success');
           setDirectPunchMessage(isRewardingPunch 
             ? `🎉 מזל טוב! הגעת להטבה: ${punchCard.benefit}` 
             : `✅ ניקוב ${newPunches}/${totalPunches} בוצע בהצלחה!`);
 
-          // איפוס אחרי 3 שניות
+          // איפוס אחרי זמן מתאים (יותר לקונפטי)
           setTimeout(() => {
             setDirectPunchStatus('idle');
             setDirectPunchMessage('');
-          }, 3000);
+            setIsDirectRewardingPunch(false);
+          }, isRewardingPunch ? 4000 : 3000);
 
         } catch (err) {
           console.log('[NFC] Direct punch exception:', err);
@@ -3349,13 +3352,33 @@ export default function PunchCard() {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
+          backgroundColor: isDirectRewardingPunch ? 'transparent' : 'rgba(0,0,0,0.7)',
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 9999,
         }}>
+          {/* קונפטי לניקוב מזכה */}
+          {isDirectRewardingPunch && directPunchStatus === 'success' && (
+            <Video
+              source={require('../../assets/animations/confetti.mp4')}
+              shouldPlay
+              isLooping={false}
+              resizeMode={ResizeMode.COVER}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: '100%',
+                height: '100%',
+              }}
+            />
+          )}
           <View style={{
-            backgroundColor: directPunchStatus === 'success' ? '#4CAF50' : directPunchStatus === 'error' ? '#f44336' : brandColor,
+            backgroundColor: directPunchStatus === 'success' 
+              ? (isDirectRewardingPunch ? 'rgba(76, 175, 80, 0.95)' : '#4CAF50') 
+              : directPunchStatus === 'error' ? '#f44336' : brandColor,
             padding: 30,
             borderRadius: 20,
             alignItems: 'center',
@@ -3364,9 +3387,12 @@ export default function PunchCard() {
             {directPunchStatus === 'punching' && (
               <ActivityIndicator size="large" color="#fff" style={{ marginBottom: 15 }} />
             )}
+            {isDirectRewardingPunch && directPunchStatus === 'success' && (
+              <Text style={{ fontSize: 60, marginBottom: 10 }}>🎉</Text>
+            )}
             <Text style={{
               color: '#fff',
-              fontSize: 18,
+              fontSize: isDirectRewardingPunch ? 22 : 18,
               fontFamily: 'Rubik',
               textAlign: 'center',
               fontWeight: 'bold',
