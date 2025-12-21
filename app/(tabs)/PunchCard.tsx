@@ -1952,8 +1952,25 @@ export default function PunchCard() {
       </View>
       {/* עטיפה מבודדת ל-2 ו-3 שורות */}
       <View style={{ marginTop: rows.length === 2 ? 90 : rows.length === 3 ? 60 : 0 }}>
-                 {/* שם הלקוח - מבודד מגובה הגריד | ב-3 שורות: עולה 50px מבודד */}
-         <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 3 ? -50 : rows.length === 4 ? (Platform.OS === 'ios' ? 100 : 40) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
+                 {/* שם הלקוח - מקובע באנדרואיד למיקום של מצב 4 שורות (לא תלוי במספר שורות/הזזות אחרות) */}
+         <Text
+           style={[
+             styles.customerName,
+             {
+               color: cardTextColor,
+               // Android: משמר מיקום סופי זהה ל-4 שורות ע"י פיצוי על marginTop של העטיפה (2/3 שורות).
+               // iOS: נשאר בדיוק כמו לפני.
+               marginTop:
+                 Platform.OS === 'android'
+                   ? (rows.length === 2 ? -50 : rows.length === 3 ? -20 : 40)
+                   : (rows.length === 3 ? -50 : rows.length === 4 ? 100 : undefined),
+             },
+           ]}
+           accessibilityRole="text"
+           accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}
+         >
+           {customer?.name || ''}
+         </Text>
       {/* מקשה אחת (Android בלבד וב-3 שורות): גריד + טקסטים + ברקוד יורדים 130px, בלי להזיז לוגו/שם עסק/תפריטים */}
       <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 130 }] } : undefined}>
         {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
