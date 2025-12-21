@@ -1954,8 +1954,8 @@ export default function PunchCard() {
       <View style={{ marginTop: rows.length === 2 ? 90 : rows.length === 3 ? 60 : 0 }}>
                  {/* שם הלקוח - מבודד מגובה הגריד | ב-3 שורות: עולה 50px מבודד */}
          <Text style={[styles.customerName, { color: cardTextColor, marginTop: rows.length === 3 ? -50 : rows.length === 4 ? (Platform.OS === 'ios' ? 100 : 40) : undefined }]} accessibilityRole="text" accessibilityLabel={`שלום ${customer?.name || 'לקוח'}`}>{customer?.name || ''}</Text>
-      {/* מקשה אחת (Android בלבד וב-3 שורות): גריד + טקסטים + ברקוד יורדים 80px, בלי להזיז לוגו/שם עסק/תפריטים */}
-      <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 80 }] } : undefined}>
+      {/* מקשה אחת (Android בלבד וב-3 שורות): גריד + טקסטים + ברקוד יורדים 130px, בלי להזיז לוגו/שם עסק/תפריטים */}
+      <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 130 }] } : undefined}>
         {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
         <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
           {/* אייקונים - ב-3 שורות: עולה 60px מבודד | ב-4 שורות יורד 20px */}
