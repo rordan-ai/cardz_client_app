@@ -977,6 +977,11 @@ export default function PunchCard() {
   for (let i = 0; i < iconsArr.length; i += iconsPerRow) {
     rows.push(iconsArr.slice(i, i + iconsPerRow));
   }
+  
+  // Debug: בדיקה אם rows.length תקין
+  if (__DEV__ && Platform.OS === 'android') {
+    console.log('[PunchCard] totalPunches:', totalPunches, 'usedPunches:', usedPunches, 'iconsArr.length:', iconsArr.length, 'rows.length:', rows.length);
+  }
 
   
 
