@@ -1801,12 +1801,10 @@ export default function PunchCard() {
         </View>
       )}
     <ScrollView contentContainerStyle={[styles.container, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
-      {/* סימון גרסה (Android בלבד) */}
-      {Platform.OS === 'android' && (
-        <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-          {Platform.OS === 'android' ? 'V18' : 'V23'}
-        </Text>
-      )}
+      {/* סימון גרסה */}
+      <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
+        {Platform.OS === 'android' ? 'V19' : 'V24'}
+      </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
         style={[styles.hamburgerContainer, styles.topIconOffsetClean]}

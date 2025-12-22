@@ -308,9 +308,9 @@ export default function BusinessSelector() {
           accessibilityHint="לחץ לפתיחת אתר החברה המפתחת"
         />
         
-        {/* סימון גרסה לבדיקת עדכונים (Android בלבד כדי לא לשנות iOS) */}
+        {/* סימון גרסה לבדיקת עדכונים */}
         <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
-          {Platform.OS === 'android' ? 'V18' : 'V23'}
+          {Platform.OS === 'android' ? 'V19' : 'V24'}
         </Text>
       </ImageBackground>
 
