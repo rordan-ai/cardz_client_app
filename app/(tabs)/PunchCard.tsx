@@ -1989,6 +1989,8 @@ export default function PunchCard() {
           <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 130 }] } : undefined}>
             {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
             <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
+              {/* עטיפה מבודדת ל-4 שורות: גריד+טקסטים עולים ביחד 3px (כמקשה אחת) */}
+              <View style={rows.length === 4 ? { transform: [{ translateY: -3 }] } : undefined}>
               {/* אייקונים - הזזה מבודדת (Android בלבד):
                   - 3 שורות: 40px למעלה
                   - 4 שורות: 5px למעלה */}
@@ -2128,6 +2130,7 @@ export default function PunchCard() {
           )}
             </View>
           </View>
+              </View>{/* סגירת עטיפת 4 שורות (גריד+טקסטים -3px) */}
         </View>
 
         {/* סגירת "עמוד ראשון" (Android בלבד) */}
