@@ -2081,7 +2081,11 @@ export default function PunchCard() {
           {/* ניקובים */}
           <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
           {/* טקסט מתחת לאייקונים */}
-          <Text style={[styles.benefitText, { color: cardTextColor }]} accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefit}`}>
+          <Text 
+            style={[styles.benefitText, { color: cardTextColor }]} 
+            accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefit}`}
+            numberOfLines={2}
+          >
             נותרו {unpunched} ניקובים לקבלת {benefit}
           </Text>
           {/* סטטוס תשלום מראש */}
@@ -3744,22 +3748,26 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     marginTop: -20,
     fontFamily: 'Rubik',
+    textAlign: 'center',
   },
   benefitText: {
     fontSize: 16,
     marginBottom: 6,
     fontFamily: 'Rubik',
+    textAlign: 'center',
   },
   prepaidText: {
     fontSize: 14,
     marginBottom: 8,
     fontFamily: 'Rubik',
+    textAlign: 'center',
   },
   expirationText: {
     fontSize: 10,
     marginBottom: 8,
     fontWeight: 'bold',
     fontFamily: 'Rubik',
+    textAlign: 'center',
   },
   barcodeBox: {
     marginVertical: 24,
