@@ -1797,7 +1797,7 @@ export default function PunchCard() {
       {/* סימון גרסה (Android בלבד) */}
       {Platform.OS === 'android' && (
         <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-          V10
+          {Platform.OS === 'android' ? 'V18' : 'V23'}
         </Text>
       )}
       {/* תפריט המבורגר */}
