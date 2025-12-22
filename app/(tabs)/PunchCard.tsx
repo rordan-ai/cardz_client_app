@@ -963,10 +963,12 @@ export default function PunchCard() {
 
   
 
-  // בניית מערך אייקונים
+  // בניית מערך אייקונים - מגן מפני ערכים שליליים/לא-תקינים
+  const safeUsed = Math.max(0, Math.min(totalPunches, usedPunches));
+  const safeUnpunched = Math.max(0, totalPunches - safeUsed);
   const iconsArr = [
-    ...Array(usedPunches).fill(punchedIcon),
-    ...Array(unpunched).fill(unpunchedIcon),
+    ...Array(safeUsed).fill(punchedIcon),
+    ...Array(safeUnpunched).fill(unpunchedIcon),
   ];
 
   
