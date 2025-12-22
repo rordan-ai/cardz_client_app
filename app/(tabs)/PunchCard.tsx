@@ -1803,7 +1803,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={[styles.container, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
       {/* סימון גרסה */}
       <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V19' : 'V24'}
+        {Platform.OS === 'android' ? 'V20' : 'V25'}
       </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
@@ -2082,7 +2082,7 @@ export default function PunchCard() {
           <Text 
             style={[styles.benefitText, { color: cardTextColor }]} 
             accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefit}`}
-            numberOfLines={2}
+            numberOfLines={3}
           >
             נותרו {unpunched} ניקובים לקבלת {benefit}
           </Text>
