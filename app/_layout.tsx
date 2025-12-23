@@ -4,11 +4,13 @@ import { Platform, Linking } from 'react-native';
 import { useEffect, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../components/supabaseClient';
+import { useBusiness } from '../components/BusinessContext';
 
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
 
 export default function RootLayout() {
   const router = useRouter();
+  const { setBusinessCode } = useBusiness();
   const nfcHandledRef = useRef(false);
 
   // NFC Deep Link Handler - intercepts mycardz://business/XXXX
@@ -34,6 +36,11 @@ export default function RootLayout() {
         }
         
         console.log('[RootLayout] Phone:', savedPhone ? 'exists' : 'none');
+        
+        // CRITICAL: עדכון business context לפני routing (למניעת עיצוב של עסק ישן)
+        console.log('[RootLayout] Setting business context:', businessCode);
+        await setBusinessCode(businessCode);
+        console.log('[RootLayout] Business context updated');
         
         if (!savedPhone) {
           // אין ביומטרי - למסך כניסה

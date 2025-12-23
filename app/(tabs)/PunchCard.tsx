@@ -1803,7 +1803,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={[styles.container, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
       {/* סימון גרסה */}
       <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V25' : 'V30'}
+        {Platform.OS === 'android' ? 'V26' : 'V31'}
       </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
