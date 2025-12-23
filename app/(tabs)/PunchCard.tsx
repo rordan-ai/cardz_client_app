@@ -1803,7 +1803,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={[styles.container, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
       {/* סימון גרסה */}
       <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V21' : 'V26'}
+        {Platform.OS === 'android' ? 'V22' : 'V27'}
       </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
@@ -1989,8 +1989,8 @@ export default function PunchCard() {
           <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 130 }] } : undefined}>
             {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
             <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-              {/* עטיפה מבודדת ל-4 שורות: גריד+טקסטים עולים ביחד 3px (כמקשה אחת) */}
-              <View style={rows.length === 4 ? { transform: [{ translateY: -3 }] } : undefined}>
+              {/* עטיפה מבודדת ל-4 שורות: גריד+טקסטים עולים ביחד 9px (כמקשה אחת) */}
+              <View style={rows.length === 4 ? { transform: [{ translateY: -9 }] } : undefined}>
               {/* אייקונים - הזזה מבודדת (Android בלבד):
                   - 3 שורות: 40px למעלה
                   - 4 שורות: 5px למעלה */}
