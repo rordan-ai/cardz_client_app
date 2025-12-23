@@ -15,17 +15,23 @@ class NfcDispatchActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
+    Log.d("NfcDispatch", "=== NFC ACTIVITY STARTED ===")
+    Log.d("NfcDispatch", "Intent action: ${intent?.action}")
+    Log.d("NfcDispatch", "Intent data: ${intent?.data}")
+    Log.d("NfcDispatch", "Intent type: ${intent?.type}")
+
     val launchIntent = Intent(this, MainActivity::class.java)
     launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
     // פענוח business code מה-NFC tag
     val businessCode = extractBusinessCodeFromIntent(intent)
+    Log.d("NfcDispatch", "Extracted business code: $businessCode")
     
     if (businessCode != null) {
       // שליחת deep link שה-Linking listener יתפוס
       val deepLinkUri = Uri.parse("mycardz://business/$businessCode")
       launchIntent.data = deepLinkUri
-      Log.d("NfcDispatch", "Business code: $businessCode, deep link: $deepLinkUri")
+      Log.d("NfcDispatch", "✓ Sending deep link: $deepLinkUri")
     } else {
       // fallback - העברה ישירה של Intent
       launchIntent.action = intent?.action
@@ -35,9 +41,10 @@ class NfcDispatchActivity : Activity() {
       if (extras != null) {
         launchIntent.putExtras(extras)
       }
-      Log.w("NfcDispatch", "Failed to parse business code")
+      Log.w("NfcDispatch", "✗ Failed to parse, forwarding raw intent")
     }
 
+    Log.d("NfcDispatch", "Starting MainActivity with data: ${launchIntent.data}")
     startActivity(launchIntent)
     finish()
   }
