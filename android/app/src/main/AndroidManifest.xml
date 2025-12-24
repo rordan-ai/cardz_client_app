@@ -52,12 +52,20 @@
       android:launchMode="singleTask"
       android:noHistory="true"
       android:theme="@style/Theme.App.SplashScreen">
+      <!-- URI Record: mycardz://business/XXXX -->
       <intent-filter android:priority="1000">
+        <action android:name="android.nfc.action.NDEF_DISCOVERED"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:scheme="mycardz"/>
+      </intent-filter>
+      <!-- Text Record: תאימות לאחור -->
+      <intent-filter android:priority="999">
         <action android:name="android.nfc.action.NDEF_DISCOVERED"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <data android:mimeType="text/plain"/>
       </intent-filter>
-      <intent-filter android:priority="999">
+      <!-- Fallback: TECH_DISCOVERED -->
+      <intent-filter android:priority="998">
         <action android:name="android.nfc.action.TECH_DISCOVERED"/>
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>
