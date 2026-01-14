@@ -310,7 +310,7 @@ export default function BusinessSelector() {
         
         {/* סימון גרסה לבדיקת עדכונים */}
         <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
-          {Platform.OS === 'android' ? 'V27' : 'V31'}
+          {Platform.OS === 'android' ? 'V30.64' : 'V33.69'}
         </Text>
       </ImageBackground>
 

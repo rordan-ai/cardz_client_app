@@ -188,17 +188,24 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
     businessCode: string,
     phone: string,
     card: CustomerCard,
-    productName: string
+    productName: string,
+    customerName?: string
   ): Promise<string | null> => {
     try {
+      const isRewardPunch = (card.used_punches + 1) >= card.total_punches;
+      
       // שימוש ב-Edge Function כדי לעקוף בעיות RLS/הרשאות ביצירת punch_requests
       const { data, error } = await supabase.functions.invoke('punch-request-create', {
         body: {
           business_code: businessCode,
           customer_phone: phone,
+          customer_name: customerName || 'לקוח',
           card_number: card.card_number,
           product_name: productName,
           is_prepaid: card.prepaid === 'כן',
+          current_punches: card.used_punches + 1,
+          total_punches: card.total_punches,
+          is_rewarding: isRewardPunch
         }
       });
 
@@ -274,7 +281,7 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
         // לא נכשל - הניקוב כבר בוצע
       }
 
-      console.log('[NFC] Punch executed successfully, rewarding:', isRewardingPunch);
+      console.log('[CONFETTI-useNFCPunch] Punch executed successfully, isRewardingPunch:', isRewardingPunch, { newPunches, totalPunches: card.total_punches });
       return { success: true, isRewardingPunch };
     } catch (err) {
       console.log('[NFC] Error:', 'executePunch', err);
@@ -324,9 +331,11 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
               const rewarding = Number.isFinite(used) && Number.isFinite(total) && used >= total;
 
               if (rewarding) {
+                console.log('[CONFETTI-useNFCPunch] 🎉 Setting flowState to rewarding_punch (after admin completion)', { used, total });
                 setFlowState('rewarding_punch');
                 return;
               }
+              console.log('[CONFETTI-useNFCPunch] Setting flowState to success (not rewarding)', { used, total });
               setFlowState('success');
             } catch (e) {
               console.log('[NFC] Error:', 'fetchCardAfterCompleted', e);
@@ -526,9 +535,11 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       );
       if (result.success) {
         if (result.isRewardingPunch) {
+          console.log('[CONFETTI-useNFCPunch] 🎉 Setting flowState to rewarding_punch (prepaid direct punch)');
           setFlowState('rewarding_punch');
           return; // לא משחררים נעילה כאן — המודאל יתקדם למסך חידוש/סגירה
         }
+        console.log('[CONFETTI-useNFCPunch] Setting flowState to success (prepaid, not rewarding)');
         setFlowState('success');
       } else {
         if (result.atMax) {
@@ -550,7 +561,8 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       businessCode,
       phone,
       { ...card, used_punches: latestUsed, total_punches: latestTotal },
-      card.benefit || 'מוצר'
+      card.benefit || 'מוצר',
+      undefined // ב-Hook הזה customerName לא תמיד זמין, נשלח undefined והפונקציה תשים 'לקוח' כברירת מחדל
     );
 
     if (requestId) {

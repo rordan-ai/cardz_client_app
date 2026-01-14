@@ -10,7 +10,7 @@ import * as Application from 'expo-application';
 import * as Updates from 'expo-updates';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, DeviceEventEmitter, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, DeviceEventEmitter, Dimensions, FlatList, Image, ImageBackground, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Barcode } from 'react-native-svg-barcode';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { WebView } from 'react-native-webview';
@@ -114,6 +114,7 @@ export default function PunchCard() {
     expiration_date?: string;
     nfc_string?: string;
     login_brand_color?: string;
+    card_background_color?: string;
     punch_mode?: string;
   } | null>(null);
 
@@ -133,6 +134,15 @@ export default function PunchCard() {
 
   // פתיחת מודאל NFC אוטומטית או ניקוב ישיר כשהאפליקציה נפתחה מתג NFC
   useEffect(() => {
+    console.log('[DEBUG-DIRECT-PUNCH] useEffect triggered', {
+      isNfcLaunch,
+      isAutoPunch,
+      nfcLaunchHandled: nfcLaunchHandled.current,
+      nfcString: localBusiness?.nfc_string,
+      cooldown: nfcCooldownRef.current,
+      cardNumber: punchCard?.card_number
+    });
+    
     // תנאים בסיסיים:
     // 1. nfcLaunch או autoPunch פעילים
     // 2. יש nfc_string לעסק
@@ -143,10 +153,14 @@ export default function PunchCard() {
                            localBusiness?.nfc_string && 
                            !nfcCooldownRef.current;
     
+    console.log('[DEBUG-DIRECT-PUNCH] shouldProcess:', shouldProcess);
     if (!shouldProcess) return;
 
     // במצב autoPunch - ממתינים לטעינת הכרטיסייה
-    if (isAutoPunch && !punchCard?.card_number) return;
+    if (isAutoPunch && !punchCard?.card_number) {
+      console.log('[DEBUG-DIRECT-PUNCH] Waiting for card to load...');
+      return;
+    }
 
     // בדיקת תנאים לניקוב ישיר (בלי מודאל):
     // 1. autoPunch פעיל
@@ -155,31 +169,41 @@ export default function PunchCard() {
     const isPrepaid = punchCard?.prepaid === 'כן';
     const isAutoMode = localBusiness?.punch_mode === 'auto';
     const canDirectPunch = isAutoPunch && isPrepaid && isAutoMode && punchCard?.card_number;
+    console.log('[DEBUG-DIRECT-PUNCH] Conditions:', { isPrepaid, isAutoMode, canDirectPunch });
 
     nfcLaunchHandled.current = true;
+    console.log('[DEBUG-DIRECT-PUNCH] nfcLaunchHandled set to true');
 
     if (canDirectPunch) {
       // ניקוב ישיר ללא פתיחת מודאל!
-      console.log('[NFC PunchCard] Direct punch - no modal needed!', { 
+      console.log('[DEBUG-DIRECT-PUNCH] ===== START =====');
+      console.log('[DEBUG-DIRECT-PUNCH] canDirectPunch=true', { 
         cardNumber: punchCard.card_number, 
         isPrepaid, 
-        isAutoMode 
+        isAutoMode,
+        benefit: punchCard.benefit
       });
       
       // ביצוע ניקוב ישיר
       const executeDirectPunch = async () => {
+        console.log('[DEBUG-DIRECT-PUNCH] executeDirectPunch() called');
         setDirectPunchStatus('punching');
         setDirectPunchMessage('מבצע ניקוב...');
+        console.log('[DEBUG-DIRECT-PUNCH] Status set to punching');
         
         try {
           // בדיקת מצב נוכחי של הכרטיסייה
-          const { data: currentCard } = await supabase
+          console.log('[DEBUG-DIRECT-PUNCH] Fetching card from DB...');
+          const { data: currentCard, error: fetchError } = await supabase
             .from('PunchCards')
             .select('used_punches, total_punches')
             .eq('card_number', punchCard.card_number)
             .single();
 
+          console.log('[DEBUG-DIRECT-PUNCH] Card fetch result:', { currentCard, fetchError });
+
           if (!currentCard) {
+            console.log('[DEBUG-DIRECT-PUNCH] ERROR: Card not found');
             setDirectPunchStatus('error');
             setDirectPunchMessage('כרטיסייה לא נמצאה');
             return;
@@ -187,9 +211,11 @@ export default function PunchCard() {
 
           const usedPunches = currentCard.used_punches;
           const totalPunches = currentCard.total_punches;
+          console.log('[DEBUG-DIRECT-PUNCH] Current punches:', usedPunches, '/', totalPunches);
 
           // בדיקה אם הכרטיסייה מלאה
           if (usedPunches >= totalPunches) {
+            console.log('[DEBUG-DIRECT-PUNCH] ERROR: Card is full');
             setDirectPunchStatus('error');
             setDirectPunchMessage('הכרטיסייה מלאה - פנה לקופאי לחידוש');
             return;
@@ -197,6 +223,7 @@ export default function PunchCard() {
 
           // ביצוע הניקוב
           const newPunches = usedPunches + 1;
+          console.log('[DEBUG-DIRECT-PUNCH] Updating DB to:', newPunches);
           const { error: updateError } = await supabase
             .from('PunchCards')
             .update({ used_punches: newPunches })
@@ -204,13 +231,15 @@ export default function PunchCard() {
             .lt('used_punches', totalPunches);
 
           if (updateError) {
-            console.log('[NFC] Direct punch error:', updateError);
+            console.log('[DEBUG-DIRECT-PUNCH] ERROR: Update failed:', updateError);
             setDirectPunchStatus('error');
             setDirectPunchMessage('שגיאה בביצוע ניקוב');
             return;
           }
+          console.log('[DEBUG-DIRECT-PUNCH] DB updated successfully');
 
           // הוספה ללוג פעילות
+          console.log('[DEBUG-DIRECT-PUNCH] Adding activity log...');
           await supabase.from('activity_logs').insert({
             business_code: localBusiness?.business_code,
             customer_phone: phoneIntl,
@@ -218,40 +247,60 @@ export default function PunchCard() {
             source: 'nfc_auto',
             details: `ניקוב אוטומטי מ-NFC: ${newPunches}/${totalPunches}`
           });
+          console.log('[DEBUG-DIRECT-PUNCH] Activity log added');
 
           // עדכון state מקומי
+          console.log('[DEBUG-DIRECT-PUNCH] Updating local state...');
           setPunchCard(prev => prev ? { ...prev, used_punches: newPunches } : null);
 
           // בדיקה אם זה ניקוב מזכה
           const isRewardingPunch = newPunches >= totalPunches;
+          console.log('[DEBUG-DIRECT-PUNCH] isRewardingPunch:', isRewardingPunch);
           setIsDirectRewardingPunch(isRewardingPunch);
           
           setDirectPunchStatus('success');
-          setDirectPunchMessage(isRewardingPunch 
+          const successMsg = isRewardingPunch 
             ? `🎉 מזל טוב! הגעת להטבה: ${punchCard.benefit}` 
-            : `✅ ניקוב ${newPunches}/${totalPunches} בוצע בהצלחה!`);
+            : `✅ ניקוב ${newPunches}/${totalPunches} בוצע בהצלחה!`;
+          setDirectPunchMessage(successMsg);
+          console.log('[DEBUG-DIRECT-PUNCH] SUCCESS! Message:', successMsg);
 
           // איפוס אחרי זמן מתאים (יותר לקונפטי)
+          const resetDelay = isRewardingPunch ? 4000 : 3000;
+          console.log('[DEBUG-DIRECT-PUNCH] Will reset after', resetDelay, 'ms');
           setTimeout(() => {
+            console.log('[DEBUG-DIRECT-PUNCH] Resetting status to idle');
             setDirectPunchStatus('idle');
             setDirectPunchMessage('');
             setIsDirectRewardingPunch(false);
-          }, isRewardingPunch ? 4000 : 3000);
+            console.log('[DEBUG-DIRECT-PUNCH] ===== COMPLETE =====');
+          }, resetDelay);
 
         } catch (err) {
-          console.log('[NFC] Direct punch exception:', err);
+          console.log('[DEBUG-DIRECT-PUNCH] EXCEPTION:', err);
           setDirectPunchStatus('error');
           setDirectPunchMessage('שגיאה בביצוע ניקוב');
         }
       };
 
+      console.log('[DEBUG-DIRECT-PUNCH] Scheduling executeDirectPunch in 300ms');
       setTimeout(executeDirectPunch, 300);
     } else {
       // לא עומד בתנאים לניקוב ישיר - פתיחת מודאל
-      console.log('[NFC PunchCard] Opening NFC modal', { isNfcLaunch, isAutoPunch, cardNumber: punchCard?.card_number });
+      console.log('[DEBUG-DIRECT-PUNCH] Opening NFC modal instead', { isNfcLaunch, isAutoPunch, cardNumber: punchCard?.card_number });
       setTimeout(() => setNfcModalVisible(true), 300);
     }
+    
+    console.log('[DEBUG-DIRECT-PUNCH] useEffect finished setup');
   }, [isNfcLaunch, isAutoPunch, localBusiness?.nfc_string, localBusiness?.punch_mode, punchCard?.card_number, punchCard?.prepaid, punchCard?.benefit, phoneIntl]);
+
+  // לוג לזיהוי unmount
+  useEffect(() => {
+    console.log('[DEBUG-DIRECT-PUNCH] PunchCard component MOUNTED');
+    return () => {
+      console.log('[DEBUG-DIRECT-PUNCH] PunchCard component UNMOUNTING!');
+    };
+  }, []);
 
   // פונקציה לסגירת מודאל NFC עם cooldown
   const closeNfcModalWithCooldown = () => {
@@ -358,6 +407,36 @@ export default function PunchCard() {
         return;
       }
       
+      // שליפת נתוני העסק ראשית (כולל הגדרות רקע) - לפני כל בדיקה אחרת
+      const { data: businessDataEarly, error: businessErrorEarly } = await supabase
+        .from('businesses')
+        .select('*')
+        .eq('business_code', resolvedBusinessCode)
+        .limit(1);
+      
+      // לוג לדיבוג - כולל שגיאות RLS
+      console.log('[BG-DEBUG] Query result:', {
+        hasData: !!businessDataEarly,
+        dataLength: businessDataEarly?.length,
+        error: businessErrorEarly,
+        resolvedBusinessCode
+      });
+      
+      if (businessErrorEarly) {
+        console.error('[BG-DEBUG] RLS or query error:', businessErrorEarly);
+      }
+      
+      if (businessDataEarly && businessDataEarly.length > 0) {
+        console.log('[BG-DEBUG] Business data from DB (early fetch):', {
+          business_code: businessDataEarly[0].business_code,
+          card_background_color: businessDataEarly[0].card_background_color,
+          all_keys: Object.keys(businessDataEarly[0])
+        });
+        setLocalBusiness(businessDataEarly[0]);
+      } else {
+        console.log('[BG-DEBUG] No business data found!');
+      }
+      
       const { data: customers, error: customerError } = await supabase
         .from('customers')
         .select('*')
@@ -442,28 +521,21 @@ export default function PunchCard() {
         productNameForCard = customerCards[0]?.products?.[0]?.product_name || '';
       }
       
-      // שליפת נתוני העסק (כולל max_punches)
-      const { data: businessData, error: businessError } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('business_code', resolvedBusinessCode)
-        .limit(1);
-      
-      if (businessData && businessData.length > 0) {
-        setLocalBusiness(businessData[0]);
+      // עדכון Context ו-Preload תמונות (נתוני העסק כבר נשלפו מוקדם יותר)
+      if (businessDataEarly && businessDataEarly.length > 0) {
         await refreshBusiness();
         
         // Preload תמונות לשיפור הביצועים
-        const businessInfo = businessData[0];
+        const businessInfo = businessDataEarly[0];
         if (businessInfo.logo) {
           Image.prefetch(businessInfo.logo).catch(() => {});
         }
-            if (businessInfo.punched_icon) {
-      Image.prefetch(businessInfo.punched_icon).catch(() => {});
-    }
-    if (businessInfo.unpunched_icon) {
-      Image.prefetch(businessInfo.unpunched_icon).catch(() => {});
-    }
+        if (businessInfo.punched_icon) {
+          Image.prefetch(businessInfo.punched_icon).catch(() => {});
+        }
+        if (businessInfo.unpunched_icon) {
+          Image.prefetch(businessInfo.unpunched_icon).catch(() => {});
+        }
       }
       
       // שליפת כרטיסייה לפי card_number
@@ -951,11 +1023,13 @@ export default function PunchCard() {
   const cardCode = punchCard?.card_number || '';
 
   // לוגיקת ניקובים - שימוש ב-max_punches מהעסק במקום total_punches מהכרטיסייה
-  const totalPunches = business?.max_punches || 0;
+  // משתמשים ב-localBusiness כי business (מהContext) לא נטען בכניסה ישירה מ-NFC deep link
+  const totalPunches = localBusiness?.max_punches || business?.max_punches || 0;
   const usedPunches = punchCard?.used_punches || 0;
   const unpunched = totalPunches - usedPunches;
-  const punchedIcon = business?.punched_icon;
-  const unpunchedIcon = business?.unpunched_icon;
+  // משתמשים ב-localBusiness כי business (מהContext) לא נטען בכניסה ישירה מ-NFC deep link
+  const punchedIcon = localBusiness?.punched_icon || business?.punched_icon;
+  const unpunchedIcon = localBusiness?.unpunched_icon || business?.unpunched_icon;
   // בשורת "לקבלת" מציגים את שם מוצר הכרטיסייה (למקרה של כמה כרטיסיות בעסק).
   // אם אין לנו product_name, ניפול אחורה ל-benefit / product_code כדי לא להשאיר ריק.
   const benefit = (punchCard?.product_name || '').trim() || (punchCard?.benefit || '').trim() || punchCard?.product_code || '';
@@ -981,14 +1055,24 @@ export default function PunchCard() {
   }
   
   // Debug: בדיקה אם rows.length תקין
-  if (__DEV__ && Platform.OS === 'android') {
-    console.log('[PunchCard] totalPunches:', totalPunches, 'usedPunches:', usedPunches, 'iconsArr.length:', iconsArr.length, 'rows.length:', rows.length);
+  if (Platform.OS === 'android') {
+    console.log('[PunchCard] Grid debug:', {
+      totalPunches,
+      usedPunches,
+      iconsArr_length: iconsArr.length,
+      rows_length: rows.length,
+      punchedIcon: punchedIcon ? 'exists' : 'MISSING',
+      unpunchedIcon: unpunchedIcon ? 'exists' : 'MISSING',
+      localBusiness_exists: !!localBusiness,
+      business_exists: !!business
+    });
   }
 
   
 
   // צבע הטקסט מהעסק או ברירת מחדל
-  const cardTextColor = business?.card_text_color || '#6B3F1D';
+  // משתמשים ב-localBusiness כי business (מהContext) לא נטען בכניסה ישירה מ-NFC deep link
+  const cardTextColor = localBusiness?.card_text_color || business?.card_text_color || '#6B3F1D';
 
   // הודעות דמי פשוטות - 2 הודעות לדמו
   // פונקציה למחיקת הודעה
@@ -1792,6 +1876,15 @@ export default function PunchCard() {
     }
   };
 
+  // צבע רקע דינמי מה-DB או ברירת מחדל
+  const cardBackgroundColor = localBusiness?.card_background_color || '#FBF8F8';
+  
+  // לוג לדיבוג רקע
+  console.log('[BG-RENDER] Background settings:', {
+    cardBackgroundColor,
+    hasLocalBusiness: !!localBusiness
+  });
+
   return (
     <>
       {/* כפתור חזרה ל-iOS - בתחתית המסך */}
@@ -1800,10 +1893,11 @@ export default function PunchCard() {
           <BackButton fallbackRoute="/(tabs)/customers-login" color={brandColor} />
         </View>
       )}
-    <ScrollView contentContainerStyle={[styles.container, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
+    <View style={{ flex: 1, backgroundColor: cardBackgroundColor }}>
+    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: cardBackgroundColor }, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
       {/* סימון גרסה */}
       <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V26' : 'V31'}
+        {Platform.OS === 'android' ? 'V30.64' : 'V33.69'}
       </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
@@ -1963,9 +2057,13 @@ export default function PunchCard() {
       </View>
       {/* עטיפה מבודדת ל-2 ו-3 שורות */}
       <View style={{ marginTop: rows.length === 2 ? 90 : rows.length === 3 ? 60 : 0 }}>
+        {/* iOS בלבד: הזזה של כל התוכן (שם לקוח + גריד + טקסטים + NFC + ברקוד) 160px למטה */}
+        <View style={Platform.OS === 'ios' ? { transform: [{ translateY: 160 }] } : undefined}>
         {/* Android: עמוד ראשון בגובה המסך כדי שהברקוד יהיה "עמוד שני" ויתגלה מיד בתחילת גלילה */}
         <View style={Platform.OS === 'android' ? { minHeight: height } : undefined}>
           {/* שם הלקוח - מקובע באנדרואיד למיקום של מצב 4 שורות (לא תלוי במספר שורות/הזזות אחרות) */}
+          {/* iOS בלבד: עטיפה מבודדת לשם הלקוח - העלאה 65px למעלה */}
+          <View style={Platform.OS === 'ios' ? { transform: [{ translateY: -65 }] } : undefined}>
           <Text
             style={[
               styles.customerName,
@@ -1984,13 +2082,14 @@ export default function PunchCard() {
           >
             {customer?.name || ''}
           </Text>
+          </View>{/* סגירת wrapper iOS - העלאה 35px למעלה לשם הלקוח בלבד */}
 
           {/* מקשה אחת (Android בלבד וב-3 שורות): גריד + טקסטים יורדים 130px, בלי להזיז לוגו/שם עסק/תפריטים */}
           <View style={Platform.OS === 'android' && rows.length === 3 ? { transform: [{ translateY: 130 }] } : undefined}>
-            {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px */}
-            <View style={[styles.bottomContentOffset, rows.length === 4 ? { marginTop: -20 } : {}]}>
-              {/* עטיפה מבודדת ל-4 שורות: גריד+טקסטים עולים ביחד 16px (כמקשה אחת) */}
-              <View style={rows.length === 4 ? { transform: [{ translateY: -16 }] } : undefined}>
+            {/* כל התוכן מתחת לשם הלקוח - ב-4 שורות עולה 20px (Android בלבד) */}
+            <View style={[styles.bottomContentOffset, Platform.OS === 'android' && rows.length === 4 ? { marginTop: -20 } : {}]}>
+              {/* עטיפה מבודדת ל-4 שורות: גריד+טקסטים עולים ביחד 16px (כמקשה אחת) - Android בלבד */}
+              <View style={Platform.OS === 'android' && rows.length === 4 ? { transform: [{ translateY: -16 }] } : undefined}>
               {/* אייקונים - הזזה מבודדת (Android בלבד):
                   - 3 שורות: 40px למעלה
                   - 4 שורות: 5px למעלה */}
@@ -2130,7 +2229,7 @@ export default function PunchCard() {
           )}
             </View>
           </View>
-              </View>{/* סגירת עטיפת 4 שורות (גריד+טקסטים -3px) */}
+              </View>{/* סגירת עטיפת 4 שורות (גריד+טקסטים -16px) */}
         </View>
 
         {/* סגירת "עמוד ראשון" (Android בלבד) */}
@@ -2172,6 +2271,7 @@ export default function PunchCard() {
             <Text style={styles.cardCode}>#{cardCode}</Text>
           </View>
         )}
+        </View>{/* סגירת wrapper iOS - הזזה 70px למטה */}
 
       </View>{/* סגירת עטיפת 2/3 שורות */}
       </View>{/* סגירת עטיפת הגדלה 25% */}
@@ -3433,6 +3533,7 @@ export default function PunchCard() {
       </Modal>
 
     </ScrollView>
+    </View>
 
       {/* הודעת סטטוס ניקוב ישיר (autoPunch) */}
       {directPunchStatus !== 'idle' && (
@@ -3447,13 +3548,25 @@ export default function PunchCard() {
           alignItems: 'center',
           zIndex: 9999,
         }}>
-          {/* קונפטי לניקוב מזכה */}
+          {/* קונפטי לניקוב מזכה - לוג לדיבוג */}
+          {directPunchStatus !== 'idle' && (() => { 
+            console.log('[CONFETTI-DEBUG] Render check:', { isDirectRewardingPunch, directPunchStatus, shouldShowConfetti: isDirectRewardingPunch && directPunchStatus === 'success' }); 
+            return null; 
+          })()}
           {isDirectRewardingPunch && directPunchStatus === 'success' && (
             <Video
               source={require('../../assets/animations/confetti.mp4')}
               shouldPlay
+              isMuted={true}
               isLooping={false}
               resizeMode={ResizeMode.COVER}
+              onLoad={() => console.log('[CONFETTI-DEBUG] Video LOADED')}
+              onError={(e) => console.log('[CONFETTI-DEBUG] Video ERROR:', e)}
+              onPlaybackStatusUpdate={(status) => {
+                if (status.isLoaded && status.isPlaying) {
+                  console.log('[CONFETTI-DEBUG] Video PLAYING');
+                }
+              }}
               style={{
                 position: 'absolute',
                 top: 0,
@@ -3672,7 +3785,7 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     alignItems: 'center',
-    backgroundColor: '#FBF8F8',
+    // backgroundColor מוגדר דינמית מה-DB
     paddingTop: 8,
     paddingBottom: 20,
     paddingHorizontal: 8,

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabaseClient';
 
 interface Business {
@@ -9,6 +9,10 @@ interface Business {
   phone?: string;
   login_brand_color?: string;
   login_background_image?: string;
+  background_login_page_color?: string;
+  card_background_color?: string;
+  entry_signup_text_color?: string;
+  entry_click_icon_color?: string;
   business_whatsapp?: string;
   business_phone?: string;
   max_punches?: number;
@@ -44,9 +48,14 @@ export const BusinessProvider = ({ children }: { children: React.ReactNode }) =>
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(false); // מתחיל כ-false כי אין עסק לטעון בהתחלה
   const [currentBusinessCode, setCurrentBusinessCode] = useState<string | null>(null);
+  const currentBusinessCodeRef = useRef(currentBusinessCode);
 
-  const fetchBusiness = async (businessCode?: string) => {
-    const codeToFetch = businessCode || currentBusinessCode;
+  useEffect(() => {
+    currentBusinessCodeRef.current = currentBusinessCode;
+  }, [currentBusinessCode]);
+
+  const fetchBusiness = useCallback(async (businessCode?: string): Promise<Business | null> => {
+    const codeToFetch = businessCode || currentBusinessCodeRef.current;
     if (!codeToFetch) {
       console.log('[BusinessContext] No business code to fetch');
       setLoading(false);
@@ -66,24 +75,25 @@ export const BusinessProvider = ({ children }: { children: React.ReactNode }) =>
     setBusiness(data);
     setLoading(false);
     return data; // מחזיר את הנתונים החדשים
-  };
+  }, []);
 
   const refreshBusiness = async () => {
-    const oldData = business;
-    const newData = await fetchBusiness(currentBusinessCode);
+    await fetchBusiness();
   };
 
-  const setBusinessCode = async (code: string) => {
+  const setBusinessCode = useCallback(async (code: string) => {
     setCurrentBusinessCode(code);
+    // Explicitly fetch business data and wait for it to complete
     await fetchBusiness(code);
-  };
+  }, [fetchBusiness]);
 
-  // לא טוען עסק אוטומטית - רק כשמגדירים business code מפורש
+  // UseEffect for initial load if needed, but setBusinessCode handles direct updates
   useEffect(() => {
-    if (currentBusinessCode) {
+    // Only fetch if not already loaded or if code changed externally
+    if (currentBusinessCode && (!business || business.business_code !== currentBusinessCode)) {
       fetchBusiness(currentBusinessCode);
     }
-  }, [currentBusinessCode]);
+  }, [currentBusinessCode, business, fetchBusiness]);
 
   return (
     <BusinessContext.Provider value={{ 

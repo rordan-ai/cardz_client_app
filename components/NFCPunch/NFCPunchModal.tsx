@@ -87,6 +87,11 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
     }
   }, [visible, nfcString, customerPhoneFromProps, selectedCardNumber, startPunchFlow]);
 
+  // לוג לדיבאג - מעקב אחר שינויי flowState
+  useEffect(() => {
+    console.log('[CONFETTI-NFCModal] flowState changed to:', flowState, { showRenewalAfterReward, visible });
+  }, [flowState, showRenewalAfterReward, visible]);
+
   // טיפול בהצלחה
   useEffect(() => {
     if (flowState === 'success') {
@@ -100,6 +105,7 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   // טיפול בניקוב מזכה - קונפטי וסאונד
   useEffect(() => {
     if (flowState === 'rewarding_punch') {
+      console.log('[CONFETTI-NFCModal] 🎉 REWARDING PUNCH DETECTED! Starting confetti flow...');
       setShowRenewalAfterReward(false);
       // לפי האפיון: בזמן הקונפטי כבר צריך להתעדכן מספר הניקובים בכרטיסייה
       // לכן מרעננים מייד, ואת מודאל החידוש מציגים אחרי האנימציה.
@@ -364,16 +370,25 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
         );
 
       case 'rewarding_punch':
+        console.log('[CONFETTI-NFCModal] Rendering rewarding_punch case - Video should appear NOW');
         return (
           <View style={styles.fullScreenOverlay}>
-            {/* וידאו מלא עם קול (לפי הדרישה) */}
+            {/* וידאו מלא - isMuted חובה כדי ש-shouldPlay יעבוד ב-Android 14+ */}
             <Video
               source={require('../../assets/animations/confetti.mp4')}
               shouldPlay
+              isMuted={true}
               isLooping={false}
               resizeMode={ResizeMode.CONTAIN}
               style={[styles.confettiFullScreen, styles.confettiScaled]}
-              onError={(e) => logger.log('[Video] Non-critical error:', e)}
+              onLoad={() => console.log('[CONFETTI-NFCModal] Video LOADED successfully')}
+              onReadyForDisplay={() => console.log('[CONFETTI-NFCModal] Video READY FOR DISPLAY')}
+              onPlaybackStatusUpdate={(status) => {
+                if (status.isLoaded) {
+                  console.log('[CONFETTI-NFCModal] Video status:', { isPlaying: status.isPlaying, positionMillis: status.positionMillis });
+                }
+              }}
+              onError={(e) => console.log('[CONFETTI-NFCModal] Video ERROR:', e)}
             />
           </View>
         );

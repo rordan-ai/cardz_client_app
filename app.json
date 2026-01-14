@@ -17,6 +17,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.mycompany.mycard",
       "googleServicesFile": "./GoogleService-Info.plist",
+      "associatedDomains": [
+        "applinks:app.punchcards.digital",
+        "applinks:punchcards.digital"
+      ],
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
@@ -27,13 +31,14 @@
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["mycardz"]
+            "CFBundleURLName": "com.mycompany.mycard.mycardz",
+            "CFBundleURLSchemes": [
+              "mycardz"
+            ]
           }
         ]
       },
-      "runtimeVersion": {
-        "policy": "appVersion"
-      }
+      "runtimeVersion": "1.0.0"
     },
     "android": {
       "adaptiveIcon": {
@@ -43,6 +48,28 @@
       "edgeToEdgeEnabled": true,
       "package": "com.mycardz.app",
       "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "punchcards.digital",
+              "pathPrefix": "/business"
+            },
+            {
+              "scheme": "https",
+              "host": "app.punchcards.digital",
+              "pathPrefix": "/business"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -94,7 +121,8 @@
       ],
       "expo-secure-store",
       "react-native-nfc-manager",
-      "./plugins/with-nfc-android"
+      "./plugins/with-nfc-android",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
@@ -112,8 +140,6 @@
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    }
+    "runtimeVersion": "1.0.0"
   }
 }

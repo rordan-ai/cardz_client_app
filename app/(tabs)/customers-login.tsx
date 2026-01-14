@@ -48,6 +48,10 @@ export default function CustomersLogin() {
   const [biometricAuthInProgress, setBiometricAuthInProgress] = useState(false);
 
   const brandColor = business?.login_brand_color || '#9747FF';
+  const loginBackgroundColor = business?.background_login_page_color || '#FBF8F8';
+  // צבעים חדשים עם fallback ל-brandColor
+  const signupTextColor = business?.entry_signup_text_color || brandColor;
+  const clickIconColor = business?.entry_click_icon_color || '#fff';
 
   // פונקציה לאימות ביומטרי (מוגדרת לפני שימוש ב-useEffect כדי לא ליצור ReferenceError)
   const authenticateBiometric = useCallback(async (): Promise<boolean> => {
@@ -315,7 +319,7 @@ export default function CustomersLogin() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FBF8F8' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: loginBackgroundColor }}>
         {/* כפתור המבורגר גם במצב טעינה */}
                  <TouchableOpacity onPress={openMenu} style={{ position: 'absolute', top: Platform.OS === 'ios' ? 70 : 30, alignSelf: 'center' }}>
            <Image source={HamburgerIcon} style={{ width: 36, height: 36, tintColor: '#9747FF' }} />
@@ -364,7 +368,7 @@ export default function CustomersLogin() {
   }
 
   return (
-    <View style={styles(brandColor).container} accessible={false} importantForAccessibility="yes">
+    <View style={[styles(brandColor).container, { backgroundColor: loginBackgroundColor }]} accessible={false} importantForAccessibility="yes">
       {/* כפתור חזרה ל-iOS */}
       <View style={{ position: 'absolute', bottom: 30, left: 10, zIndex: 100 }}>
         <BackButton fallbackRoute="/(tabs)/business_selector" color={brandColor} />
@@ -500,7 +504,7 @@ export default function CustomersLogin() {
               accessibilityRole="button"
               accessibilityHint="לחץ לצפייה בכרטיסייה שלך לאחר הזנת מספר טלפון"
             >
-              <Image source={ClickIcon} style={[styles(brandColor).clickIcon, { tintColor: '#fff' }]} />
+              <Image source={ClickIcon} style={[styles(brandColor).clickIcon, { tintColor: clickIconColor }]} />
             </TouchableOpacity>
           </View>
           {error ? <Text style={styles(brandColor).errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{error}</Text> : null}
@@ -513,10 +517,10 @@ export default function CustomersLogin() {
               accessibilityRole="button"
               accessibilityHint="לחץ להרשמה וקבלת כרטיסייה חדשה"
             >
-              <Text style={[styles(brandColor).registerText, { color: brandColor }]}>הרשמ/י לקבלת כרטיסייה</Text>
+              <Text style={[styles(brandColor).registerText, { color: signupTextColor }]}>הרשמ/י לקבלת כרטיסייה</Text>
             </TouchableOpacity>
             <View style={{width: 8}} />
-            <Text style={styles(brandColor).registerQuestion}>אין לך עדיין כרטיסייה?</Text>
+            <Text style={[styles(brandColor).registerQuestion, { color: signupTextColor }]}>אין לך עדיין כרטיסייה?</Text>
           </View>
           {/* תמונת נושא */}
           <View style={{ alignItems: 'center', marginTop: -38, width: '100%' }}>
@@ -788,7 +792,7 @@ export default function CustomersLogin() {
 const styles = (brandColor: string) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FBF8F8',
+    // backgroundColor מוגדר דינמית מה-DB
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingTop: Platform.OS === 'ios' ? 60 : 20,

@@ -42,7 +42,7 @@
         <data android:scheme="mycardz"/>
         <data android:scheme="exp+my-new-test-app"/>
       </intent-filter>
-      <meta-data android:name="android.nfc.action.TECH_DISCOVERED" android:resource="@xml/nfc_tech_filter"/>
+      <!-- NFC נמנע מ-intent-filters ישירים - NfcDispatchActivity מטפל בכל סוגי התגים ומעביר לכאן -->
     </activity>
 
     <!-- Activity ייעודי ל-NFC כדי שהמערכת תפתח את האפליקציה במקום "New tag scanned" -->

@@ -1,11 +1,331 @@
-import { Slot } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { DeviceEventEmitter, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { WebView } from 'react-native-webview';
-import { BusinessProvider } from '../../components/BusinessContext';
-import FCMService from '../../components/FCMService';
 import * as MediaLibrary from 'expo-media-library';
+import { Slot, useRouter, usePathname } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { useEffect, useRef, useState } from 'react';
+import { DeviceEventEmitter, Linking, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import NfcManager from 'react-native-nfc-manager';
 import ViewShot, { captureRef } from 'react-native-view-shot';
+import { WebView } from 'react-native-webview';
+import { BusinessProvider, useBusiness } from '../../components/BusinessContext';
+import FCMService from '../../components/FCMService';
+import { supabase } from '../../components/supabaseClient';
+import { getCapturedInitialUrl, initialUrlPromise } from '../_layout';
+
+const BIOMETRIC_PHONE_KEY = 'biometric_phone';
+const LAST_NFC_TAG_KEY = 'last_nfc_tag_id';
+const NFC_TAG_COOLDOWN_MS = 30000; // 30 שניות - לא לטפל באותו תג שוב
+
+/**
+ * בדיקה אם תג NFC כבר טופל לאחרונה (למניעת ניקוב כפול)
+ */
+const isTagAlreadyHandled = async (tagId: string): Promise<boolean> => {
+  try {
+    const stored = await SecureStore.getItemAsync(LAST_NFC_TAG_KEY);
+    if (!stored) return false;
+    
+    const { id, timestamp } = JSON.parse(stored);
+    const elapsed = Date.now() - timestamp;
+    
+    // אם אותו תג נקרא תוך cooldown - כבר טופל
+    if (id === tagId && elapsed < NFC_TAG_COOLDOWN_MS) {
+      console.log('[NfcHandler] Tag already handled recently:', tagId, 'elapsed:', elapsed);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * שמירת תג NFC שטופל
+ */
+const markTagAsHandled = async (tagId: string): Promise<void> => {
+  try {
+    await SecureStore.setItemAsync(LAST_NFC_TAG_KEY, JSON.stringify({
+      id: tagId,
+      timestamp: Date.now()
+    }));
+  } catch (err) {
+    console.log('[NfcHandler] Failed to save tag ID:', err);
+  }
+};
+
+/**
+ * פענוח תג NFC מ-NfcManager.getLaunchTagEvent()
+ */
+const parseNfcTag = (tag: any): string | null => {
+  if (!tag?.ndefMessage?.length) return null;
+  
+  const record = tag.ndefMessage[0];
+  const payload = record.payload;
+  if (!payload?.length) return null;
+  
+  const type = record.type;
+  const typeString = type ? String.fromCharCode(...type) : '';
+  
+  // URI Record (type = 'U' או 0x55)
+  if (typeString === 'U' || (type?.[0] === 0x55)) {
+    const prefixCode = payload[0];
+    const uriPath = String.fromCharCode(...payload.slice(1));
+    const prefixes: { [key: number]: string } = {
+      0x00: '', 0x01: 'http://www.', 0x02: 'https://www.', 0x03: 'http://', 0x04: 'https://'
+    };
+    return (prefixes[prefixCode] || '') + uriPath;
+  }
+  
+  // Text Record (type = 'T' או 0x54)
+  if (typeString === 'T' || (type?.[0] === 0x54)) {
+    const langLen = payload[0] & 0x3f;
+    if (1 + langLen >= payload.length) return null;
+    return String.fromCharCode(...payload.slice(1 + langLen));
+  }
+  
+  // סוג רשומה לא מוכר - להחזיר null
+  console.log('[NfcHandler] Unknown NDEF record type:', typeString);
+  return null;
+};
+
+/**
+ * קומפוננט פנימי לטיפול ב-NFC Deep Links
+ * חייב להיות בתוך BusinessProvider כדי להשתמש ב-useBusiness
+ */
+function NfcDeepLinkHandler() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { setBusinessCode } = useBusiness();
+  // מונע עיבוד כפול של אותו URL התחלתי בלבד
+  const initialUrlHandledRef = useRef(false);
+  // מונע עיבוד מקבילי של deep links
+  const isProcessingRef = useRef(false);
+
+  useEffect(() => {
+    // אם אנחנו כבר במסך PunchCard - אנחנו לא רוצים שה-Layout ינהל את ה-NFC
+    // כדי למנוע קונפליקטים ונעילות (PunchCard מנהל את ה-NFC בעצמו)
+    if (pathname.includes('PunchCard')) {
+      console.log('[NfcHandler] PunchCard active, disabling layout NFC listener');
+      return;
+    }
+
+    const handleNfcDeepLink = async (url: string, isInitialUrl: boolean = false) => {
+      // מניעת עיבוד כפול של URL התחלתי
+      if (isInitialUrl && initialUrlHandledRef.current) return;
+      // מניעת עיבוד מקבילי - בדיקה וסימון אטומיים
+      if (isProcessingRef.current) return;
+      isProcessingRef.current = true; // סימון מיידי למניעת race condition
+      
+      console.log('[NfcHandler] Deep link received:', url, isInitialUrl ? '(initial)' : '(event)');
+      
+      // תמיכה ב-3 פורמטים:
+      // 1. mycardz://business/0002 (custom scheme - Android)
+      // 2. https://punchcards.digital/business/0002 (Universal Link - iOS Background Tag Reading)
+      // 3. https://punchcards.digital/b/0002 (קיצור)
+      let businessCode: string | null = null;
+      
+      if (url.startsWith('mycardz://business/')) {
+        // וולידציה: רק 4 ספרות
+        const match = url.match(/^mycardz:\/\/business\/(\d{4})$/);
+        businessCode = match ? match[1] : null;
+      } else if (url.includes('punchcards.digital/business/')) {
+        // תומך גם ב-app.punchcards.digital וגם ב-punchcards.digital
+        const match = url.match(/punchcards\.digital\/business\/(\d{4})/);
+        businessCode = match ? match[1] : null;
+      } else if (url.includes('punchcards.digital/b/')) {
+        const match = url.match(/punchcards\.digital\/b\/(\d{4})/);
+        businessCode = match ? match[1] : null;
+      }
+      
+      if (!businessCode) {
+        console.log('[NfcHandler] Not a valid deep link, ignoring:', url);
+        isProcessingRef.current = false; // שחרור הנעילה
+        return;
+      }
+      
+      console.log('[NfcHandler] Business code:', businessCode);
+      
+      try {
+        const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
+        
+        // נרמול מספר טלפון לפורמט מקומי (05XXXXXXXX) - הכרחי לשאילתות מול האדמין
+        const getPhoneVariants = (p: string | null) => {
+          if (!p) return [];
+          let clean = p.replace(/[^0-9]/g, '');
+          let variants = [clean];
+          
+          if (clean.startsWith('05') && clean.length === 10) {
+            variants.push('972' + clean.slice(1));
+            variants.push(clean.slice(1)); // 5XXXXXXXX
+          } else if (clean.startsWith('972') && clean.length === 12) {
+            variants.push('0' + clean.slice(3));
+            variants.push(clean.slice(3)); // 5XXXXXXXX
+          } else if (clean.startsWith('5') && clean.length === 9) {
+            variants.push('0' + clean);
+            variants.push('972' + clean);
+          }
+          
+          return [...new Set(variants)].filter(v => v.length >= 9);
+        };
+
+        const phoneVariants = getPhoneVariants(savedPhone);
+        const phoneLocal = phoneVariants.find(v => v.startsWith('05')) || (phoneVariants.length > 0 ? phoneVariants[0] : null);
+        
+        console.log('[NfcHandler] Saved phone:', savedPhone ? 'exists' : 'none');
+        
+        // עדכון business context לפני routing
+        console.log('[NfcHandler] Setting business context:', businessCode);
+        
+        // Wait for business context to be fully set and loaded
+        await setBusinessCode(businessCode);
+        console.log('[NfcHandler] Business context updated and loaded');
+        
+        if (!savedPhone) {
+          // אין ביומטרי - למסך כניסה עם העסק מוגדר
+          console.log('[NfcHandler] → customers-login (no phone)');
+          router.replace({
+            pathname: '/(tabs)/customers-login',
+            params: { businessCode, fromDeepLink: 'true' }
+          });
+          return;
+        }
+
+        // יש ביומטרי - בדיקת סוג כרטיסייה
+        const { data: businessData } = await supabase
+          .from('businesses')
+          .select('punch_mode')
+          .eq('business_code', businessCode)
+          .single();
+
+        const { data: cards } = await supabase
+          .from('PunchCards')
+          .select('prepaid')
+          .in('customer_phone', phoneVariants)
+          .eq('business_code', businessCode)
+          .eq('status', 'active');
+
+        const isAuto = businessData?.punch_mode === 'auto';
+        const hasSingle = cards && cards.length === 1;
+        const isPrepaid = hasSingle ? cards[0].prepaid === 'כן' : false;
+
+        console.log('[NfcHandler] auto:', isAuto, 'single:', hasSingle, 'prepaid:', isPrepaid);
+
+        // ניווט ישיר ל-PunchCard עם הפרמטרים המתאימים
+        console.log('[NfcHandler] → PunchCard');
+        router.replace({
+          pathname: '/(tabs)/PunchCard',
+          params: {
+            phone: savedPhone,
+            businessCode,
+            nfcLaunch: 'true',
+            autoPunch: (isAuto && hasSingle && isPrepaid) ? 'true' : 'false'
+          }
+        });
+
+        // סימון URL התחלתי כמטופל רק לאחר הצלחה
+        if (isInitialUrl) initialUrlHandledRef.current = true;
+      } catch (err) {
+        console.error('[NfcHandler] Error:', err);
+        // במקרה של שגיאה - עדיין נלך למסך כניסה עם העסק
+        await setBusinessCode(businessCode);
+        router.replace({
+          pathname: '/(tabs)/customers-login',
+          params: { businessCode, fromDeepLink: 'true' }
+        });
+      } finally {
+        // שחרור הנעילה מיידי - מנגנון isTagAlreadyHandled כבר מונע עיבוד כפול של אותו תג
+        isProcessingRef.current = false;
+      }
+    };
+
+    // בדיקת URL התחלתי (כשהאפליקציה נפתחת מ-NFC)
+    const checkInitialUrl = async () => {
+      // 1. נסה קודם את ה-URL שנלכד ברמת root layout (מוקדם יותר)
+      // נמתין ללכידה הראשונית שתסתיים
+      const capturedUrl = await initialUrlPromise;
+      if (capturedUrl) {
+        console.log('[NfcHandler] Using captured initial URL:', capturedUrl);
+        await handleNfcDeepLink(capturedUrl, true);
+        return;
+      }
+      
+      // 2. Fallback: נסה Linking.getInitialURL (במקרה שהלכידה נכשלה)
+      const url = await Linking.getInitialURL();
+      console.log('[NfcHandler] Initial URL from Linking:', url);
+      if (url) {
+        await handleNfcDeepLink(url, true); // isInitialUrl = true
+        return;
+      }
+      
+      // 3. Fallback לאנדרואיד: נסה NfcManager.getLaunchTagEvent / getBackgroundTag
+      if (Platform.OS === 'android') {
+        try {
+          // פונקציית עזר להמרת tag data ל-deep link
+          const tagDataToDeepLink = (tagData: string): string | null => {
+            // כבר URL תקין
+            if (tagData.startsWith('mycardz://') || tagData.includes('punchcards.digital/')) {
+              return tagData;
+            }
+            // קוד עסק בלבד (4 ספרות)
+            if (tagData.match(/^\d{4}$/)) {
+              return `mycardz://business/${tagData}`;
+            }
+            return null;
+          };
+          
+          // בדיקת תג שהפעיל את האפליקציה
+          const launchTag = await NfcManager.getLaunchTagEvent();
+          if (launchTag) {
+            console.log('[NfcHandler] Launch tag found');
+            // בדיקה אם כבר טיפלנו בתג הזה (למניעת ניקוב כפול בפתיחה ידנית)
+            const tagId = launchTag.id || (launchTag.ndefMessage && launchTag.ndefMessage.length > 0 ? JSON.stringify(launchTag.ndefMessage[0].payload) : `no_id_${Date.now()}`);
+            if (await isTagAlreadyHandled(tagId)) {
+              console.log('[NfcHandler] Launch tag already handled, skipping');
+            } else {
+              const tagData = parseNfcTag(launchTag);
+              if (tagData) {
+                console.log('[NfcHandler] Tag data:', tagData);
+                const deepLink = tagDataToDeepLink(tagData);
+                if (deepLink) {
+                  await markTagAsHandled(tagId); // סימון שטיפלנו בתג
+                  await handleNfcDeepLink(deepLink, true); // isInitialUrl = true
+                  return;
+                }
+              }
+            }
+          }
+          
+          // בדיקת תג רקע
+          const bgTag = await NfcManager.getBackgroundTag();
+          if (bgTag) {
+            console.log('[NfcHandler] Background tag found');
+            const tagData = parseNfcTag(bgTag);
+            if (tagData) {
+              const deepLink = tagDataToDeepLink(tagData);
+              if (deepLink) {
+                await NfcManager.clearBackgroundTag();
+                await handleNfcDeepLink(deepLink, true); // isInitialUrl = true
+                return;
+              }
+            }
+          }
+        } catch (err) {
+          console.log('[NfcHandler] NfcManager fallback error:', err);
+        }
+      }
+    };
+    
+    checkInitialUrl();
+
+    // האזנה ל-deep links בזמן שהאפליקציה פתוחה
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      console.log('[NfcHandler] URL event:', url);
+      handleNfcDeepLink(url, false); // isInitialUrl = false - זו סריקה חדשה
+    });
+    
+    return () => subscription.remove();
+  }, [router, setBusinessCode, pathname]);
+
+  return null; // קומפוננט זה לא מרנדר כלום
+}
 
 const sanitizeBody = (body: string, voucherUrl?: string) => {
   let result = body;
@@ -219,6 +539,7 @@ export default function Layout() {
 
   return (
     <BusinessProvider>
+      <NfcDeepLinkHandler />
       <Slot />
       {/* מודל התראה מובנה באפליקציה עם RTL מלא */}
       <Modal visible={!!notification} transparent animationType="fade">

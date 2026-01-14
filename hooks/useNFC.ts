@@ -28,7 +28,7 @@ interface UseNFCReturn extends NFCState {
 }
 
 // נעילה גלובלית למניעת קריאות NFC מקבילות
-let isNfcLocked = false;
+let _globalNfcLocked = false;
 
 export const useNFC = (): UseNFCReturn => {
   const [state, setState] = useState<NFCState>({
@@ -40,6 +40,7 @@ export const useNFC = (): UseNFCReturn => {
   });
 
   const resolveRef = useRef<((value: string | null) => void) | null>(null);
+  const isInstanceLockedRef = useRef(false);
 
   // פענוח תג NFC - תומך ב-Text Records וגם URI Records
   const parseTag = (tag: any): string | null => {
@@ -161,13 +162,14 @@ export const useNFC = (): UseNFCReturn => {
 
   // התחלת קריאה
   const startReading = useCallback(async (): Promise<string | null> => {
-    // בדיקת נעילה
-    if (isNfcLocked) {
-      console.log('[NFC] Already reading, skipping');
+    // בדיקת נעילה - גם גלובלית וגם של המופע הנוכחי
+    if (_globalNfcLocked || isInstanceLockedRef.current) {
+      console.log('[NFC] Already reading or globally locked, skipping');
       return null;
     }
     
-    isNfcLocked = true;
+    isInstanceLockedRef.current = true;
+    _globalNfcLocked = true;
     setState(prev => ({ ...prev, isReading: true, error: null }));
 
     try {
@@ -185,7 +187,8 @@ export const useNFC = (): UseNFCReturn => {
         setState(prev => ({ ...prev, lastTag: tagData, isReading: false }));
         
         await NfcManager.cancelTechnologyRequest();
-        isNfcLocked = false;
+        isInstanceLockedRef.current = false;
+        _globalNfcLocked = false;
         return tagData;
         
       } else {
@@ -193,24 +196,28 @@ export const useNFC = (): UseNFCReturn => {
         return new Promise((resolve) => {
           resolveRef.current = (tagData) => {
             console.log('[NFC] Android: Tag read via listener:', tagData);
-            isNfcLocked = false;
+            isInstanceLockedRef.current = false;
+            _globalNfcLocked = false;
             resolve(tagData);
           };
 
+          // טיימר קצר יותר ללופים מהירים (5 שניות במקום 30)
           setTimeout(() => {
             if (resolveRef.current) {
               resolveRef.current = null;
-              isNfcLocked = false;
+              isInstanceLockedRef.current = false;
+              _globalNfcLocked = false;
               setState(prev => ({ ...prev, isReading: false }));
               resolve(null);
             }
-          }, 30000);
+          }, 5000);
         });
       }
     } catch (error) {
       console.log('[NFC] Error:', 'startReading', error);
       setState(prev => ({ ...prev, isReading: false, error: 'Failed to read tag' }));
-      isNfcLocked = false;
+      isInstanceLockedRef.current = false;
+      _globalNfcLocked = false;
       
       // ניקוי iOS session
       if (Platform.OS === 'ios') {
@@ -231,7 +238,8 @@ export const useNFC = (): UseNFCReturn => {
     } catch (error) {
       // התעלמות משגיאות stop
     }
-    isNfcLocked = false;
+    isInstanceLockedRef.current = false;
+    _globalNfcLocked = false;
   }, []);
 
   // פענוח מזהה עסק מהמחרוזת
@@ -298,7 +306,7 @@ export const useNFC = (): UseNFCReturn => {
       NfcManager.unregisterTagEvent().catch(() => {});
       NfcManager.cancelTechnologyRequest().catch(() => {});
       resolveRef.current = null;
-      isNfcLocked = false;
+      _globalNfcLocked = false;
     };
   }, []);
 

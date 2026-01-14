@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "C4N93LK5V7.com.mycompany.mycard",
+        "paths": [
+          "/business/*",
+          "/b/*"
+        ]
+      }
+    ]
+  }
+}
+

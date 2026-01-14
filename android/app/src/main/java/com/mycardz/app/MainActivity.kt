@@ -26,12 +26,21 @@ class MainActivity : ReactActivity() {
     SplashScreenManager.registerOnActivity(this)
     // @generated end expo-splashscreen
     
+    Log.d("MainActivity", "=== onCreate ===")
+    Log.d("MainActivity", "Intent action: ${intent?.action}")
+    Log.d("MainActivity", "Intent data: ${intent?.data}")
+    Log.d("MainActivity", "Intent extras: ${intent?.extras?.keySet()?.joinToString()}")
+    
     // טיפול ב-NFC Intent שמגיע עם AAR (Android Application Record)
     val nfcDeepLink = processNfcIntent(intent)
     if (nfcDeepLink != null) {
-      Log.d("MainActivity", "NFC deep link created: $nfcDeepLink")
+      Log.d("MainActivity", "✓ NFC deep link created: $nfcDeepLink")
       intent.data = Uri.parse(nfcDeepLink)
+    } else {
+      Log.d("MainActivity", "✗ No NFC deep link extracted")
     }
+    
+    Log.d("MainActivity", "Final intent.data: ${intent?.data}")
     
     super.onCreate(null)
   }
@@ -59,12 +68,8 @@ class MainActivity : ReactActivity() {
     val action = intent.action
     Log.d("MainActivity", "Processing intent action: $action")
     
-    // בדיקה אם זה NFC Intent
-    if (action != NfcAdapter.ACTION_NDEF_DISCOVERED && 
-        action != NfcAdapter.ACTION_TECH_DISCOVERED &&
-        action != NfcAdapter.ACTION_TAG_DISCOVERED) {
-      return null
-    }
+    // ננסה לקרוא NDEF messages גם אם ה-action הוא MAIN (קורה כש-AAR פותח את האפליקציה)
+    // לא נחסום לפי action - רק נבדוק אם יש NDEF data
     
     try {
       val rawMessages = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES)

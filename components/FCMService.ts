@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import { Platform, DeviceEventEmitter, Linking } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { supabase } from './supabaseClient';
 
 class FCMService {
@@ -71,6 +72,26 @@ class FCMService {
       const enabled =
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+      // יצירת Notification Channel לאנדרואיד (חובה ב-Android 8+)
+      if (Platform.OS === 'android') {
+        try {
+          await Notifications.setNotificationChannelAsync('fcm_default_channel', {
+            name: 'Default Notifications',
+            importance: Notifications.AndroidImportance.HIGH,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF231F7C',
+            sound: 'default',
+          });
+          if (__DEV__) {
+            console.log('[FCM] Android notification channel created: fcm_default_channel');
+          }
+        } catch (channelError) {
+          if (__DEV__) {
+            console.warn('[FCM] Failed to create notification channel:', channelError);
+          }
+        }
+      }
 
       if (!enabled) {
         if (__DEV__) {

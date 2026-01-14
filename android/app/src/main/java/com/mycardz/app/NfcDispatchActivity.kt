@@ -67,13 +67,13 @@ class NfcDispatchActivity : Activity() {
           val type = record.type
           
           // URI Record
-          if (tnf == 3.toByte() || (tnf == 1.toByte() && type.isNotEmpty() && type[0] == 0x55.toByte())) {
+          if (tnf == 3.toShort() || (tnf == 1.toShort() && type.isNotEmpty() && type[0] == 0x55.toByte())) {
             val uri = parseUriRecord(payload)
             return extractBusinessCodeFromUri(uri)
           }
           
           // Text Record
-          if (tnf == 1.toByte()) {
+          if (tnf == 1.toShort()) {
             val text = parseTextRecord(payload)
             if (text.startsWith("mycardz://business/")) {
               return text.substringAfter("mycardz://business/")
