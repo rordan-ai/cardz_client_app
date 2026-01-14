@@ -22,6 +22,7 @@ import {
 import { useBusiness } from '../../components/BusinessContext';
 import { supabase } from '../../components/supabaseClient';
 import TutorialSlideshow from '../../components/TutorialSlideshow';
+import { isPreview, isDev } from '@/config/environment';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 1024 && height >= 768;
@@ -310,8 +311,25 @@ export default function BusinessSelector() {
         
         {/* סימון גרסה לבדיקת עדכונים */}
         <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
-          {Platform.OS === 'android' ? 'V30.66' : 'V33.71'}
+          {Platform.OS === 'android' ? 'V30.68' : 'V33.73'}
         </Text>
+        
+        {/* באנר סביבה - רק ב-preview/dev */}
+        {(isPreview || isDev) && (
+          <View style={{ 
+            position: 'absolute', 
+            top: 50, 
+            right: 10, 
+            backgroundColor: isDev ? '#FF6B00' : '#007AFF', 
+            paddingHorizontal: 8, 
+            paddingVertical: 2, 
+            borderRadius: 4 
+          }}>
+            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold', fontFamily: 'Rubik' }}>
+              {isDev ? 'DEV' : 'PREVIEW'}
+            </Text>
+          </View>
+        )}
       </ImageBackground>
 
       {/* דיאלוג תפריט המבורגר */}

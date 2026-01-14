@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import Head from 'expo-router/head';
 import { Linking, Platform } from 'react-native';
+import { logEnvironmentInfo } from '@/config/environment';
 
 // לכידת Initial URL מוקדם ככל האפשר - ברמת המודול לפני כל רנדור
 // זה מבטיח שלא נפספס את ה-URL גם אם יש עיכוב בטעינת tabs layout
@@ -30,6 +31,9 @@ if (Platform.OS !== 'web') {
   _initialUrlCaptured = true;
   _resolveInitialUrl(null);
 }
+
+// לוג סביבה בהפעלה
+logEnvironmentInfo();
 
 // פונקציה לקבלת ה-URL שנלכד - לשימוש ב-tabs layout
 export const getCapturedInitialUrl = (): string | null => _capturedInitialUrl;
