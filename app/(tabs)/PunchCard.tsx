@@ -1897,7 +1897,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: cardBackgroundColor }, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
       {/* סימון גרסה */}
       <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V30.64' : 'V33.69'}
+        {Platform.OS === 'android' ? 'V30.66' : 'V33.71'}
       </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
@@ -3428,6 +3428,17 @@ export default function PunchCard() {
               <Text style={accessibilityStyles.bulletPoint}>✔ תמיכה וניהול חשבון</Text>
               <Text style={accessibilityStyles.paragraph}>לא נעשה שימוש מסחרי, שיווקי חיצוני או מכירת מידע.</Text>
 
+              <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold', marginTop: 12 }]}>תיבת דואר בתוך האפליקציה (Inbox) – הודעות פוש ו-SMS:</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                במסך הכרטיסייה קיימת תיבת דואר של האפליקציה (אייקון "דואר"/Inbox). הודעות שנשלחות אליך במסגרת השירות (לרבות הודעות פוש והודעות SMS) עשויות להיות מוצגות ונשמרות גם בתוך תיבת הדואר באפליקציה, כולל חיווי/סימון שיש הודעות.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                לתשומת לבך: כיבוי/חסימה של התראות פוש במכשיר משפיעים על הצגת ההתראה במכשיר בלבד, ואינם מונעים את הופעת/שמירת תוכן ההודעות בתוך תיבת הדואר באפליקציה.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                השימוש באפליקציה מהווה אישור והסכמה לכך שתוכן הודעות פוש ו-SMS הנשלחות אליך במסגרת השירות עשוי להופיע ולהישמר בתיבת הדואר באפליקציה, גם אם בחרת שלא לקבל התראות פוש במכשיר, וכי אינך מחויב לקרוא הודעות אלו או להתייחס אליהן.
+              </Text>
+
               <Text style={accessibilityStyles.sectionTitle}>3. גישה למידע</Text>
               <Text style={accessibilityStyles.paragraph}>לנתונים שלך יכולים לגשת:</Text>
               <Text style={accessibilityStyles.bulletPoint}>• בעל העסק (האדמין) – לניהול הכרטיסייה</Text>
@@ -3479,7 +3490,7 @@ export default function PunchCard() {
               </TouchableOpacity>
 
               <Text style={[accessibilityStyles.paragraph, { marginTop: 20, opacity: 0.7 }]}>
-                עדכון אחרון: דצמבר 2025 | גרסה ללקוחות לפי תיקון 13
+                עדכון אחרון: ינואר 2026 | הוספת מידע על תיבת דואר באפליקציה
               </Text>
 
               <View style={{ height: 100 }} />
@@ -3533,7 +3544,6 @@ export default function PunchCard() {
       </Modal>
 
     </ScrollView>
-    </View>
 
       {/* הודעת סטטוס ניקוב ישיר (autoPunch) */}
       {directPunchStatus !== 'idle' && (
@@ -3675,6 +3685,7 @@ export default function PunchCard() {
           }}
         />
       )}
+    </View>
     </>
   );
 }
