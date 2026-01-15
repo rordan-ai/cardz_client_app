@@ -288,6 +288,7 @@ export default function PunchCard() {
     } else {
       // לא עומד בתנאים לניקוב ישיר - פתיחת מודאל
       console.log('[DEBUG-DIRECT-PUNCH] Opening NFC modal instead', { isNfcLaunch, isAutoPunch, cardNumber: punchCard?.card_number });
+      setCardSelectionVisible(false); // סגירת מודאל בחירה אם פתוח
       setTimeout(() => setNfcModalVisible(true), 300);
     }
     
@@ -604,6 +605,8 @@ export default function PunchCard() {
             (launchTag === expectedNfcString || expectedNfcString.includes(launchTag) || launchTag.includes(expectedNfcString));
           if (launchMatch && !nfcModalVisible && !nfcCooldownRef.current) {
             console.log('[NFC] App launched with tag:', launchTag);
+            // סגירת מודאל בחירת כרטיסייה אם פתוח (למנוע שני מודאלים במקביל)
+            setCardSelectionVisible(false);
             // השמעת צליל הצלחה
             try {
               const { sound } = await Audio.Sound.createAsync(
@@ -628,6 +631,8 @@ export default function PunchCard() {
             (backgroundTag === expectedNfcString || expectedNfcString.includes(backgroundTag) || backgroundTag.includes(expectedNfcString));
           if (bgMatch && !nfcModalVisible && !nfcCooldownRef.current) {
             console.log('[NFC] Background tag found:', backgroundTag);
+            // סגירת מודאל בחירת כרטיסייה אם פתוח (למנוע שני מודאלים במקביל)
+            setCardSelectionVisible(false);
             try {
               const { sound } = await Audio.Sound.createAsync(
                 require('../../assets/sounds/nfc-success.mp3')
@@ -672,6 +677,8 @@ export default function PunchCard() {
                            (businessNfc && businessNfc.includes(expectedNfcString || ''));
             // בדיקת cooldown למניעת לולאות
             if (isMatch && !nfcCooldownRef.current) {
+              // סגירת מודאל בחירת כרטיסייה אם פתוח (למנוע שני מודאלים במקביל)
+              setCardSelectionVisible(false);
               // השמעת צליל הצלחה
               try {
                 const { sound } = await Audio.Sound.createAsync(
@@ -1897,7 +1904,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: cardBackgroundColor }, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
       {/* סימון גרסה */}
       <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V30.76' : 'V33.81'}
+        {Platform.OS === 'android' ? 'V30.77' : 'V33.82'}
       </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
@@ -2211,6 +2218,7 @@ export default function PunchCard() {
                   await initNFC();
                   const tagData = await startReading();
                   if (tagData) {
+                    setCardSelectionVisible(false); // סגירת מודאל בחירה אם פתוח
                     setNfcModalVisible(true);
                   }
                 } catch (err) {

@@ -36,7 +36,6 @@ export default function NewClientForm() {
   const [selectedProduct, setSelectedProduct] = useState<{ product_code: string, product_name: string } | null>(null);
   const [birthDate, setBirthDate] = useState('');
   const [referralCode, setReferralCode] = useState('');
-  const [isPrepaid, setIsPrepaid] = useState(false);
   const firstNameInputRef = useRef<TextInput>(null);
   const lastNameInputRef = useRef<TextInput>(null);
   const phoneInputRef = useRef<TextInput>(null);
@@ -163,8 +162,7 @@ export default function NewClientForm() {
           product_code: productCode,
           total_punches: maxPunches,
           used_punches: 0,
-          status: 'active',
-          prepaid: isPrepaid ? 'כן' : 'לא'
+          status: 'active'
         };
         
         const { error: cardError } = await supabase.from('PunchCards').insert(cardData);
@@ -515,14 +513,6 @@ export default function NewClientForm() {
                 </Text>
               </View>
             </TouchableOpacity>
-          </View>
-
-          {/* כפתור שולם מראש */}
-          <View style={styles.checkRow}>
-            <TouchableOpacity onPress={() => setIsPrepaid(v => !v)}>
-              <Check checked={isPrepaid} />
-            </TouchableOpacity>
-            <Text style={styles.checkLabel}>שולם מראש (Prepaid)</Text>
           </View>
           
           {/* שדות אופציונליים - שורה של שני עמודים */}
