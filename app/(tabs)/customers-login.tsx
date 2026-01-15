@@ -87,12 +87,38 @@ export default function CustomersLogin() {
       setSmsLoading(true);
       setSmsError('');
       
-      // פורמט מספר טלפון ישראלי
-      let formattedPhone = phoneNumber.replace(/\D/g, '');
-      if (formattedPhone.startsWith('0')) {
-        formattedPhone = '+972' + formattedPhone.substring(1);
-      } else if (!formattedPhone.startsWith('+')) {
-        formattedPhone = '+972' + formattedPhone;
+      // פורמט מספר טלפון - תמיכה בישראלי ובינלאומי
+      let formattedPhone = phoneNumber.trim();
+      
+      // אם מתחיל ב-+ זה כבר בינלאומי - רק לנקות תווים לא חוקיים
+      if (formattedPhone.startsWith('+')) {
+        formattedPhone = '+' + formattedPhone.substring(1).replace(/\D/g, '');
+      } 
+      // מספר ישראלי מקומי (05X-XXXXXXX)
+      else {
+        formattedPhone = formattedPhone.replace(/\D/g, '');
+        
+        // אם מתחיל ב-972, להוסיף רק +
+        if (formattedPhone.startsWith('972')) {
+          formattedPhone = '+' + formattedPhone;
+        }
+        // אם מתחיל ב-0 (מספר מקומי), להחליף ל-+972
+        else if (formattedPhone.startsWith('0')) {
+          formattedPhone = '+972' + formattedPhone.substring(1);
+        }
+        // אחרת להניח שזה מספר ישראלי בלי 0 בהתחלה
+        else if (formattedPhone.length === 9) {
+          formattedPhone = '+972' + formattedPhone;
+        }
+        // מספר לא תקין
+        else {
+          throw new Error('invalid-format');
+        }
+      }
+      
+      // וידוא אורך תקין (לפחות 12 תווים: +972 + 9 ספרות)
+      if (formattedPhone.length < 12) {
+        throw new Error('invalid-format');
       }
       
       console.log('[SMS] Sending verification to:', formattedPhone);
@@ -103,7 +129,9 @@ export default function CustomersLogin() {
     } catch (error: any) {
       console.error('[SMS] Error sending:', error);
       setSmsLoading(false);
-      if (error.code === 'auth/invalid-phone-number') {
+      if (error.message === 'invalid-format') {
+        setSmsError('פורמט מספר לא תקין. הזן 05X-XXXXXXX או +XXX...');
+      } else if (error.code === 'auth/invalid-phone-number') {
         setSmsError('מספר טלפון לא תקין');
       } else if (error.code === 'auth/too-many-requests') {
         setSmsError('יותר מדי ניסיונות. נסה שוב מאוחר יותר');
