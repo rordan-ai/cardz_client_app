@@ -43,6 +43,7 @@ export default function CustomersLogin() {
 
   // מצבי כניסה ביומטרית
   const [biometricSetupModalVisible, setBiometricSetupModalVisible] = useState(false);
+  const [resetLoginModalVisible, setResetLoginModalVisible] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricSetupDone, setBiometricSetupDone] = useState(false);
   const [biometricAuthInProgress, setBiometricAuthInProgress] = useState(false);
@@ -521,6 +522,10 @@ export default function CustomersLogin() {
             </TouchableOpacity>
             <View style={{width: 8}} />
             <Text style={[styles(brandColor).registerQuestion, { color: signupTextColor }]}>אין לך עדיין כרטיסייה?</Text>
+            <View style={{width: 16}} />
+            <TouchableOpacity onPress={() => setResetLoginModalVisible(true)}>
+              <Text style={[styles(brandColor).registerText, { color: signupTextColor, textDecorationLine: 'underline' }]}>איפוס כניסה</Text>
+            </TouchableOpacity>
           </View>
           {/* תמונת נושא */}
           <View style={{ alignItems: 'center', marginTop: -38, width: '100%' }}>
@@ -629,6 +634,45 @@ export default function CustomersLogin() {
               onPress={continueLoginWithoutBiometric}
             >
               <Text style={biometricStyles.cancelButtonText}>לא עכשיו</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* מודאל איפוס כניסה */}
+      <Modal
+        visible={resetLoginModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setResetLoginModalVisible(false)}
+      >
+        <View style={biometricStyles.overlay}>
+          <View style={biometricStyles.container}>
+            <Text style={[biometricStyles.title, { color: '#E53935' }]}>⚠️ איפוס כניסה</Text>
+            <Text style={biometricStyles.description}>
+              האם הנך בטוח/ה שברצונך לאפס את מספר הטלפון והזיהוי הביומטרי?
+            </Text>
+            <Text style={biometricStyles.note}>
+              פעולה זו תשלח אליך הודעת SMS עם קוד אימות.{'\n'}
+              מיד לאחריה הכנס/י עם המספר החדש והגדר/י כניסה ביומטרית חדשה.
+            </Text>
+            
+            <TouchableOpacity
+              style={[biometricStyles.setupButton, { backgroundColor: brandColor }]}
+              onPress={() => {
+                setResetLoginModalVisible(false);
+                // TODO: כאן יתווסף לוגיקת SMS כשתמומש
+                Alert.alert('בקרוב', 'פונקציונליות איפוס עם SMS תתווסף בקרוב');
+              }}
+            >
+              <Text style={biometricStyles.setupButtonText}>כן, אני מעוניינ/ת</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={biometricStyles.cancelButton}
+              onPress={() => setResetLoginModalVisible(false)}
+            >
+              <Text style={biometricStyles.cancelButtonText}>לא, נלחץ בטעות</Text>
             </TouchableOpacity>
           </View>
         </View>
