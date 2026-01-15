@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useNFCPunch } from '../../hooks/useNFCPunch';
 import { supabase } from '../../components/supabaseClient';
+import { getBenefitText } from '../../components/BusinessContext';
 import logger from '../../utils/logger';
 
 const { width } = Dimensions.get('window');
@@ -66,11 +67,26 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   const [renewing, setRenewing] = React.useState(false);
   const [renewalSuccessMessage, setRenewalSuccessMessage] = React.useState<string | null>(null);
   const [renewalErrorMessage, setRenewalErrorMessage] = React.useState<string | null>(null);
+  const [businessRewardData, setBusinessRewardData] = React.useState<any>(null);
 
   // עדכון ref כשה-selectedCard משתנה (לפתרון stale closure)
   useEffect(() => {
     selectedCardRef.current = selectedCard;
   }, [selectedCard]);
+
+  // שליפת נתוני הטבה של העסק (reward_type וכו')
+  useEffect(() => {
+    if (visible && currentBusinessCode) {
+      (async () => {
+        const { data } = await supabase
+          .from('businesses')
+          .select('reward_type, reward_discount_percent, reward_discount_product, reward_custom_gift, reward_custom_text')
+          .eq('business_code', currentBusinessCode)
+          .single();
+        if (data) setBusinessRewardData(data);
+      })();
+    }
+  }, [visible, currentBusinessCode]);
 
   // התחלת פלואו כשהמודאל נפתח
   // שולחים את מספר הטלפון ומספר הכרטיסייה כי הלקוח כבר מזוהה וכבר בחר כרטיסייה!
@@ -224,7 +240,7 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
         <View style={styles.content}>
           <Text style={styles.title}>הכרטיסייה מלאה!</Text>
           <Text style={styles.message}>
-            מזל טוב על השלמת הכרטיסייה וקבלת {selectedCard?.product_name || 'ההטבה'}!{'\n'}
+            מזל טוב על השלמת הכרטיסייה וקבלת {getBenefitText(businessRewardData, selectedCard?.product_name || 'המוצר')}!{'\n'}
             האם תרצה לפתוח כרטיסייה חדשה?
           </Text>
           <View style={styles.buttonRow}>

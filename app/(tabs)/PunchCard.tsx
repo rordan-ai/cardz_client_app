@@ -14,7 +14,7 @@ import { ActivityIndicator, Alert, DeviceEventEmitter, Dimensions, FlatList, Ima
 import { Barcode } from 'react-native-svg-barcode';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { WebView } from 'react-native-webview';
-import { useBusiness } from '../../components/BusinessContext';
+import { useBusiness, getBenefitText } from '../../components/BusinessContext';
 import FCMService from '../../components/FCMService';
 import { getCurrentLogoScale } from '../../components/LogoUtils';
 import MarketingPopup from '../../components/MarketingPopup';
@@ -259,8 +259,11 @@ export default function PunchCard() {
           setIsDirectRewardingPunch(isRewardingPunch);
           
           setDirectPunchStatus('success');
+          // חישוב טקסט הטבה דינמי לפי הגדרות העסק
+          const productName = punchCard.benefit || punchCard.product_name || 'מוצר';
+          const rewardText = getBenefitText(localBusiness as any, productName);
           const successMsg = isRewardingPunch 
-            ? `🎉 מזל טוב! הגעת להטבה: ${punchCard.benefit}` 
+            ? `🎉 מזל טוב! הגעת להטבה: ${rewardText}` 
             : `✅ ניקוב ${newPunches}/${totalPunches} בוצע בהצלחה!`;
           setDirectPunchMessage(successMsg);
           console.log('[DEBUG-DIRECT-PUNCH] SUCCESS! Message:', successMsg);
@@ -1043,6 +1046,8 @@ export default function PunchCard() {
   // בשורת "לקבלת" מציגים את שם מוצר הכרטיסייה (למקרה של כמה כרטיסיות בעסק).
   // אם אין לנו product_name, ניפול אחורה ל-benefit / product_code כדי לא להשאיר ריק.
   const benefit = (punchCard?.product_name || '').trim() || (punchCard?.benefit || '').trim() || punchCard?.product_code || '';
+  // טקסט הטבה דינמי לפי הגדרות העסק (reward_type)
+  const benefitDisplayText = getBenefitText(localBusiness as any, benefit || 'מוצר');
   const prepaid = punchCard?.prepaid === 'כן' ? 'כן' : 'לא';
 
   
@@ -1907,7 +1912,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: cardBackgroundColor }, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
       {/* סימון גרסה */}
       <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V30.79' : 'V33.84'}
+        {Platform.OS === 'android' ? 'V30.80' : 'V33.85'}
       </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
@@ -2189,13 +2194,13 @@ export default function PunchCard() {
           >
           {/* ניקובים */}
           <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
-          {/* טקסט מתחת לאייקונים */}
+          {/* טקסט מתחת לאייקונים - הטבה דינמית לפי הגדרות העסק */}
           <Text 
             style={[styles.benefitText, { color: cardTextColor }]} 
-            accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefit}`}
+            accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefitDisplayText}`}
             numberOfLines={3}
           >
-            נותרו {unpunched} ניקובים לקבלת {benefit}
+            נותרו {unpunched} ניקובים לקבלת {benefitDisplayText}
           </Text>
           {/* סטטוס תשלום מראש */}
           <Text style={[styles.prepaidText, { color: cardTextColor }]}>תשלום מראש: {prepaid}</Text>

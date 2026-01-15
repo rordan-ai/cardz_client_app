@@ -21,7 +21,12 @@ interface Business {
   card_text_color?: string;
   logo_size?: number;
   expiration_date?: string;
-  // אפשר להוסיף שדות נוספים לפי הצורך
+  // שדות הטבה מותאמת (reward)
+  reward_type?: 'free_product' | 'discount_percent' | 'custom_gift' | 'custom_text';
+  reward_discount_percent?: number;
+  reward_discount_product?: string;
+  reward_custom_gift?: string;
+  reward_custom_text?: string;
 }
 
 interface BusinessContextType {
@@ -43,6 +48,27 @@ const BusinessContext = createContext<BusinessContextType>({
 });
 
 export const useBusiness = () => useContext(BusinessContext);
+
+// פונקציית עזר לחישוב טקסט ההטבה לפי הגדרות העסק
+export const getBenefitText = (business: Business | null, productName: string): string => {
+  if (!business) return `${productName} חינם`;
+  
+  switch (business.reward_type) {
+    case 'discount_percent':
+      const product = business.reward_discount_product?.trim() || productName;
+      return `הנחה של ${business.reward_discount_percent || 0}% על ${product}`;
+    
+    case 'custom_gift':
+      return business.reward_custom_gift?.trim() || 'מתנה';
+    
+    case 'custom_text':
+      return business.reward_custom_text?.trim() || 'הטבה מיוחדת';
+    
+    case 'free_product':
+    default:
+      return `${productName} חינם`;
+  }
+};
 
 export const BusinessProvider = ({ children }: { children: React.ReactNode }) => {
   const [business, setBusiness] = useState<Business | null>(null);
