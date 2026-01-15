@@ -7,7 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Application from 'expo-application';
 import * as Updates from 'expo-updates';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert, ActivityIndicator } from 'react-native';
+import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert, ActivityIndicator, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { useBusiness } from '../../components/BusinessContext';
 import MarketingPopup from '../../components/MarketingPopup';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
@@ -765,8 +765,12 @@ export default function CustomersLogin() {
           }
         }}
       >
-        <View style={biometricStyles.overlay}>
-          <View style={biometricStyles.container}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={biometricStyles.overlay}
+          >
+            <View style={biometricStyles.container}>
             {/* שלב 1: אזהרה והזנת מספר */}
             {smsVerificationStep === 'phone' && (
               <>
@@ -869,8 +873,9 @@ export default function CustomersLogin() {
                 </Text>
               </>
             )}
-          </View>
-        </View>
+            </View>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* מודאל הצהרת נגישות */}
