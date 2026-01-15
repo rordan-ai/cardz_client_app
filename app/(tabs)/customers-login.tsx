@@ -605,13 +605,13 @@ export default function CustomersLogin() {
               accessibilityRole="button"
               accessibilityHint="לחץ להרשמה וקבלת כרטיסייה חדשה"
             >
-              <Text style={[styles(brandColor).registerText, { color: signupTextColor }]}>הרשמ/י לקבלת כרטיסייה</Text>
+              <Text style={[styles(brandColor).registerText, { color: signupTextColor, textDecorationLine: 'underline', fontWeight: 'bold' }]}>הרשמה</Text>
             </TouchableOpacity>
-            <View style={{width: 8}} />
-            <Text style={[styles(brandColor).registerQuestion, { color: signupTextColor }]}>אין לך עדיין כרטיסייה?</Text>
-            <View style={{width: 16}} />
+            <View style={{width: 6}} />
+            <Text style={[styles(brandColor).registerQuestion, { color: signupTextColor }]}>אין כרטיסייה?</Text>
+            <View style={{width: 10}} />
             <TouchableOpacity onPress={() => setResetLoginModalVisible(true)}>
-              <Text style={[styles(brandColor).registerText, { color: signupTextColor, textDecorationLine: 'underline' }]}>איפוס כניסה</Text>
+              <Text style={[styles(brandColor).registerText, { color: signupTextColor, textDecorationLine: 'underline', fontWeight: 'bold' }]}>איפוס כניסה</Text>
             </TouchableOpacity>
           </View>
           {/* תמונת נושא */}
