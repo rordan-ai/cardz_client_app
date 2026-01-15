@@ -7,11 +7,12 @@ import * as SecureStore from 'expo-secure-store';
 import * as Application from 'expo-application';
 import * as Updates from 'expo-updates';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert, ActivityIndicator } from 'react-native';
 import { useBusiness } from '../../components/BusinessContext';
 import MarketingPopup from '../../components/MarketingPopup';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
 import { BackButton } from '../../components/BackButton';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 // מפתח לשמירה מאובטחת - מספר טלפון בלבד (לא קשור לעסק ספציפי)
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
@@ -44,6 +45,14 @@ export default function CustomersLogin() {
   // מצבי כניסה ביומטרית
   const [biometricSetupModalVisible, setBiometricSetupModalVisible] = useState(false);
   const [resetLoginModalVisible, setResetLoginModalVisible] = useState(false);
+  
+  // מצבי אימות SMS
+  const [smsVerificationStep, setSmsVerificationStep] = useState<'phone' | 'code' | 'success'>('phone');
+  const [resetPhone, setResetPhone] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [confirmResult, setConfirmResult] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
+  const [smsLoading, setSmsLoading] = useState(false);
+  const [smsError, setSmsError] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricSetupDone, setBiometricSetupDone] = useState(false);
   const [biometricAuthInProgress, setBiometricAuthInProgress] = useState(false);
@@ -70,6 +79,84 @@ export default function CustomersLogin() {
       if (__DEV__) console.error('[Biometric] Auth error:', error);
       return false;
     }
+  }, []);
+
+  // פונקציות אימות SMS
+  const sendSmsVerification = useCallback(async (phoneNumber: string) => {
+    try {
+      setSmsLoading(true);
+      setSmsError('');
+      
+      // פורמט מספר טלפון ישראלי
+      let formattedPhone = phoneNumber.replace(/\D/g, '');
+      if (formattedPhone.startsWith('0')) {
+        formattedPhone = '+972' + formattedPhone.substring(1);
+      } else if (!formattedPhone.startsWith('+')) {
+        formattedPhone = '+972' + formattedPhone;
+      }
+      
+      console.log('[SMS] Sending verification to:', formattedPhone);
+      const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+      setConfirmResult(confirmation);
+      setSmsVerificationStep('code');
+      setSmsLoading(false);
+    } catch (error: any) {
+      console.error('[SMS] Error sending:', error);
+      setSmsLoading(false);
+      if (error.code === 'auth/invalid-phone-number') {
+        setSmsError('מספר טלפון לא תקין');
+      } else if (error.code === 'auth/too-many-requests') {
+        setSmsError('יותר מדי ניסיונות. נסה שוב מאוחר יותר');
+      } else {
+        setSmsError('שגיאה בשליחת SMS. נסה שוב');
+      }
+    }
+  }, []);
+
+  const verifySmsCode = useCallback(async (code: string) => {
+    if (!confirmResult) return;
+    
+    try {
+      setSmsLoading(true);
+      setSmsError('');
+      
+      await confirmResult.confirm(code);
+      
+      // אימות הצליח - איפוס הנתונים המאוחסנים
+      await SecureStore.deleteItemAsync(BIOMETRIC_PHONE_KEY);
+      setBiometricSetupDone(false);
+      
+      setSmsVerificationStep('success');
+      setSmsLoading(false);
+      
+      // סגירת המודאל אחרי 2 שניות
+      setTimeout(() => {
+        setResetLoginModalVisible(false);
+        setSmsVerificationStep('phone');
+        setResetPhone('');
+        setVerificationCode('');
+        setConfirmResult(null);
+        Alert.alert('הצלחה', 'הכניסה אופסה בהצלחה. כעת תוכל/י להיכנס עם מספר טלפון חדש.');
+      }, 2000);
+      
+    } catch (error: any) {
+      console.error('[SMS] Error verifying:', error);
+      setSmsLoading(false);
+      if (error.code === 'auth/invalid-verification-code') {
+        setSmsError('קוד שגוי. נסה שוב');
+      } else {
+        setSmsError('שגיאה באימות. נסה שוב');
+      }
+    }
+  }, [confirmResult]);
+
+  const resetSmsFlow = useCallback(() => {
+    setSmsVerificationStep('phone');
+    setResetPhone('');
+    setVerificationCode('');
+    setConfirmResult(null);
+    setSmsError('');
+    setSmsLoading(false);
   }, []);
 
   // בדיקה אם ביומטריה זמינה במכשיר
@@ -644,36 +731,117 @@ export default function CustomersLogin() {
         visible={resetLoginModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setResetLoginModalVisible(false)}
+        onRequestClose={() => {
+          if (!smsLoading) {
+            setResetLoginModalVisible(false);
+            resetSmsFlow();
+          }
+        }}
       >
         <View style={biometricStyles.overlay}>
           <View style={biometricStyles.container}>
-            <Text style={[biometricStyles.title, { color: '#E53935' }]}>⚠️ איפוס כניסה</Text>
-            <Text style={biometricStyles.description}>
-              האם הנך בטוח/ה שברצונך לאפס את מספר הטלפון והזיהוי הביומטרי?
-            </Text>
-            <Text style={biometricStyles.note}>
-              פעולה זו תשלח אליך הודעת SMS עם קוד אימות.{'\n'}
-              מיד לאחריה הכנס/י עם המספר החדש והגדר/י כניסה ביומטרית חדשה.
-            </Text>
-            
-            <TouchableOpacity
-              style={[biometricStyles.setupButton, { backgroundColor: brandColor }]}
-              onPress={() => {
-                setResetLoginModalVisible(false);
-                // TODO: כאן יתווסף לוגיקת SMS כשתמומש
-                Alert.alert('בקרוב', 'פונקציונליות איפוס עם SMS תתווסף בקרוב');
-              }}
-            >
-              <Text style={biometricStyles.setupButtonText}>כן, אני מעוניינ/ת</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={biometricStyles.cancelButton}
-              onPress={() => setResetLoginModalVisible(false)}
-            >
-              <Text style={biometricStyles.cancelButtonText}>לא, נלחץ בטעות</Text>
-            </TouchableOpacity>
+            {/* שלב 1: אזהרה והזנת מספר */}
+            {smsVerificationStep === 'phone' && (
+              <>
+                <Text style={[biometricStyles.title, { color: '#E53935' }]}>⚠️ איפוס כניסה</Text>
+                <Text style={biometricStyles.description}>
+                  האם הנך בטוח/ה שברצונך לאפס את מספר הטלפון והזיהוי הביומטרי?
+                </Text>
+                <Text style={biometricStyles.note}>
+                  הזן/י את מספר הטלפון שלך לקבלת קוד אימות ב-SMS.{'\n'}
+                  לאחר האימות תוכל/י להיכנס עם מספר חדש.
+                </Text>
+                
+                <TextInput
+                  style={[biometricStyles.input, { borderColor: brandColor }]}
+                  placeholder="מספר טלפון"
+                  placeholderTextColor="#999"
+                  keyboardType="phone-pad"
+                  value={resetPhone}
+                  onChangeText={setResetPhone}
+                  editable={!smsLoading}
+                />
+                
+                {smsError ? <Text style={biometricStyles.errorText}>{smsError}</Text> : null}
+                
+                <TouchableOpacity
+                  style={[biometricStyles.setupButton, { backgroundColor: brandColor, opacity: smsLoading || !resetPhone ? 0.6 : 1 }]}
+                  onPress={() => sendSmsVerification(resetPhone)}
+                  disabled={smsLoading || !resetPhone}
+                >
+                  {smsLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={biometricStyles.setupButtonText}>שלח קוד SMS</Text>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={biometricStyles.cancelButton}
+                  onPress={() => {
+                    setResetLoginModalVisible(false);
+                    resetSmsFlow();
+                  }}
+                  disabled={smsLoading}
+                >
+                  <Text style={biometricStyles.cancelButtonText}>ביטול</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* שלב 2: הזנת קוד */}
+            {smsVerificationStep === 'code' && (
+              <>
+                <Text style={[biometricStyles.title, { color: brandColor }]}>📱 הזן קוד אימות</Text>
+                <Text style={biometricStyles.description}>
+                  נשלח קוד אימות למספר {resetPhone}
+                </Text>
+                
+                <TextInput
+                  style={[biometricStyles.input, { borderColor: brandColor, textAlign: 'center', fontSize: 24, letterSpacing: 8 }]}
+                  placeholder="------"
+                  placeholderTextColor="#999"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  value={verificationCode}
+                  onChangeText={setVerificationCode}
+                  editable={!smsLoading}
+                />
+                
+                {smsError ? <Text style={biometricStyles.errorText}>{smsError}</Text> : null}
+                
+                <TouchableOpacity
+                  style={[biometricStyles.setupButton, { backgroundColor: brandColor, opacity: smsLoading || verificationCode.length < 6 ? 0.6 : 1 }]}
+                  onPress={() => verifySmsCode(verificationCode)}
+                  disabled={smsLoading || verificationCode.length < 6}
+                >
+                  {smsLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={biometricStyles.setupButtonText}>אמת קוד</Text>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={biometricStyles.cancelButton}
+                  onPress={resetSmsFlow}
+                  disabled={smsLoading}
+                >
+                  <Text style={biometricStyles.cancelButtonText}>חזרה</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* שלב 3: הצלחה */}
+            {smsVerificationStep === 'success' && (
+              <>
+                <Text style={[biometricStyles.title, { color: '#4CAF50' }]}>✅ הצלחה!</Text>
+                <Text style={biometricStyles.description}>
+                  הכניסה אופסה בהצלחה.{'\n'}
+                  כעת תוכל/י להיכנס עם מספר טלפון חדש.
+                </Text>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -1194,6 +1362,24 @@ const biometricStyles = StyleSheet.create({
     color: '#888',
     fontSize: 14,
     textAlign: 'center',
+    fontFamily: 'Rubik',
+  },
+  input: {
+    width: '100%',
+    height: 50,
+    borderWidth: 2,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    fontSize: 18,
+    fontFamily: 'Rubik',
+    marginBottom: 12,
+    backgroundColor: '#f9f9f9',
+  },
+  errorText: {
+    color: '#E53935',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 12,
     fontFamily: 'Rubik',
   },
 }); 

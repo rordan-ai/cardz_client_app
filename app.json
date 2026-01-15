@@ -100,6 +100,7 @@
       "expo-web-browser",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
+      "@react-native-firebase/auth",
       "./plugins/android-manifest-fix",
       [
         "expo-notifications",
