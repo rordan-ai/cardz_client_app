@@ -61,10 +61,16 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   const [showPhoneInput, setShowPhoneInput] = React.useState(false);
   const hasStartedRef = useRef(false);
   const initialSelectedCardNumberRef = useRef<string | undefined>(undefined);
+  const selectedCardRef = useRef(selectedCard); // ref לשמירת selectedCard עדכני
   const [showRenewalAfterReward, setShowRenewalAfterReward] = React.useState(false);
   const [renewing, setRenewing] = React.useState(false);
   const [renewalSuccessMessage, setRenewalSuccessMessage] = React.useState<string | null>(null);
   const [renewalErrorMessage, setRenewalErrorMessage] = React.useState<string | null>(null);
+
+  // עדכון ref כשה-selectedCard משתנה (לפתרון stale closure)
+  useEffect(() => {
+    selectedCardRef.current = selectedCard;
+  }, [selectedCard]);
 
   // התחלת פלואו כשהמודאל נפתח
   // שולחים את מספר הטלפון ומספר הכרטיסייה כי הלקוח כבר מזוהה וכבר בחר כרטיסייה!
@@ -96,13 +102,15 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   useEffect(() => {
     if (flowState === 'success') {
       setTimeout(() => {
-        // מעביר את מספר הכרטיסייה שננקבה בפועל (מה-hook או מה-props)
-        const punchedCardNumber = selectedCard?.card_number || selectedCardNumber;
+        // מעביר את מספר הכרטיסייה שננקבה בפועל (מה-ref העדכני או מה-props)
+        // חשוב: משתמשים ב-ref ולא ב-state כי ה-setTimeout יכול "ללכוד" state ישן (stale closure)
+        const punchedCardNumber = selectedCardRef.current?.card_number || selectedCardNumber;
+        console.log('[NFCPunchModal] Closing with punchedCardNumber:', punchedCardNumber);
         onSuccess(punchedCardNumber);
         handleClose();
       }, 2000);
     }
-  }, [flowState]);
+  }, [flowState, selectedCardNumber, onSuccess, handleClose]);
 
   // טיפול בניקוב מזכה - קונפטי וסאונד
   useEffect(() => {
@@ -111,11 +119,12 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
       setShowRenewalAfterReward(false);
       // לפי האפיון: בזמן הקונפטי כבר צריך להתעדכן מספר הניקובים בכרטיסייה
       // לכן מרעננים מייד, ואת מודאל החידוש מציגים אחרי האנימציה.
-      const punchedCardNumber = selectedCard?.card_number || selectedCardNumber;
+      // חשוב: משתמשים ב-ref ולא ב-state כי יכול להיות stale closure
+      const punchedCardNumber = selectedCardRef.current?.card_number || selectedCardNumber;
       onSuccess(punchedCardNumber);
       setTimeout(() => setShowRenewalAfterReward(true), 3500);
     }
-  }, [flowState]);
+  }, [flowState, selectedCardNumber, onSuccess]);
 
   const handleClose = () => {
     resetFlow();

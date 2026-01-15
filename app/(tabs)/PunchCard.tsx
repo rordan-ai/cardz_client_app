@@ -621,7 +621,8 @@ export default function PunchCard() {
             } catch (soundErr) {
               console.log('[NFC] Sound play error:', soundErr);
             }
-            setNfcModalVisible(true);
+            // delay קטן לוודא שמודאל הבחירה נסגר לפני פתיחת NFC modal
+            setTimeout(() => setNfcModalVisible(true), 100);
             return; // לא צריך להמשיך להאזנה רגילה אם כבר טיפלנו בתג
           }
           
@@ -646,7 +647,8 @@ export default function PunchCard() {
             } catch (soundErr) {
               console.log('[NFC] Sound play error:', soundErr);
             }
-            setNfcModalVisible(true);
+            // delay קטן לוודא שמודאל הבחירה נסגר לפני פתיחת NFC modal
+            setTimeout(() => setNfcModalVisible(true), 100);
             return;
           }
         } catch (err) {
@@ -694,7 +696,8 @@ export default function PunchCard() {
               } catch (soundErr) {
                 console.log('[NFC] Sound play error:', soundErr);
               }
-              setNfcModalVisible(true);
+              // delay קטן לוודא שמודאל הבחירה נסגר לפני פתיחת NFC modal
+              setTimeout(() => setNfcModalVisible(true), 100);
               // עצירה מיידית של הקריאה כדי שלא תיתפס אותה סריקה שוב
               stopReading().catch?.(() => {});
             }
@@ -1904,7 +1907,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: cardBackgroundColor }, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
       {/* סימון גרסה */}
       <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V30.77' : 'V33.82'}
+        {Platform.OS === 'android' ? 'V30.78' : 'V33.83'}
       </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
@@ -2219,7 +2222,8 @@ export default function PunchCard() {
                   const tagData = await startReading();
                   if (tagData) {
                     setCardSelectionVisible(false); // סגירת מודאל בחירה אם פתוח
-                    setNfcModalVisible(true);
+                    // delay קטן לוודא שמודאל הבחירה נסגר לפני פתיחת NFC modal
+                    setTimeout(() => setNfcModalVisible(true), 100);
                   }
                 } catch (err) {
                   console.log('[iOS NFC] Scan error:', err);

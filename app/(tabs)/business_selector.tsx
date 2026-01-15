@@ -311,7 +311,7 @@ export default function BusinessSelector() {
         
         {/* סימון גרסה לבדיקת עדכונים */}
         <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
-          {Platform.OS === 'android' ? 'V30.77' : 'V33.82'}
+          {Platform.OS === 'android' ? 'V30.78' : 'V33.83'}
         </Text>
         
         {/* באנר סביבה - רק ב-preview/dev */}
