@@ -98,6 +98,15 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
     console.log('[CONFETTI-NFCModal] flowState changed to:', flowState, { showRenewalAfterReward, visible });
   }, [flowState, showRenewalAfterReward, visible]);
 
+  // כשהלקוח מזוהה (יש טלפון מהקונטקסט) והגענו ל-selecting_card - סוגרים את המודאל
+  // כי בחירת כרטיסייה צריכה להתבצע במודאל הראשי של PunchCard, לא כאן
+  useEffect(() => {
+    if (flowState === 'selecting_card' && customerPhoneFromProps && !selectedCardNumber) {
+      console.log('[NFCPunchModal] Customer identified but no card selected - closing modal, use main card selection');
+      handleClose();
+    }
+  }, [flowState, customerPhoneFromProps, selectedCardNumber]);
+
   // טיפול בהצלחה
   useEffect(() => {
     if (flowState === 'success') {
