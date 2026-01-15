@@ -597,7 +597,7 @@ export default function CustomersLogin() {
           </View>
           {error ? <Text style={styles(brandColor).errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{error}</Text> : null}
           {/* הרשמה */}
-          <View style={styles(brandColor).registerRow}>
+          <View style={[styles(brandColor).registerRow, { justifyContent: 'space-between', width: '100%' }]}>
             <TouchableOpacity
               style={styles(brandColor).registerBtn}
               onPress={() => router.push('/(tabs)/newclient_form')}
@@ -605,11 +605,10 @@ export default function CustomersLogin() {
               accessibilityRole="button"
               accessibilityHint="לחץ להרשמה וקבלת כרטיסייה חדשה"
             >
-              <Text style={[styles(brandColor).registerText, { color: signupTextColor, textDecorationLine: 'underline', fontWeight: 'bold' }]}>הרשמה</Text>
+              <Text style={[styles(brandColor).registerQuestion, { color: signupTextColor }]}>
+                אין כרטיסייה? <Text style={{ textDecorationLine: 'underline', fontWeight: 'bold' }}>הרשמ/י לקבלת כרטיסייה</Text>
+              </Text>
             </TouchableOpacity>
-            <View style={{width: 6}} />
-            <Text style={[styles(brandColor).registerQuestion, { color: signupTextColor }]}>אין כרטיסייה?</Text>
-            <View style={{width: 10}} />
             <TouchableOpacity onPress={() => setResetLoginModalVisible(true)}>
               <Text style={[styles(brandColor).registerText, { color: signupTextColor, textDecorationLine: 'underline', fontWeight: 'bold' }]}>איפוס כניסה</Text>
             </TouchableOpacity>
