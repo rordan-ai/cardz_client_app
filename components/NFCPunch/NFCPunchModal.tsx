@@ -26,7 +26,7 @@ interface NFCPunchModalProps {
   selectedCardNumber?: string; // מספר הכרטיסייה שכבר נבחרה (אופציונלי)
   brandColor?: string;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (punchedCardNumber?: string) => void; // מעביר את מספר הכרטיסייה שננקבה
   onCardRenewed?: (newCardNumber: string) => void;
 }
 
@@ -96,7 +96,9 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   useEffect(() => {
     if (flowState === 'success') {
       setTimeout(() => {
-        onSuccess();
+        // מעביר את מספר הכרטיסייה שננקבה בפועל (מה-hook או מה-props)
+        const punchedCardNumber = selectedCard?.card_number || selectedCardNumber;
+        onSuccess(punchedCardNumber);
         handleClose();
       }, 2000);
     }
@@ -109,7 +111,8 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
       setShowRenewalAfterReward(false);
       // לפי האפיון: בזמן הקונפטי כבר צריך להתעדכן מספר הניקובים בכרטיסייה
       // לכן מרעננים מייד, ואת מודאל החידוש מציגים אחרי האנימציה.
-      onSuccess();
+      const punchedCardNumber = selectedCard?.card_number || selectedCardNumber;
+      onSuccess(punchedCardNumber);
       setTimeout(() => setShowRenewalAfterReward(true), 3500);
     }
   }, [flowState]);

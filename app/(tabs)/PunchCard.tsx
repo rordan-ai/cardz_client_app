@@ -1897,7 +1897,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: cardBackgroundColor }, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
       {/* סימון גרסה */}
       <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V30.74' : 'V33.79'}
+        {Platform.OS === 'android' ? 'V30.75' : 'V33.80'}
       </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
@@ -3662,24 +3662,33 @@ export default function PunchCard() {
               } catch {}
             })();
           }}
-          onSuccess={() => {
+          onSuccess={(punchedCardNumber) => {
             // רענון הכרטיסייה אחרי ניקוב (מיידי, כדי למנוע ניקוב נוסף על נתונים ישנים)
             refreshBusiness();
             (async () => {
               try {
-                const cardNumber = punchCard?.card_number;
+                // משתמש ב-cardNumber שהועבר מהמודאל (הכרטיסייה שננקבה בפועל)
+                const cardNumber = punchedCardNumber || punchCard?.card_number;
                 if (!cardNumber) return;
                 const { data: cardRow } = await supabase
                   .from('PunchCards')
-                  .select('used_punches, total_punches, status, updated_at')
+                  .select('business_code, customer_phone, product_code, card_number, total_punches, used_punches, status, created_at, updated_at, benefit, prepaid')
                   .eq('card_number', cardNumber)
                   .maybeSingle();
 
                 if (!cardRow) return;
-                setPunchCard((prev) => ({
-                  ...(prev || {}),
-                  ...(cardRow as any),
-                }) as any);
+                
+                // אם הכרטיסייה הנוכחית שונה מהכרטיסייה שננקבה - מעדכן לכרטיסייה שננקבה
+                setPunchCard((prev) => {
+                  // אם כבר יש כרטיסייה והיא שונה, מחליף לחדשה
+                  if (prev && prev.card_number !== cardNumber) {
+                    console.log('[NFC] Switching to punched card:', cardNumber);
+                  }
+                  return {
+                    ...(cardRow as any),
+                    product_name: prev?.product_name || '',
+                  } as any;
+                });
               } catch {}
             })();
           }}
