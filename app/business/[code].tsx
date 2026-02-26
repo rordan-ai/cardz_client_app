@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter, Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, DeviceEventEmitter, StyleSheet } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../../components/supabaseClient';
 import { useBusiness } from '../../components/BusinessContext';
@@ -29,6 +29,14 @@ export default function BusinessDeepLinkHandler() {
       console.log('[DeepLink Route] Processing business code:', code);
 
       try {
+        // אם PunchCard כבר פעיל — לא לנתב מחדש, אלא לשלוח אירוע לפתיחת מודאל ניקוב
+        const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
+        if (savedPhone) {
+          console.log('[DeepLink Route] Emitting nfc-punch-trigger for PunchCard');
+          DeviceEventEmitter.emit('nfc-punch-trigger', { businessCode: code });
+          router.back();
+          return;
+        }
         // בדיקה 1: יש מספר טלפון שמור?
         const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
         console.log('[DeepLink Route] Saved phone:', savedPhone ? 'exists' : 'none');

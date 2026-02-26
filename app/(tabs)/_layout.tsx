@@ -100,14 +100,13 @@ function NfcDeepLinkHandler() {
   const isProcessingRef = useRef(false);
 
   useEffect(() => {
-    // אם אנחנו כבר במסך PunchCard - אנחנו לא רוצים שה-Layout ינהל את ה-NFC
-    // כדי למנוע קונפליקטים ונעילות (PunchCard מנהל את ה-NFC בעצמו)
-    if (pathname.includes('PunchCard')) {
-      console.log('[NfcHandler] PunchCard active, disabling layout NFC listener');
-      return;
-    }
+    const onPunchCard = pathname.includes('PunchCard');
 
     const handleNfcDeepLink = async (url: string, isInitialUrl: boolean = false) => {
+      if (onPunchCard) {
+        console.log('[NfcHandler] PunchCard active, NFC deep link ignored (handled by PunchCard):', url);
+        return;
+      }
       // מניעת עיבוד כפול של URL התחלתי
       if (isInitialUrl && initialUrlHandledRef.current) return;
       // מניעת עיבוד מקבילי - בדיקה וסימון אטומיים

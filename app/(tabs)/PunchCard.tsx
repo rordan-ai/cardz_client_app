@@ -306,6 +306,18 @@ export default function PunchCard() {
     };
   }, []);
 
+  // האזנה לאירוע NFC deep link שמגיע כשהמשתמש כבר על PunchCard
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('nfc-punch-trigger', ({ businessCode: triggerCode }) => {
+      console.log('[PunchCard] nfc-punch-trigger received, businessCode:', triggerCode);
+      if (!nfcCooldownRef.current) {
+        setCardSelectionVisible(false);
+        setTimeout(() => setNfcModalVisible(true), 150);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   // פונקציה לסגירת מודאל NFC עם cooldown
   const closeNfcModalWithCooldown = () => {
     setNfcModalVisible(false);
