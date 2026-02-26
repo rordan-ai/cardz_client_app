@@ -183,7 +183,7 @@ function NfcDeepLinkHandler() {
           console.log('[NfcHandler] → customers-login (no phone)');
           router.replace({
             pathname: '/(tabs)/customers-login',
-            params: { businessCode, fromDeepLink: 'true' }
+            params: { businessCode, nfcLaunch: 'true' }
           });
           return;
         }
@@ -228,7 +228,7 @@ function NfcDeepLinkHandler() {
         await setBusinessCode(businessCode);
         router.replace({
           pathname: '/(tabs)/customers-login',
-          params: { businessCode, fromDeepLink: 'true' }
+          params: { businessCode, nfcLaunch: 'true' }
         });
       } finally {
         // שחרור הנעילה מיידי - מנגנון isTagAlreadyHandled כבר מונע עיבוד כפול של אותו תג

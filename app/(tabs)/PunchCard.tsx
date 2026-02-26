@@ -1,20 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // AsyncStorage no longer used for inbox; messages loaded from Supabase inbox table
 import { Ionicons } from '@expo/vector-icons';
-import { Audio, Video, ResizeMode } from 'expo-av';
+import { Audio, ResizeMode, Video } from 'expo-av';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
-import * as Application from 'expo-application';
-import * as Updates from 'expo-updates';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, DeviceEventEmitter, Dimensions, FlatList, Image, ImageBackground, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, DeviceEventEmitter, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Barcode } from 'react-native-svg-barcode';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { WebView } from 'react-native-webview';
-import { useBusiness, getBenefitText } from '../../components/BusinessContext';
+import { BackButton } from '../../components/BackButton';
+import { getBenefitText, useBusiness } from '../../components/BusinessContext';
 import FCMService from '../../components/FCMService';
 import { getCurrentLogoScale } from '../../components/LogoUtils';
 import MarketingPopup from '../../components/MarketingPopup';
@@ -22,7 +21,6 @@ import { NFCPunchModal } from '../../components/NFCPunch';
 import { supabase } from '../../components/supabaseClient';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
 import { useNFC } from '../../hooks/useNFC';
-import { BackButton } from '../../components/BackButton';
 
 const { width, height } = Dimensions.get('window');
 
@@ -58,6 +56,7 @@ export default function PunchCard() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [mailVisible, setMailVisible] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [totalUnreadMessages, setTotalUnreadMessages] = useState(0); // Badge על אייקון האפליקציה - מכל העסקים
   const [inboxLoading, setInboxLoading] = useState(false);
   const [notifications, setNotifications] = useState<Array<{
     id: string;
@@ -126,6 +125,7 @@ export default function PunchCard() {
   const { isSupported: nfcSupported, initNFC, startReading, stopReading, parseBusinessId, checkLaunchTag, checkBackgroundTag } = useNFC();
   const nfcLaunchHandled = useRef(false);
   const nfcCooldownRef = useRef(false); // מניעת פתיחה כפולה של מודאל NFC
+  const nfcManualReadingRef = useRef(false); // מניעת התנגשות: כפתור ידני מול האזנה רציפה
 
   // State לניקוב ישיר (autoPunch)
   const [directPunchStatus, setDirectPunchStatus] = useState<'idle' | 'punching' | 'success' | 'error'>('idle');
@@ -663,7 +663,8 @@ export default function PunchCard() {
       const listenForNFC = async () => {
         if (!mounted) return;
         // אם מודאל הניקוב פתוח - לא קוראים תג נוסף (מונע ניקובים כפולים מאותה סריקה)
-        if (nfcModalVisible) {
+        // אם כפתור ידני פעיל - לא להתחרות על קריאת NFC
+        if (nfcModalVisible || nfcManualReadingRef.current) {
           if (mounted) {
             readTimeoutId = setTimeout(listenForNFC, 500);
           }
@@ -856,6 +857,32 @@ export default function PunchCard() {
     loadUnreadCount();
   }, [localBusiness?.business_code, phoneStr]);
 
+  // טעינת מספר הודעות לא נקראות מכל העסקים (ל-Badge על אייקון האפליקציה)
+  useEffect(() => {
+    const loadTotalUnreadCount = async () => {
+      if (phoneStr) {
+        try {
+          const phoneVariants = [phoneStr, phoneIntl].filter(Boolean);
+          const { count } = await supabase
+            .from('inbox')
+            .select('*', { count: 'exact', head: true })
+            .in('customer_phone', phoneVariants.length > 0 ? phoneVariants : ['__NO_MATCH__'])
+            .eq('status', 'unread');
+          
+          if (count !== null) {
+            setTotalUnreadMessages(count);
+          }
+        } catch (error) {
+          if (__DEV__) {
+            console.error('[Badge] Error loading total unread count:', error);
+          }
+        }
+      }
+    };
+    
+    loadTotalUnreadCount();
+  }, [phoneStr]);
+
   // טעינת נתוני חבר מזמין חבר
   useEffect(() => {
     const fetchReferralData = async () => {
@@ -908,21 +935,21 @@ export default function PunchCard() {
     fetchReferralData();
   }, [localBusiness?.business_code]);
 
-  // עדכון Badge באייקון האפליקציה באמצעות expo-notifications
+  // עדכון Badge באייקון האפליקציה באמצעות expo-notifications (סך הודעות מכל העסקים)
   useEffect(() => {
     const updateBadge = async () => {
       try {
         if (Platform.OS === 'ios' || Platform.OS === 'android') {
-          await Notifications.setBadgeCountAsync(unreadMessages);
+          await Notifications.setBadgeCountAsync(totalUnreadMessages);
         }
       } catch (error) {
         if (__DEV__) {
-          console.warn('[Inbox] Failed to update app badge:', error);
+          console.warn('[Badge] Failed to update app badge:', error);
         }
       }
     };
     updateBadge();
-  }, [unreadMessages]);
+  }, [totalUnreadMessages]);
 
   // טעינת העדפות Opt-In באופן מתמשך (ברירת מחדל true, אך שומר ערכים אם קיימים ב-AsyncStorage)
   useEffect(() => {
@@ -977,6 +1004,7 @@ export default function PunchCard() {
           (async () => {
             try {
               const phoneVariants = [phoneStr, phoneIntl].filter(Boolean);
+              // ספירת הודעות לעסק הנוכחי
               const { count } = await supabase
                 .from('inbox')
                 .select('*', { count: 'exact', head: true })
@@ -986,6 +1014,17 @@ export default function PunchCard() {
 
               if (count !== null) {
                 setUnreadMessages(count);
+              }
+              
+              // ספירת הודעות מכל העסקים (ל-Badge על האייקון)
+              const { count: totalCount } = await supabase
+                .from('inbox')
+                .select('*', { count: 'exact', head: true })
+                .in('customer_phone', phoneVariants.length > 0 ? phoneVariants : ['__NO_MATCH__'])
+                .eq('status', 'unread');
+
+              if (totalCount !== null) {
+                setTotalUnreadMessages(totalCount);
               }
             } catch (_) {
               // בליעת שגיאות כדי לא לפגוע ביציבות
@@ -1099,9 +1138,15 @@ export default function PunchCard() {
         .eq('id', notificationId)
         .eq('business_code', localBusiness?.business_code || '')
         .eq('customer_phone', phoneStr || '');
+      const deletedNotification = notifications.find(n => n.id === notificationId);
+      const wasUnread = deletedNotification && !deletedNotification.read;
       const updatedNotifications = notifications.filter(n => n.id !== notificationId);
       setNotifications(updatedNotifications);
       setUnreadMessages(updatedNotifications.filter(n => !n.read).length);
+      // עדכון Badge על האייקון (סך מכל העסקים)
+      if (wasUnread) {
+        setTotalUnreadMessages(prev => Math.max(0, prev - 1));
+      }
     } catch (_) {
       // ignore
     }
@@ -1118,11 +1163,17 @@ export default function PunchCard() {
         .eq('customer_phone', phoneStr || '');
       
       // עדכון UI מיד לאחר עדכון ה-inbox
+      const targetNotification = notifications.find(n => n.id === notificationId);
+      const wasUnread = targetNotification && !targetNotification.read;
       const updatedNotifications = notifications.map(n => 
         n.id === notificationId ? { ...n, read: true } : n
       );
       setNotifications(updatedNotifications);
       setUnreadMessages(updatedNotifications.filter(n => !n.read).length);
+      // עדכון Badge על האייקון (סך מכל העסקים)
+      if (wasUnread) {
+        setTotalUnreadMessages(prev => Math.max(0, prev - 1));
+      }
       
       // לוג קריאת הודעה לטבלת user_activities (לא חוסם את ה-UI)
       (async () => {
@@ -1193,6 +1244,13 @@ export default function PunchCard() {
       product_name: selectedProductName,
     } as any);
     setLoading(false);
+    
+    // אם הגענו דרך NFC - המשך לתהליך הניקוב
+    // חשוב: לאפס את ה-cooldown כי המודאל נסגר קודם לטובת בחירת כרטיסייה
+    if (isNfcLaunch) {
+      nfcCooldownRef.current = false;
+      setTimeout(() => setNfcModalVisible(true), 150);
+    }
   };
 
   // גשר לביטול alert בדף השובר ולהחליפו בטוסט פנימי + חיבור כפתור שמירה
@@ -1912,7 +1970,7 @@ export default function PunchCard() {
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: cardBackgroundColor }, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
       {/* סימון גרסה */}
       <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V30.80' : 'V33.85'}
+        {Platform.OS === 'android' ? 'V31.05' : 'V34.05'}
       </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
@@ -1947,10 +2005,10 @@ export default function PunchCard() {
             
             try {
               const phoneVariants = [phoneStr, phoneIntl].filter(Boolean);
-              // שאילתה מתוקנת - רק שדות שקיימים בטבלת inbox
+              // שאילתה עם כל השדות הנדרשים כולל title ו-data (לשובר)
               const { data, error } = await supabase
                 .from('inbox')
-                .select('id, message, status, created_at')
+                .select('id, message, status, created_at, title, data')
                 .eq('business_code', localBusiness.business_code)
                 .in('customer_phone', phoneVariants.length > 0 ? phoneVariants : ['__NO_MATCH__'])
                 .order('created_at', { ascending: false });
@@ -1961,11 +2019,11 @@ export default function PunchCard() {
               } else if (data) {
                 const mapped = data.map((row: any) => ({
                   id: String(row.id),
-                  title: 'הודעה מהעסק',  // ברירת מחדל - אין שדה title בטבלה
+                  title: row.title || 'הודעה מהעסק',
                   body: row.message || '',
                   timestamp: new Date(row.created_at).getTime(),
                   read: row.status === 'read',
-                  voucherUrl: undefined,  // אין שדה data בטבלה
+                  voucherUrl: row.data?.voucher_url || undefined
                 }));
                 setNotifications(mapped);
                 setUnreadMessages(mapped.filter(n => !n.read).length);
@@ -2194,13 +2252,16 @@ export default function PunchCard() {
           >
           {/* ניקובים */}
           <Text style={[styles.punchCount, { color: cardTextColor }]} accessibilityLabel={`יש לך ${usedPunches} ניקובים מתוך ${totalPunches}`}>{`ניקובים: ${usedPunches}/${totalPunches}`}</Text>
-          {/* טקסט מתחת לאייקונים - הטבה דינמית לפי הגדרות העסק */}
+          {/* טקסט מתחת לאייקונים - שונה לפי סוג כרטיסייה */}
           <Text 
             style={[styles.benefitText, { color: cardTextColor }]} 
-            accessibilityLabel={`נותרו ${unpunched} ניקובים לקבלת ${benefitDisplayText}`}
+            accessibilityLabel={prepaid === 'כן' ? `עוד ${unpunched} לניצול הכרטיסייה` : `נותרו ${unpunched} ניקובים לקבלת ${benefitDisplayText}`}
             numberOfLines={3}
           >
-            נותרו {unpunched} ניקובים לקבלת {benefitDisplayText}
+            {prepaid === 'כן'
+              ? `עוד ${unpunched} לניצול הכרטיסייה`
+              : `נותרו ${unpunched} ניקובים לקבלת ${benefitDisplayText}`
+            }
           </Text>
           {/* סטטוס תשלום מראש */}
           <Text style={[styles.prepaidText, { color: cardTextColor }]}>תשלום מראש: {prepaid}</Text>
@@ -2213,37 +2274,39 @@ export default function PunchCard() {
           </Text>
           </View>
 
-          {/* כפתור NFC ל-iOS בלבד - באנדרואיד הסריקה אוטומטית */}
-          {Platform.OS === 'ios' && (
-            <TouchableOpacity
-              style={{
-                marginTop: 20,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onPress={async () => {
-                try {
-                  await initNFC();
-                  const tagData = await startReading();
-                  if (tagData) {
-                    setCardSelectionVisible(false); // סגירת מודאל בחירה אם פתוח
-                    // delay קטן לוודא שמודאל הבחירה נסגר לפני פתיחת NFC modal
-                    setTimeout(() => setNfcModalVisible(true), 100);
-                  }
-                } catch (err) {
-                  console.log('[iOS NFC] Scan error:', err);
+          {/* כפתור סריקת NFC ידנית - זהה ב-iOS וב-Android - מחייב נוכחות פיזית ליד המתקן */}
+          <TouchableOpacity
+            style={{
+              marginTop: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onPress={async () => {
+              try {
+                nfcManualReadingRef.current = true;
+                await stopReading();
+                await initNFC();
+                const tagData = await startReading();
+                nfcManualReadingRef.current = false;
+                if (tagData) {
+                  setCardSelectionVisible(false);
+                  setTimeout(() => setNfcModalVisible(true), 100);
                 }
-              }}
-              accessibilityLabel="סרוק תג NFC לניקוב"
-              accessibilityRole="button"
-            >
-              <Image 
-                source={require('../../assets/icons/NFC_ISO_BOTTEN.png')}
-                style={{ width: 80, height: 80 }}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
-          )}
+              } catch (err) {
+                nfcManualReadingRef.current = false;
+                console.log('[NFC] Scan error:', err);
+              }
+            }}
+            accessibilityLabel="סרוק תג NFC לניקוב"
+            accessibilityRole="button"
+            accessibilityHint="הצמד את הטלפון למתקן NFC בבית העסק"
+          >
+            <Image 
+              source={require('../../assets/icons/NFC_ISO_BOTTEN.png')}
+              style={{ width: 80, height: 80 }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
             </View>
           </View>
               </View>{/* סגירת עטיפת 4 שורות (גריד+טקסטים -16px) */}
@@ -3445,6 +3508,13 @@ export default function PunchCard() {
               <Text style={accessibilityStyles.bulletPoint}>✔ תמיכה וניהול חשבון</Text>
               <Text style={accessibilityStyles.paragraph}>לא נעשה שימוש מסחרי, שיווקי חיצוני או מכירת מידע.</Text>
 
+              <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold', marginTop: 12 }]}>
+                אין "Tracking" לפי הגדרת Apple: האפליקציה אינה מקשרת מידע משתמש עם מידע מצדדים שלישיים לצרכי פרסום או מדידה בין אפליקציות/אתרים, אינה משתפת מזהים לצרכי רימרקטינג, ואינה משתמשת ב-IDFA.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                העסק עשוי לשלוח הודעות שיווקיות ופופאפים ללקוחותיו בתוך האפליקציה במסגרת השירות. זוהי תקשורת ישירה מהעסק ללקוחותיו בלבד, ללא שיתוף מידע עם גורמים חיצוניים.
+              </Text>
+
               <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold', marginTop: 12 }]}>תיבת דואר בתוך האפליקציה (Inbox) – הודעות פוש ו-SMS:</Text>
               <Text style={accessibilityStyles.paragraph}>
                 במסך הכרטיסייה קיימת תיבת דואר של האפליקציה (אייקון "דואר"/Inbox). הודעות שנשלחות אליך במסגרת השירות (לרבות הודעות פוש והודעות SMS) עשויות להיות מוצגות ונשמרות גם בתוך תיבת הדואר באפליקציה, כולל חיווי/סימון שיש הודעות.
@@ -3482,9 +3552,20 @@ export default function PunchCard() {
                 השירות מאפשר שימוש לקטינים. האחריות על התאמת השירות לגיל הלקוח מוטלת על בעל העסק.
               </Text>
 
-              <Text style={accessibilityStyles.sectionTitle}>8. קוקיז ומעקב</Text>
+              <Text style={accessibilityStyles.sectionTitle}>8. קוקיז, אנליטיקה ומעקב</Text>
+              <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold' }]}>אין מעקב (Tracking):</Text>
               <Text style={accessibilityStyles.paragraph}>
-                האפליקציה אינה משתמשת בקוקיז, פיקסלים או מנגנוני מעקב. נעשה שימוש ב־Google Analytics אנונימי בלבד.
+                האפליקציה אינה משתמשת בקוקיז, פיקסלים, או מנגנוני מעקב פרסומי.
+              </Text>
+              <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold' }]}>
+                אין שימוש ב-Google Analytics, IDFA, או כלי מעקב אחרים.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                האפליקציה אינה משתפת מידע עם רשתות פרסום או גורמי צד שלישי לצורך מעקב.
+              </Text>
+              <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold', marginTop: 12 }]}>תקשורת שיווקית פנימית:</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                העסק עשוי לשלוח לך הודעות (פוש, SMS, הודעות בתוך האפליקציה) על מבצעים, הטבות והגרלות. מדובר בתקשורת ישירה מהעסק ללקוחות שלו בלבד, ללא שיתוף מידע עם גורמים חיצוניים או שימוש למטרות מעקב פרסומי.
               </Text>
 
               <Text style={accessibilityStyles.sectionTitle}>9. הגבלת אחריות</Text>
@@ -3507,7 +3588,7 @@ export default function PunchCard() {
               </TouchableOpacity>
 
               <Text style={[accessibilityStyles.paragraph, { marginTop: 20, opacity: 0.7 }]}>
-                עדכון אחרון: ינואר 2026 | הוספת מידע על תיבת דואר באפליקציה
+                עדכון אחרון: ינואר 2026 | הבהרה על אי-שימוש ב-Tracking לפי Apple
               </Text>
 
               <View style={{ height: 100 }} />
@@ -3640,10 +3721,18 @@ export default function PunchCard() {
           businessId={localBusiness.id || 0}
           businessName={localBusiness.business_name || localBusiness.name}
           nfcString={localBusiness.nfc_string}
+          businessCode={resolvedBusinessCode || localBusiness.business_code}
           customerPhone={phoneStr || phoneIntl || ''} // הלקוח כבר מזוהה!
           selectedCardNumber={punchCard?.card_number} // אם המשתמש כבר בחר כרטיסייה - לא להציג בחירה שוב
           brandColor={localBusiness.login_brand_color}
           onClose={closeNfcModalWithCooldown}
+          onNeedCardSelection={() => {
+            // NFCPunchModal זיהה שיש ריבוי כרטיסיות ואין בחירה - פותח מודאל בחירה ראשי
+            console.log('[PunchCard] Opening card selection modal from NFC request');
+            if (availableCards.length > 1) {
+              setCardSelectionVisible(true);
+            }
+          }}
           onCardRenewed={(newCardNumber) => {
             // עדכון מסך הכרטיסייה לכרטיסייה החדשה המאופסת
             (async () => {
