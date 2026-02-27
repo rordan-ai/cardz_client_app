@@ -37,10 +37,6 @@ export default function BusinessDeepLinkHandler() {
           router.back();
           return;
         }
-        // בדיקה 1: יש מספר טלפון שמור?
-        const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
-        console.log('[DeepLink Route] Saved phone:', savedPhone ? 'exists' : 'none');
-
         // הגדרת העסק בקונטקסט
         await setBusinessCode(code);
 
