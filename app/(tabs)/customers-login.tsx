@@ -35,9 +35,15 @@ export default function CustomersLogin() {
 
   const resolvedBusinessCode = typeof nfcBusinessCode === 'string' ? nfcBusinessCode : Array.isArray(nfcBusinessCode) ? nfcBusinessCode[0] : null;
 
+  useEffect(() => {
+    if (resolvedBusinessCode && !business && !loading) {
+      setBusinessCode(resolvedBusinessCode);
+    }
+  }, [resolvedBusinessCode, business, loading, setBusinessCode]);
+
   const [backgroundImageError, setBackgroundImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0);
-  const { business, loading, refresh: refreshBusiness } = useBusiness();
+  const { business, loading, refresh: refreshBusiness, setBusinessCode } = useBusiness();
   const [menuVisible, setMenuVisible] = useState(false);
   const [accessibilityModalVisible, setAccessibilityModalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-200)).current;
@@ -432,7 +438,7 @@ export default function CustomersLogin() {
     }
   };
 
-  if (loading) {
+  if (loading || (resolvedBusinessCode && !business)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: loginBackgroundColor }}>
         {/* כפתור המבורגר גם במצב טעינה */}
