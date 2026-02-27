@@ -18,7 +18,7 @@ export type PunchFlowState =
   | 'card_full'        // כרטיסייה מלאה - שאלה לפתיחת חדשה
   | 'waiting_approval' // ממתין לאישור אדמין
   | 'punching'         // מבצע ניקוב
-  | 'rewarding_punch'  // ניקוב מזכה - קונפטי וסאונד
+  // 'rewarding_punch' הוסר - במקום זה משתמשים ב-'card_full' לניקוב מזכה
   | 'success'
   | 'error'
   | 'timeout';
@@ -55,7 +55,7 @@ interface UseNFCPunchReturn {
   error: string | null;
   
   // פעולות
-  startPunchFlow: (nfcString: string, customerPhone?: string, preSelectedCardNumber?: string) => Promise<void>;
+  startPunchFlow: (nfcString: string, customerPhone?: string, preSelectedCardNumber?: string, businessCode?: string) => Promise<void>;
   identifyWithBiometric: () => Promise<boolean>;
   identifyWithPhone: (phone: string) => Promise<boolean>;
   selectCard: (card: CustomerCard) => void;
@@ -331,11 +331,11 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
               const rewarding = Number.isFinite(used) && Number.isFinite(total) && used >= total;
 
               if (rewarding) {
-                console.log('[CONFETTI-useNFCPunch] 🎉 Setting flowState to rewarding_punch (after admin completion)', { used, total });
-                setFlowState('rewarding_punch');
+                console.log('[useNFCPunch] Rewarding punch detected - showing card_full for renewal', { used, total });
+                setFlowState('card_full');
                 return;
               }
-              console.log('[CONFETTI-useNFCPunch] Setting flowState to success (not rewarding)', { used, total });
+              console.log('[useNFCPunch] Setting flowState to success (not rewarding)', { used, total });
               setFlowState('success');
             } catch (e) {
               console.log('[NFC] Error:', 'fetchCardAfterCompleted', e);
@@ -377,14 +377,32 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
   // התחלת פלואו ניקוב
   // customerPhoneFromContext - מספר הטלפון של הלקוח המחובר (כבר מזוהה!)
   // preSelectedCardNumber - מספר הכרטיסייה שכבר נבחרה (אם הלקוח כבר בתוך כרטיסייה ספציפית)
-  const startPunchFlow = useCallback(async (nfcString: string, customerPhoneFromContext?: string, preSelectedCardNumber?: string) => {
+  const startPunchFlow = useCallback(async (nfcString: string, customerPhoneFromContext?: string, preSelectedCardNumber?: string, businessCodeOverride?: string) => {
     try {
       resetFlow();
       
-      console.log('[NFC] Starting punch flow with phone:', customerPhoneFromContext, 'preSelectedCard:', preSelectedCardNumber);
+      console.log('[NFC] Starting punch flow with phone:', customerPhoneFromContext, 'preSelectedCard:', preSelectedCardNumber, 'businessCodeOverride:', businessCodeOverride);
 
-      // F2: זיהוי עסק לפי nfc_string
-      const business = await identifyBusinessByNFC(nfcString);
+      let business: { business_code: string; name: string; punch_mode: string } | null = null;
+
+      if (businessCodeOverride) {
+        // זיהוי עסק ישירות לפי business_code (מונע באג state ישן)
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('business_code, name, punch_mode')
+          .eq('business_code', businessCodeOverride)
+          .single();
+        if (!error && data) {
+          business = data;
+          console.log('[NFC] Business identified by code:', business.business_code);
+        }
+      }
+
+      if (!business) {
+        // fallback: זיהוי לפי nfc_string
+        business = await identifyBusinessByNFC(nfcString);
+      }
+
       if (!business) {
         setError('תג NFC לא מזוהה');
         setFlowState('error');
@@ -535,11 +553,11 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       );
       if (result.success) {
         if (result.isRewardingPunch) {
-          console.log('[CONFETTI-useNFCPunch] 🎉 Setting flowState to rewarding_punch (prepaid direct punch)');
-          setFlowState('rewarding_punch');
+          console.log('[useNFCPunch] Rewarding punch (prepaid) - showing card_full for renewal');
+          setFlowState('card_full');
           return; // לא משחררים נעילה כאן — המודאל יתקדם למסך חידוש/סגירה
         }
-        console.log('[CONFETTI-useNFCPunch] Setting flowState to success (prepaid, not rewarding)');
+        console.log('[useNFCPunch] Setting flowState to success (prepaid, not rewarding)');
         setFlowState('success');
       } else {
         if (result.atMax) {

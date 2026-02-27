@@ -7,7 +7,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:127384108600:android:a4180dc9108a70525570cd",
+        "mobilesdk_app_id": "1:127384108600:android:049ba66ce99ffae95570cd",
         "android_client_info": {
           "package_name": "com.mycardz.app"
         }
@@ -20,7 +20,42 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "127384108600-94omku6r38fa804h9c9sm2p84a5pbm2j.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.mycardz.app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:127384108600:android:1d0e48ebf7bcb93c5570cd",
+        "android_client_info": {
+          "package_name": "com.yuladigital.cardz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkohJJJc4c8x6aIiobK6Lft7Ihiy8usqU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "127384108600-94omku6r38fa804h9c9sm2p84a5pbm2j.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.mycardz.app"
+              }
+            }
+          ]
         }
       }
     }

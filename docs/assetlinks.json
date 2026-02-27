@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.mycardz.app",
+      "sha256_cert_fingerprints": [
+        "3E:A0:14:42:73:FD:E2:4E:BD:D9:56:DE:C4:E7:DD:FC:FB:79:9B:2F:67:66:1B:5D:ED:3D:9B:75:EC:1E"
+      ]
+    }
+  }
+]

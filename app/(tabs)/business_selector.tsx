@@ -281,10 +281,6 @@ export default function BusinessSelector() {
           accessibilityHint="לחץ לפתיחת אתר החברה המפתחת"
         />
         
-        {/* סימון גרסה לבדיקת עדכונים */}
-        <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
-          {Platform.OS === 'android' ? 'V31.05' : 'V34.05'}
-        </Text>
         
         {/* באנר סביבה - רק ב-preview/dev */}
         {(isPreview || isDev) && (

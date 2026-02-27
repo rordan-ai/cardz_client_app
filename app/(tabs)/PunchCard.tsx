@@ -122,6 +122,7 @@ export default function PunchCard() {
 
   // NFC state
   const [nfcModalVisible, setNfcModalVisible] = useState(false);
+  const [nfcNoticeVisible, setNfcNoticeVisible] = useState(false);
   const { isSupported: nfcSupported, initNFC, startReading, stopReading, parseBusinessId, checkLaunchTag, checkBackgroundTag } = useNFC();
   const nfcLaunchHandled = useRef(false);
   const nfcCooldownRef = useRef(false); // מניעת פתיחה כפולה של מודאל NFC
@@ -1980,10 +1981,6 @@ export default function PunchCard() {
       )}
     <View style={{ flex: 1, backgroundColor: cardBackgroundColor }}>
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: cardBackgroundColor }, Platform.OS === 'android' ? { paddingBottom: 0 } : null]}>
-      {/* סימון גרסה */}
-      <Text style={{ position: 'absolute', top: 12, left: 10, color: '#111', fontSize: 12, fontFamily: 'Rubik', zIndex: 9999 }}>
-        {Platform.OS === 'android' ? 'V31.07-FIX' : 'V34.07-FIX'}
-      </Text>
       {/* תפריט המבורגר */}
       <TouchableOpacity 
         style={[styles.hamburgerContainer, styles.topIconOffsetClean]}
@@ -2286,39 +2283,67 @@ export default function PunchCard() {
           </Text>
           </View>
 
-          {/* כפתור סריקת NFC ידנית - זהה ב-iOS וב-Android - מחייב נוכחות פיזית ליד המתקן */}
-          <TouchableOpacity
-            style={{
-              marginTop: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            onPress={async () => {
-              try {
-                nfcManualReadingRef.current = true;
-                await stopReading();
-                await initNFC();
-                const tagData = await startReading();
-                nfcManualReadingRef.current = false;
-                if (tagData) {
+          {/* כפתור סריקת NFC ידנית + אייקון הסבר */}
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', marginTop: 20 }}>
+            <TouchableOpacity
+              style={{ alignItems: 'center', justifyContent: 'center' }}
+              onPress={async () => {
+                if (Platform.OS === 'android') {
                   setCardSelectionVisible(false);
                   setTimeout(() => setNfcModalVisible(true), 100);
+                } else {
+                  try {
+                    await initNFC();
+                    const tagData = await startReading();
+                    if (tagData) {
+                      setCardSelectionVisible(false);
+                      setTimeout(() => setNfcModalVisible(true), 100);
+                    }
+                  } catch (err) {
+                    console.log('[NFC] Scan error:', err);
+                  }
                 }
-              } catch (err) {
-                nfcManualReadingRef.current = false;
-                console.log('[NFC] Scan error:', err);
-              }
-            }}
-            accessibilityLabel="סרוק תג NFC לניקוב"
-            accessibilityRole="button"
-            accessibilityHint="הצמד את הטלפון למתקן NFC בבית העסק"
-          >
-            <Image 
-              source={require('../../assets/icons/NFC_ISO_BOTTEN.png')}
-              style={{ width: 80, height: 80 }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
+              }}
+              accessibilityLabel="בקשת ניקוב ידנית"
+              accessibilityRole="button"
+              accessibilityHint={Platform.OS === 'android' ? 'לחץ לשליחת בקשת ניקוב' : 'הצמד את הטלפון למתקן NFC בבית העסק'}
+            >
+              <Image 
+                source={require('../../assets/icons/NFC_ISO_BOTTEN.png')}
+                style={{ width: 80, height: 80 }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ marginRight: 4 }}
+              onPress={() => setNfcNoticeVisible(true)}
+              accessibilityLabel="מידע על כפתור ניקוב ידני"
+              accessibilityRole="button"
+            >
+              <Image
+                source={require('../../assets/icons/notice.png')}
+                style={{ width: 36, height: 36 }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* מודאל הסבר כפתור ניקוב ידני */}
+          <Modal visible={nfcNoticeVisible} transparent animationType="fade" onRequestClose={() => setNfcNoticeVisible(false)}>
+            <TouchableWithoutFeedback onPress={() => setNfcNoticeVisible(false)}>
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '80%', maxWidth: 340, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 12, fontFamily: 'Rubik', textAlign: 'center' }}>לתשומת לב</Text>
+                  <Text style={{ fontSize: 14, color: '#555', lineHeight: 22, fontFamily: 'Rubik', textAlign: 'center' }}>
+                    לחצן זה נועד לבקשת ניקוב ידנית בהעדר זיהוי ביומטרי או בהעדר הפעלת הזיהוי בנייד.{'\n\n'}אם זוהית ביומטרית אין צורך ללחוץ עליו, פשוט קרב את הנייד למתקן הקריאה לביצוע ניקוב.
+                  </Text>
+                  <TouchableOpacity style={{ marginTop: 16, paddingVertical: 8, paddingHorizontal: 24 }} onPress={() => setNfcNoticeVisible(false)}>
+                    <Text style={{ fontSize: 16, color: cardTextColor || '#9747FF', fontWeight: 'bold', fontFamily: 'Rubik' }}>הבנתי</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
             </View>
           </View>
               </View>{/* סגירת עטיפת 4 שורות (גריד+טקסטים -16px) */}
