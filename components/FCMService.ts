@@ -1,8 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
-import { Platform, DeviceEventEmitter, Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { Alert, DeviceEventEmitter, Linking, Platform } from 'react-native';
 import { supabase } from './supabaseClient';
+
+const NOTIF_LAUNCH_COUNT_KEY = 'notification_modal_launch_count';
+const NOTIF_GRANTED_KEY = 'notification_permission_granted';
 
 class FCMService {
   private static instance: FCMService;
@@ -53,16 +56,65 @@ class FCMService {
           }
         });
       } catch {}
-      // רישום מכשירי iOS לקבלת פושים
+      // רישום מכשירי iOS לקבלת פושים עם מונה תדירות
       if (Platform.OS === 'ios') {
         try {
           await messaging().registerDeviceForRemoteMessages();
+          const existingAuth = await messaging().hasPermission();
+          if (existingAuth !== messaging.AuthorizationStatus.AUTHORIZED && 
+              existingAuth !== messaging.AuthorizationStatus.PROVISIONAL) {
+            if (await this.shouldShowNotificationModal()) {
+              await new Promise<void>((resolve) => {
+                Alert.alert(
+                  'הפעלת התראות',
+                  'על מנת שיתאפשר לך קבלת שוברים ומבצעים יש לאשר קבלת התראות',
+                  [
+                    { text: 'לא עכשיו', style: 'cancel', onPress: () => resolve() },
+                    { text: 'אשר', onPress: () => resolve() }
+                  ]
+                );
+              });
+            }
+          } else {
+            await AsyncStorage.setItem(NOTIF_GRANTED_KEY, 'true');
+          }
         } catch (registerError) {
           console.error('FCM iOS registerDeviceForRemoteMessages error:', registerError);
         }
       }
 
-      // בקשת הרשאות
+      // בקשת הרשאות באנדרואיד 13+ עם מונה תדירות
+      if (Platform.OS === 'android') {
+        try {
+          const { status: existingStatus } = await Notifications.getPermissionsAsync();
+          if (existingStatus !== 'granted') {
+            if (await this.shouldShowNotificationModal()) {
+              const granted = await new Promise<boolean>((resolve) => {
+                Alert.alert(
+                  'הפעלת התראות',
+                  'על מנת שיתאפשר לך קבלת שוברים ומבצעים יש לאשר קבלת התראות',
+                  [
+                    { text: 'לא עכשיו', style: 'cancel', onPress: () => resolve(false) },
+                    { text: 'אשר', onPress: () => resolve(true) }
+                  ]
+                );
+              });
+              if (granted) {
+                await Notifications.requestPermissionsAsync();
+                await AsyncStorage.setItem(NOTIF_GRANTED_KEY, 'true');
+              }
+            }
+          } else {
+            await AsyncStorage.setItem(NOTIF_GRANTED_KEY, 'true');
+          }
+        } catch (permError) {
+          if (__DEV__) {
+            console.warn('[FCM] Android permission request error:', permError);
+          }
+        }
+      }
+
+      // בקשת הרשאות Firebase (iOS + fallback)
       const authStatus = await messaging().requestPermission({
         alert: true,
         badge: true,
@@ -410,6 +462,22 @@ class FCMService {
   // גישה למספר הטלפון הנוכחי
   getCurrentPhone(): string | null {
     return this.customerPhone;
+  }
+
+  private async shouldShowNotificationModal(): Promise<boolean> {
+    try {
+      const alreadyGranted = await AsyncStorage.getItem(NOTIF_GRANTED_KEY);
+      if (alreadyGranted === 'true') return false;
+
+      const countStr = await AsyncStorage.getItem(NOTIF_LAUNCH_COUNT_KEY);
+      const count = countStr ? parseInt(countStr, 10) : 0;
+      await AsyncStorage.setItem(NOTIF_LAUNCH_COUNT_KEY, String(count + 1));
+
+      // הצגה בהפעלה 1, 6, 11, 16...
+      return count % 5 === 0;
+    } catch {
+      return true;
+    }
   }
 }
 
