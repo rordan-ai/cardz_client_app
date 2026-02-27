@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import * as Notifications from 'expo-notifications';
-import { Alert, DeviceEventEmitter, Linking, Platform } from 'react-native';
+import { DeviceEventEmitter, Linking, Platform } from 'react-native';
 import { supabase } from './supabaseClient';
 
 const NOTIF_LAUNCH_COUNT_KEY = 'notification_modal_launch_count';
@@ -65,14 +65,8 @@ class FCMService {
               existingAuth !== messaging.AuthorizationStatus.PROVISIONAL) {
             if (await this.shouldShowNotificationModal()) {
               await new Promise<void>((resolve) => {
-                Alert.alert(
-                  'הפעלת התראות',
-                  'על מנת שיתאפשר לך קבלת שוברים ומבצעים יש לאשר קבלת התראות',
-                  [
-                    { text: 'לא עכשיו', style: 'cancel', onPress: () => resolve() },
-                    { text: 'אשר', onPress: () => resolve() }
-                  ]
-                );
+                DeviceEventEmitter.emit('show-notification-permission-modal', { onDone: resolve });
+                setTimeout(resolve, 30000);
               });
             }
           } else {
@@ -90,14 +84,11 @@ class FCMService {
           if (existingStatus !== 'granted') {
             if (await this.shouldShowNotificationModal()) {
               const granted = await new Promise<boolean>((resolve) => {
-                Alert.alert(
-                  'הפעלת התראות',
-                  'על מנת שיתאפשר לך קבלת שוברים ומבצעים יש לאשר קבלת התראות',
-                  [
-                    { text: 'לא עכשיו', style: 'cancel', onPress: () => resolve(false) },
-                    { text: 'אשר', onPress: () => resolve(true) }
-                  ]
-                );
+                DeviceEventEmitter.emit('show-notification-permission-modal', {
+                  onAccept: () => resolve(true),
+                  onDismiss: () => resolve(false),
+                });
+                setTimeout(() => resolve(false), 30000);
               });
               if (granted) {
                 await Notifications.requestPermissionsAsync();

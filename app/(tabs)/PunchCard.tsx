@@ -2284,7 +2284,19 @@ export default function PunchCard() {
           </View>
 
           {/* כפתור סריקת NFC ידנית + אייקון הסבר */}
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', marginTop: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 20 }}>
+            <TouchableOpacity
+              style={{ marginRight: 4 }}
+              onPress={() => setNfcNoticeVisible(true)}
+              accessibilityLabel="מידע על כפתור ניקוב ידני"
+              accessibilityRole="button"
+            >
+              <Image
+                source={require('../../assets/icons/notice.png')}
+                style={{ width: 36, height: 36 }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
             <TouchableOpacity
               style={{ alignItems: 'center', justifyContent: 'center' }}
               onPress={async () => {
@@ -2311,18 +2323,6 @@ export default function PunchCard() {
               <Image 
                 source={require('../../assets/icons/NFC_ISO_BOTTEN.png')}
                 style={{ width: 80, height: 80 }}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ marginRight: 4 }}
-              onPress={() => setNfcNoticeVisible(true)}
-              accessibilityLabel="מידע על כפתור ניקוב ידני"
-              accessibilityRole="button"
-            >
-              <Image
-                source={require('../../assets/icons/notice.png')}
-                style={{ width: 36, height: 36 }}
                 resizeMode="contain"
               />
             </TouchableOpacity>

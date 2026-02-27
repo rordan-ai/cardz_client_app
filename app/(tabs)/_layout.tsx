@@ -343,6 +343,51 @@ const extractCanvaUrl = (text?: string): string | null => {
   return match ? match[0] : null;
 };
 
+function NotificationPermissionModal() {
+  const [visible, setVisible] = useState(false);
+  const callbacksRef = useRef<{ onAccept?: () => void; onDismiss?: () => void; onDone?: () => void }>({});
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('show-notification-permission-modal', (data) => {
+      callbacksRef.current = data || {};
+      setVisible(true);
+    });
+    return () => sub.remove();
+  }, []);
+
+  const handleAccept = () => {
+    setVisible(false);
+    callbacksRef.current.onAccept?.();
+    callbacksRef.current.onDone?.();
+  };
+  const handleDismiss = () => {
+    setVisible(false);
+    callbacksRef.current.onDismiss?.();
+    callbacksRef.current.onDone?.();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDismiss}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 28, width: '80%', maxWidth: 340, alignItems: 'center' }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 14, fontFamily: 'Rubik', textAlign: 'center' }}>הפעלת התראות</Text>
+          <Text style={{ fontSize: 15, color: '#555', lineHeight: 24, fontFamily: 'Rubik', textAlign: 'center' }}>
+            על מנת שיתאפשר לך קבלת שוברים ומבצעים יש לאשר קבלת התראות
+          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20, gap: 16 }}>
+            <TouchableOpacity onPress={handleDismiss} style={{ paddingVertical: 10, paddingHorizontal: 20 }}>
+              <Text style={{ fontSize: 15, color: '#888', fontFamily: 'Rubik' }}>לא עכשיו</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleAccept} style={{ backgroundColor: '#267884', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 24 }}>
+              <Text style={{ fontSize: 15, color: '#fff', fontWeight: 'bold', fontFamily: 'Rubik' }}>אשר</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function Layout() {
   const [notification, setNotification] = useState<{ title: string; body: string; voucherUrl?: string } | null>(null);
   const [inlineUrl, setInlineUrl] = useState<string | null>(null);
@@ -539,6 +584,7 @@ export default function Layout() {
   return (
     <BusinessProvider>
       <NfcDeepLinkHandler />
+      <NotificationPermissionModal />
       <Slot />
       {/* מודל התראה מובנה באפליקציה עם RTL מלא */}
       <Modal visible={!!notification} transparent animationType="fade">
