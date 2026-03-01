@@ -2142,7 +2142,7 @@ export default function PunchCard() {
         {/* iOS בלבד: הזזה של כל התוכן (שם לקוח + גריד + טקסטים + NFC + ברקוד) 160px למטה */}
         <View style={Platform.OS === 'ios' ? { transform: [{ translateY: 160 }] } : undefined}>
         {/* עמוד ראשון בגובה המסך כדי שכפתור NFC + ברקוד יהיו "עמוד שני" ויתגלו רק בגלילה */}
-        <View style={{ minHeight: Platform.OS === 'android' ? height : height - 160 }}>
+        <View style={{ minHeight: height }}>
           {/* שם הלקוח - מקובע באנדרואיד למיקום של מצב 4 שורות (לא תלוי במספר שורות/הזזות אחרות) */}
           {/* iOS בלבד: עטיפה מבודדת לשם הלקוח - העלאה 65px למעלה */}
           <View style={Platform.OS === 'ios' ? { transform: [{ translateY: -65 }] } : undefined}>
