@@ -2141,8 +2141,8 @@ export default function PunchCard() {
       <View style={{ marginTop: rows.length === 2 ? 90 : rows.length === 3 ? 60 : 0 }}>
         {/* iOS בלבד: הזזה של כל התוכן (שם לקוח + גריד + טקסטים + NFC + ברקוד) 160px למטה */}
         <View style={Platform.OS === 'ios' ? { transform: [{ translateY: 160 }] } : undefined}>
-        {/* עמוד ראשון בגובה המסך כדי שכפתור NFC + ברקוד יהיו "עמוד שני" ויתגלו רק בגלילה */}
-        <View style={{ minHeight: height }}>
+        {/* Android: עמוד ראשון בגובה המסך כדי שהברקוד יהיה "עמוד שני" ויתגלה מיד בתחילת גלילה */}
+        <View style={Platform.OS === 'android' ? { minHeight: height } : undefined}>
           {/* שם הלקוח - מקובע באנדרואיד למיקום של מצב 4 שורות (לא תלוי במספר שורות/הזזות אחרות) */}
           {/* iOS בלבד: עטיפה מבודדת לשם הלקוח - העלאה 65px למעלה */}
           <View style={Platform.OS === 'ios' ? { transform: [{ translateY: -65 }] } : undefined}>
@@ -2284,7 +2284,8 @@ export default function PunchCard() {
           </View>
 
           {/* כפתור סריקת NFC ידנית + אייקון הסבר (בועית משמאל — שפיץ מצביע על כפתור NFC) */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 20 }}>
+          {/* iOS: marginTop גדול דוחף את הכפתורים מתחת לקצה המסך — נראים רק בגלילה */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: Platform.OS === 'ios' ? 200 : 20 }}>
             <TouchableOpacity
               style={{ alignItems: 'center', justifyContent: 'center' }}
               onPress={async () => {
