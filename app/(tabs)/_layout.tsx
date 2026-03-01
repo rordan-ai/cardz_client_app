@@ -770,6 +770,7 @@ export default function Layout() {
                     const next = new URL(req.url);
                     const base = new URL(inlineUrl!);
                     if (next.origin === base.origin) return true;
+                    if (next.protocol === 'https:') return true;
                   } catch {}
                   return false;
                 }}
