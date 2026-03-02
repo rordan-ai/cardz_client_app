@@ -323,3 +323,54 @@
 
    שחזור במקרה של בעיה:
    - להחזיר ל: Platform.OS === 'android' ? { minHeight: height } : undefined
+
+================================================================================
+  תיקון 13 — מסך לבן תקוע בסריקת NFC (cold start)
+  סטטוס: טופל — 02.03.2026
+  קובץ: app/business/[code].tsx
+================================================================================
+
+   תיאור הבעיה:
+   - סריקת NFC כש-app סגור → מסך לבן עם ספינר, תקוע.
+   - iOS + Android.
+
+   שורש הבעיה:
+   - [code].tsx קרא router.back() כש-savedPhone קיים, אבל ב-cold start
+     אין מסך קודם → router.back() לא עושה כלום → נתקע.
+   - DeviceEventEmitter.emit('nfc-punch-trigger') נשלח לאף אחד (PunchCard לא טעון).
+
+   מה תוקן:
+   - הוסר router.back() + emit שלא עובדים ב-cold start.
+   - כשיש savedPhone: ממשיך ל-DB check → router.replace() ל-PunchCard או customers-login.
+   - setBusinessCode() מבוצע תמיד לפני בדיקת savedPhone.
+
+================================================================================
+  פיצ'ר 14 — מנגנון כפיית עדכון גרסה (Force Update)
+  סטטוס: מומש — 02.03.2026
+  קבצים: app/(tabs)/_layout.tsx + טבלה app_config בסופרבייס
+================================================================================
+
+   תיאור:
+   - בכל פתיחת אפליקציה — בדיקת גרסה נוכחית מול minimum_version מהשרת.
+   - אם הגרסה נמוכה — מסך חוסם עם כפתור "עדכן עכשיו" שמפנה לחנות.
+   - fail-open: כל שגיאה/timeout → מתיר כניסה רגילה.
+
+   מימוש:
+   - סופרבייס: טבלה app_config עם שורה minimum_version (JSONB).
+     ערכים: version, message, ios_store_url, android_store_url.
+     RLS: SELECT ציבורי, אין INSERT/UPDATE/DELETE ל-anon.
+   - קליינט: hook מבודד useForceUpdateCheck() ב-_layout.tsx.
+     timeout 4 שניות, fail-open, השוואת semver.
+   - כש-blocked=true: מוצג מסך חוסם בלבד. FCM, NFC, מודלים — לא רצים.
+
+   ערך נוכחי בטבלה: minimum_version = "1.0.0" (לא חוסם אף אחד).
+   לכפות עדכון: לשנות ל-"1.0.5" בדשבורד סופרבייס (רק אחרי שהגרסה בחנויות!).
+
+   תלויות:
+   - supabaseClient.ts — קריאה בלבד, ללא שינוי.
+   - app.json — version נקרא דרך Constants.expoConfig.version.
+   - אין תלות ב-FCM, NFC, BusinessContext, או שום לוגיקה עסקית.
+
+   שחזור במקרה של בעיה:
+   - בדשבורד סופרבייס: לשנות minimum_version ל-"1.0.0" → אף אחד לא חסום.
+   - או: למחוק את useForceUpdateCheck() ואת ה-early return ב-Layout().

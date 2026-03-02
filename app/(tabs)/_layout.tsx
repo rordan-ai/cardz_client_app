@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import * as MediaLibrary from 'expo-media-library';
 import { Slot, useRouter, usePathname } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -13,6 +14,60 @@ import { getCapturedInitialUrl, initialUrlPromise } from '../_layout';
 
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
 const LAST_NFC_TAG_KEY = 'last_nfc_tag_id';
+
+/**
+ * ForceUpdateGate — מנגנון כפיית עדכון גרסה.
+ * fail-open: כל שגיאה = מתיר כניסה. timeout 4 שניות.
+ */
+function useForceUpdateCheck() {
+  const [blocked, setBlocked] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<{ message: string; storeUrl: string } | null>(null);
+
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+
+        const { data, error } = await supabase
+          .from('app_config')
+          .select('value')
+          .eq('key', 'minimum_version')
+          .single()
+          .abortSignal(controller.signal);
+
+        clearTimeout(timeout);
+        if (error || !data?.value?.version) return;
+
+        const appVersion = Constants.expoConfig?.version || '0.0.0';
+        const minVersion = data.value.version;
+
+        const compare = (a: string, b: string) => {
+          const pa = a.split('.').map(Number);
+          const pb = b.split('.').map(Number);
+          for (let i = 0; i < 3; i++) {
+            if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+            if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+          }
+          return 0;
+        };
+
+        if (compare(appVersion, minVersion) < 0) {
+          const storeUrl = Platform.OS === 'ios'
+            ? data.value.ios_store_url
+            : data.value.android_store_url;
+          setUpdateInfo({ message: data.value.message, storeUrl });
+          setBlocked(true);
+        }
+      } catch {
+        // fail-open
+      }
+    };
+    check();
+  }, []);
+
+  return { blocked, updateInfo };
+}
 const NFC_TAG_COOLDOWN_MS = 30000; // 30 שניות - לא לטפל באותו תג שוב
 
 /**
@@ -389,6 +444,7 @@ function NotificationPermissionModal() {
 }
 
 export default function Layout() {
+  const { blocked: forceUpdateBlocked, updateInfo } = useForceUpdateCheck();
   const [notification, setNotification] = useState<{ title: string; body: string; voucherUrl?: string } | null>(null);
   const [inlineUrl, setInlineUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
@@ -580,6 +636,22 @@ export default function Layout() {
     const prepared = appendPhoneToVoucherUrl(notification.voucherUrl);
     setInlineUrl(prepared);
   };
+
+  if (forceUpdateBlocked && updateInfo) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+        <Text style={{ fontSize: 48, marginBottom: 20 }}>🔄</Text>
+        <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333', textAlign: 'center', marginBottom: 16, fontFamily: 'Rubik' }}>עדכון נדרש</Text>
+        <Text style={{ fontSize: 16, color: '#555', textAlign: 'center', lineHeight: 24, marginBottom: 28, fontFamily: 'Rubik' }}>{updateInfo.message}</Text>
+        <TouchableOpacity
+          style={{ backgroundColor: '#267884', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 40 }}
+          onPress={() => Linking.openURL(updateInfo.storeUrl)}
+        >
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', fontFamily: 'Rubik' }}>עדכן עכשיו</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <BusinessProvider>
