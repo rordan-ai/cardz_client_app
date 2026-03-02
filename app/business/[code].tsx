@@ -30,18 +30,11 @@ export default function BusinessDeepLinkHandler() {
 
       try {
         // אם PunchCard כבר פעיל — לא לנתב מחדש, אלא לשלוח אירוע לפתיחת מודאל ניקוב
-        const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
-        if (savedPhone) {
-          console.log('[DeepLink Route] Emitting nfc-punch-trigger for PunchCard');
-          DeviceEventEmitter.emit('nfc-punch-trigger', { businessCode: code });
-          router.back();
-          return;
-        }
-        // הגדרת העסק בקונטקסט
         await setBusinessCode(code);
+        const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
 
         if (!savedPhone) {
-          // אין טלפון שמור - עבור לדף כניסה
+          console.log('[DeepLink Route] No saved phone → customers-login');
           router.replace({
             pathname: '/(tabs)/customers-login',
             params: { businessCode: code, nfcLaunch: 'true' }
