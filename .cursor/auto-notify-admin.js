@@ -20,16 +20,12 @@ const WATCH_PATHS = [
 // פונקציה לשליחת הודעה לאדמין
 async function notifyAdmin(message, context = {}) {
   try {
-    const axios = require('axios');
-    
-    // שליחה דרך MCP AgentsCommunication
-    await axios.post('http://localhost:3000/send-message', {
-      from: 'CLIENT',
-      to: 'ADMIN',
-      message: message,
-      context: context
+    const res = await fetch('http://localhost:3000/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'CLIENT', to: 'ADMIN', message, context })
     });
-    
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     console.log('✅ Admin notified:', message.substring(0, 50));
   } catch (error) {
     console.error('❌ Failed to notify admin:', error.message);
@@ -52,15 +48,15 @@ function watchBuilds() {
 
 // מעקב אחרי שינויי קוד
 function watchCodeChanges() {
-  exec('git diff --name-only HEAD', async (error, stdout) => {
+  exec('git diff --name-only HEAD', (error, stdout) => {
     if (error) return;
     
     const changedFiles = stdout.trim().split('\n').filter(Boolean);
     if (changedFiles.length > 0) {
-      await notifyAdmin(`📝 Code changes detected: ${changedFiles.length} files`, {
+      notifyAdmin(`📝 Code changes detected: ${changedFiles.length} files`, {
         type: 'code_change',
         files: changedFiles
-      });
+      }).catch(() => {});
     }
   });
 }
