@@ -19,6 +19,7 @@ import { getCurrentLogoScale } from '../../components/LogoUtils';
 import MarketingPopup from '../../components/MarketingPopup';
 import { NFCPunchModal } from '../../components/NFCPunch';
 import { supabase } from '../../components/supabaseClient';
+import auth from '@react-native-firebase/auth';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
 import { useNFC } from '../../hooks/useNFC';
 
@@ -1486,7 +1487,39 @@ export default function PunchCard() {
     const variants = getPhoneVariants(raw);
     console.log('[ActivityFeed] Starting fetch', { businessCode, raw, variants });
     const allRows: Array<{ dateStr: string; actionLabel: string; amount: number; timestamp: string }> = [];
-    
+
+    // P1: מקור סמכותי — Edge customer-activity-log. activity_logs חסום ל-anon SELECT ב-RLS
+    // (מסך ריק מ-27/05); ה-Edge קורא ב-service_role לפי phone שמחולץ מ-Firebase ID token.
+    // phone matching מכסה הכל: הצטרפות · ניקובי-לקוח (mobile) · ניקובי-אדמין (מתויגים בטלפון).
+    try {
+      const idToken = await auth().currentUser?.getIdToken();
+      if (idToken) {
+        const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('customer-activity-log', {
+          body: { business_code: businessCode, id_token: idToken, limit: pageSize * 4 },
+        });
+        const ed: any = edgeData;
+        if (edgeErr || !ed?.ok) {
+          console.log('[ActivityFeed] Edge error', String(edgeErr?.message || edgeErr || ed?.error || ''));
+        }
+        const logs: any[] = Array.isArray(ed?.activity_logs) ? ed.activity_logs : [];
+        const rows = logs
+          .filter((row: any) => !cursorTimestamp || (row?.timestamp && String(row.timestamp) < String(cursorTimestamp)))
+          .map((row: any) => {
+            const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
+            const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+            const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+            const qty = typeof row?.amount === 'number' ? row.amount : amount;
+            return { dateStr, actionLabel: label, amount: qty, timestamp: row?.timestamp || ts.toISOString() };
+          });
+        allRows.push(...rows);
+      } else {
+        console.log('[ActivityFeed] No Firebase ID token (not signed in) — skipping Edge');
+      }
+    } catch (e: any) {
+      console.log('[ActivityFeed] Edge exception', String(e?.message || e));
+    }
+
     // 1. קריאה מ-customer_activity_feed (קיים)
     for (const custPhone of variants) {
       try {
