@@ -354,6 +354,24 @@ export default function NewClientForm() {
       const result = await createCardWithProduct((selectedProduct.product_code || '').toString().padStart(4, '0'));
         
         if (result.success) {
+          // P2 (BUG-02): רישום הצטרפות-מרחוק כ-source:'mobile' לאבחנת הדשבורד.
+          // fire-and-forget, ⛔ בלי .select() (activity_logs חסום ל-anon SELECT → 42501 אטומי).
+          supabase.from('activity_logs').insert({
+            business_code: selectedBusiness.id,
+            user_type: 'customer',
+            action_type: 'add_customer',
+            source: 'mobile',
+            user_id: normalizedPhone,
+            target_entity: normalizedPhone,
+            action_details: {
+              customer_phone: normalizedPhone,
+              customer_name: firstName + ' ' + lastName,
+              product_code: (selectedProduct.product_code || '').toString(),
+              product_name: selectedProduct.product_name,
+            },
+          }).then(({ error }) => {
+            if (error) console.log('[P2 add_customer/mobile] log failed:', error.code, error.message);
+          });
           router.push('/(tabs)/thank_you');
         } else if (result.isDuplicate) {
           setErrorModal({ visible: true, message: 'זוהה רישום כפול של מספר טלפון ומוצר זהים. נסה/י להגדיר מוצר כרטיסייה שונה.' });

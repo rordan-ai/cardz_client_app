@@ -241,12 +241,19 @@ export default function PunchCard() {
 
           // הוספה ללוג פעילות
           console.log('[DEBUG-DIRECT-PUNCH] Adding activity log...');
-          await supabase.from('activity_logs').insert({
+          // P3: רישום ניקוב-ישיר-לקוח — עמודות נכונות (היה שבור: customer_phone/action/details
+          // לא קיימות + חוסר user_type + source='nfc_auto' פסול ב-CHECK → נכשל בשקט).
+          // fire-and-forget, ⛔ בלי .select() (activity_logs חסום ל-anon SELECT → 42501 אטומי).
+          supabase.from('activity_logs').insert({
             business_code: localBusiness?.business_code,
-            customer_phone: phoneIntl,
-            action: 'punch',
-            source: 'nfc_auto',
-            details: `ניקוב אוטומטי מ-NFC: ${newPunches}/${totalPunches}`
+            user_type: 'customer',
+            action_type: 'punch',
+            source: 'mobile',
+            user_id: phoneIntl,
+            target_entity: phoneIntl,
+            action_details: { card_number: punchCard.card_number, punches: `${newPunches}/${totalPunches}` },
+          }).then(({ error }) => {
+            if (error) console.log('[P3 punch/mobile] log failed:', error.code, error.message);
           });
           console.log('[DEBUG-DIRECT-PUNCH] Activity log added');
 
