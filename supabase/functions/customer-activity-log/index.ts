@@ -102,6 +102,7 @@ serve(async (req) => {
       .eq("business_code", business_code).in("customer_phone", variants)
       .order("created_at", { ascending: false }).limit(max);
     const vlQ = supabase.from("voucher_logs").select("*")
+      .eq("business_code", business_code)
       .in("customer_phone", variants)
       .order("created_at", { ascending: false }).limit(max);
 
