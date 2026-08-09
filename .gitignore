@@ -2,6 +2,9 @@ assets/temp_for_deleet/google-services-servises.json
 gservices.b64.txt
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# Windows reserved device name — phantom entry breaks git index ops
+nul
+
 # dependencies
 node_modules/
 
