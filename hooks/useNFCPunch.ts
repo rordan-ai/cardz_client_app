@@ -547,8 +547,10 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
 
     // לפי אפיון: כרטיסייה Prepaid בלבד מבצעת ניקוב ישיר.
     // כל כרטיסייה שאינה Prepaid חייבת לעבור אישור אדמין (בלי קשר ל-punch_mode של העסק).
-    // P5: אם הצ'קבוקס prepaid_requires_approval דלוק בעסק — גם prepaid עובר אישור-אדמין (בקשה).
-    if (isPrepaid && !prepaidApprovalRef.current) {
+    // P5: ה-flag prepaid_requires_approval מנתב לאישור **רק** כשגם העסק ב-auto —
+    // כדי למנוע over-gating (prepaid+semi/manual וכרטיסים לא-prepaid לא מושפעים).
+    const p5RouteToApproval = prepaidApprovalRef.current && effectiveMode === 'auto';
+    if (isPrepaid && !p5RouteToApproval) {
       setFlowState('punching');
       const result = await executePunch(
         { ...card, used_punches: latestUsed, total_punches: latestTotal },
