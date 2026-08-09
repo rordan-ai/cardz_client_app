@@ -78,6 +78,7 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
   const subscriptionRef = useRef<any>(null);
   const punchLockRef = useRef(false);
   const punchModeRef = useRef<string | null>(null);
+  const prepaidApprovalRef = useRef<boolean>(false); // P5: צ'קבוקס prepaid_requires_approval ברמת-עסק
 
   // ניקוי
   const cleanup = useCallback(() => {
@@ -354,11 +355,11 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
   }, [cleanup]);
 
   // זיהוי עסק לפי nfc_string
-  const identifyBusinessByNFC = useCallback(async (nfcString: string): Promise<{ business_code: string; name: string; punch_mode: string } | null> => {
+  const identifyBusinessByNFC = useCallback(async (nfcString: string): Promise<{ business_code: string; name: string; punch_mode: string; prepaid_requires_approval?: boolean } | null> => {
     try {
       const { data, error } = await supabase
         .from('businesses')
-        .select('business_code, name, punch_mode')
+        .select('*') // P5: '*' כדי לכלול prepaid_requires_approval; graceful בפרוד לפני שהעמודה קיימת
         .eq('nfc_string', nfcString)
         .single();
       
@@ -383,13 +384,13 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       
       console.log('[NFC] Starting punch flow with phone:', customerPhoneFromContext, 'preSelectedCard:', preSelectedCardNumber, 'businessCodeOverride:', businessCodeOverride);
 
-      let business: { business_code: string; name: string; punch_mode: string } | null = null;
+      let business: { business_code: string; name: string; punch_mode: string; prepaid_requires_approval?: boolean } | null = null;
 
       if (businessCodeOverride) {
         // זיהוי עסק ישירות לפי business_code (מונע באג state ישן)
         const { data, error } = await supabase
           .from('businesses')
-          .select('business_code, name, punch_mode')
+          .select('*') // P5: '*' כדי לכלול prepaid_requires_approval; graceful בפרוד
           .eq('business_code', businessCodeOverride)
           .single();
         if (!error && data) {
@@ -422,6 +423,8 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       setCurrentPunchMode(mode);
       // חשוב: state אסינכרוני; משתמשים גם ב-ref כדי למנוע stale mode בתהליך המיידי
       punchModeRef.current = mode;
+      // P5: לכידת הצ'קבוקס — אם דלוק, prepaid מנותב לאישור-אדמין במקום ניקוב ישיר
+      prepaidApprovalRef.current = (business as any).prepaid_requires_approval === true;
 
       // אם יש מספר טלפון מהקונטקסט (הלקוח כבר מזוהה בכרטיסייה)
       // אין צורך בהזדהות ביומטרית נוספת!
@@ -544,7 +547,8 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
 
     // לפי אפיון: כרטיסייה Prepaid בלבד מבצעת ניקוב ישיר.
     // כל כרטיסייה שאינה Prepaid חייבת לעבור אישור אדמין (בלי קשר ל-punch_mode של העסק).
-    if (isPrepaid) {
+    // P5: אם הצ'קבוקס prepaid_requires_approval דלוק בעסק — גם prepaid עובר אישור-אדמין (בקשה).
+    if (isPrepaid && !prepaidApprovalRef.current) {
       setFlowState('punching');
       const result = await executePunch(
         { ...card, used_punches: latestUsed, total_punches: latestTotal },

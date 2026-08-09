@@ -115,6 +115,7 @@ export default function PunchCard() {
     login_brand_color?: string;
     card_background_color?: string;
     punch_mode?: string;
+    prepaid_requires_approval?: boolean;
   } | null>(null);
 
   // צבע brand מהאדמין (ברירת מחדל סגול אם אין)
@@ -169,7 +170,10 @@ export default function PunchCard() {
     // 3. מצב auto
     const isPrepaid = punchCard?.prepaid === 'כן';
     const isAutoMode = localBusiness?.punch_mode === 'auto';
-    const canDirectPunch = isAutoPunch && isPrepaid && isAutoMode && punchCard?.card_number;
+    // P5: צ'קבוקס ברמת-עסק — אם דלוק, prepaid+auto מנותב לאישור-אדמין (מודאל→בקשה)
+    // במקום ניקוב ישיר. undefined (בפרוד לפני שהעמודה קיימת) → false → התנהגות ללא שינוי.
+    const requiresApproval = localBusiness?.prepaid_requires_approval === true;
+    const canDirectPunch = isAutoPunch && isPrepaid && isAutoMode && !requiresApproval && punchCard?.card_number;
     console.log('[DEBUG-DIRECT-PUNCH] Conditions:', { isPrepaid, isAutoMode, canDirectPunch });
 
     nfcLaunchHandled.current = true;
