@@ -19,7 +19,6 @@ import { getCurrentLogoScale } from '../../components/LogoUtils';
 import MarketingPopup from '../../components/MarketingPopup';
 import { NFCPunchModal } from '../../components/NFCPunch';
 import { supabase } from '../../components/supabaseClient';
-import auth from '@react-native-firebase/auth';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
 import { useNFC } from '../../hooks/useNFC';
 
@@ -96,10 +95,13 @@ export default function PunchCard() {
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
-  const [activityRows, setActivityRows] = useState<Array<{ dateStr: string; actionLabel: string; amount: number }>>([]);
+  const [activityRows, setActivityRows] = useState<Array<{ dateStr: string; actionLabel: string; amount: number; subLabel?: string }>>([]);
   const [activityNextCursor, setActivityNextCursor] = useState<string | null>(null);
   const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const activityChannelRef = useRef<any>(null);
+  // ביצועים: cache בזיכרון ל-stale-while-revalidate (פתיחה מיידית מ-cache, רענון ברקע).
+  const activityCacheRef = useRef<{ rows: Array<{ dateStr: string; actionLabel: string; amount: number; subLabel?: string }>; next: string | null } | null>(null);
+  const ACTIVITY_PAGE_SIZE = 50;
 
   const [localBusiness, setLocalBusiness] = useState<{
     id?: number;
@@ -253,7 +255,7 @@ export default function PunchCard() {
             business_code: localBusiness?.business_code,
             user_type: 'customer',
             action_type: 'punch',
-            source: 'mobile',
+            source: 'nfc', // ניקוב-ישיר של לקוח = הצמדת תג NFC → תיוג אחיד (CHECK מתיר nfc+customer)
             user_id: phoneIntl,
             target_entity: phoneIntl,
             action_details: { card_number: punchCard.card_number, punches: `${newPunches}/${totalPunches}` },
@@ -266,17 +268,21 @@ export default function PunchCard() {
           console.log('[DEBUG-DIRECT-PUNCH] Updating local state...');
           setPunchCard(prev => prev ? { ...prev, used_punches: newPunches } : null);
 
-          // בדיקה אם זה ניקוב מזכה
+          // בדיקה אם זה ניקוב מזכה (הכרטיסייה הושלמה)
           const isRewardingPunch = newPunches >= totalPunches;
-          console.log('[DEBUG-DIRECT-PUNCH] isRewardingPunch:', isRewardingPunch);
-          setIsDirectRewardingPunch(isRewardingPunch);
-          
+          console.log('[DEBUG-DIRECT-PUNCH] isRewardingPunch:', isRewardingPunch, 'isPrepaid:', isPrepaid);
+          // כרטיסייה משולמת (prepaid): סיום = "פנה לקופה לחידוש", לא חגיגת הטבה → בלי קונפטי/🎉.
+          const celebrate = isRewardingPunch && !isPrepaid;
+          setIsDirectRewardingPunch(celebrate);
+
           setDirectPunchStatus('success');
           // חישוב טקסט הטבה דינמי לפי הגדרות העסק
           const productName = punchCard.benefit || punchCard.product_name || 'מוצר';
           const rewardText = getBenefitText(localBusiness as any, productName);
-          const successMsg = isRewardingPunch 
-            ? `🎉 מזל טוב! הגעת להטבה: ${rewardText}` 
+          const successMsg = isRewardingPunch
+            ? (isPrepaid
+                ? 'סיימת את מספר הניקובים לכרטיסייה הנוכחית, אנא פנה לקופה לחידוש הכרטיסייה'
+                : `🎉 מזל טוב! הגעת להטבה: ${rewardText}`)
             : `✅ ניקוב ${newPunches}/${totalPunches} בוצע בהצלחה!`;
           setDirectPunchMessage(successMsg);
           console.log('[DEBUG-DIRECT-PUNCH] SUCCESS! Message:', successMsg);
@@ -1451,6 +1457,10 @@ export default function PunchCard() {
         return { label: 'שובר מומש', amount: -1 };
       case 'voucher_expired':
         return { label: 'שובר פג תוקף', amount: -1 };
+      // ניקוב באמצעות NFC (הצמדת תג) — תווית אחידה בכל המסלולים
+      case 'nfc_punch':
+      case 'nfc':
+        return { label: 'ניקוב NFC', amount: 1 };
       // סוגי פעולות מ-activity_logs (אדמין)
       case 'punch':
       case 'add_punch':
@@ -1474,6 +1484,22 @@ export default function PunchCard() {
     }
   };
 
+  // מיפוי מודע-source: מבחין בין ניקוב-NFC לניקוב-ידני-של-בית-העסק (מקביל ל-punchTypeDisplay באדמין).
+  //  • nfc_punch  |  punch+source=nfc  |  punch+source=mobile (לוגים ישנים לפני mobile→nfc) → "ניקוב NFC"
+  //  • punch+source=web → "ניקוב ע"י בית העסק" (ניקוב ידני באדמין)
+  //  • כל השאר → המיפוי הרגיל לפי action_type
+  const mapRowToLabelAndAmount = (row: any): { label: string; amount: number } => {
+    const at = String(row?.action_type || '').toLowerCase();
+    const src = String(row?.source || '').toLowerCase();
+    if (at === 'nfc_punch' || (at === 'punch' && (src === 'nfc' || src === 'mobile'))) {
+      return { label: 'ניקוב NFC', amount: 1 };
+    }
+    if (at === 'punch' && src === 'web') {
+      return { label: 'ניקוב ע"י בית העסק', amount: 1 };
+    }
+    return mapActionToLabelAndAmount(row?.action_type);
+  };
+
   const fetchMyActivityFeed = async (pageSize = 100, cursor?: string) => {
     // cursor הוא timestamp בלבד
     const cursorTimestamp = cursor;
@@ -1486,36 +1512,55 @@ export default function PunchCard() {
 
     const variants = getPhoneVariants(raw);
     console.log('[ActivityFeed] Starting fetch', { businessCode, raw, variants });
-    const allRows: Array<{ dateStr: string; actionLabel: string; amount: number; timestamp: string }> = [];
+    const allRows: Array<{ dateStr: string; actionLabel: string; amount: number; timestamp: string; subLabel?: string }> = [];
+
+    // בונה תת-שורה "נותרו X מתוך Y" ממבני action_details שונים לפי מקור הלוג:
+    //  • ניקוב-לקוח ישיר (P3):    punches = "5/11"  (בוצעו/סה"כ)
+    //  • ניקוב דרך אישור (nfc):    new_punch_count + max_punches
+    //  • fallback:                new_punches + total_punches/total
+    const buildPunchesSub = (row: any): string => {
+      const d = row?.action_details && typeof row.action_details === 'object' ? row.action_details : {};
+      let done: number | undefined;
+      let total: number | undefined;
+      if (d?.punches != null && String(d.punches).includes('/')) {
+        const [a, b] = String(d.punches).split('/');
+        done = parseInt(a, 10);
+        total = parseInt(b, 10);
+      }
+      if (done == null && d?.new_punch_count != null) done = parseInt(String(d.new_punch_count), 10);
+      if (total == null && d?.max_punches != null) total = parseInt(String(d.max_punches), 10);
+      if (done == null && d?.new_punches != null) done = parseInt(String(d.new_punches), 10);
+      if (total == null && (d?.total_punches != null || d?.total != null)) total = parseInt(String(d.total_punches ?? d.total), 10);
+      if (done == null || total == null || !Number.isFinite(done) || !Number.isFinite(total) || total <= 0) return '';
+      return `נותרו ${Math.max(total - done, 0)} מתוך ${total}`;
+    };
 
     // P1: מקור סמכותי — Edge customer-activity-log. activity_logs חסום ל-anon SELECT ב-RLS
-    // (מסך ריק מ-27/05); ה-Edge קורא ב-service_role לפי phone שמחולץ מ-Firebase ID token.
-    // phone matching מכסה הכל: הצטרפות · ניקובי-לקוח (mobile) · ניקובי-אדמין (מתויגים בטלפון).
+    // (מסך ריק מ-27/05); ה-Edge קורא ב-service_role לפי phone.
+    // מודל האימות בפועל: כל האפליקציה מזהה לקוח לפי מספר-טלפון בלבד (login/ביומטרי/הצטרפות —
+    // אין Firebase session; ראה customers-login.tsx). לכן שולחים phone ישירות (לא id_token) —
+    // עקבי עם שאר האפליקציה שכבר חושפת כרטיסייה/היסטוריה/הטבות לפי טלפון. ה-Edge מנרמל את
+    // כל הווריאנטים (E.164 972… ↔ מקומי 05…) כדי לתפוס את כל מסלולי הניקוב.
     try {
-      const idToken = await auth().currentUser?.getIdToken();
-      if (idToken) {
-        const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('customer-activity-log', {
-          body: { business_code: businessCode, id_token: idToken, limit: pageSize * 4 },
-        });
-        const ed: any = edgeData;
-        if (edgeErr || !ed?.ok) {
-          console.log('[ActivityFeed] Edge error', String(edgeErr?.message || edgeErr || ed?.error || ''));
-        }
-        const logs: any[] = Array.isArray(ed?.activity_logs) ? ed.activity_logs : [];
-        const rows = logs
-          .filter((row: any) => !cursorTimestamp || (row?.timestamp && String(row.timestamp) < String(cursorTimestamp)))
-          .map((row: any) => {
-            const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
-            const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
-              + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-            const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
-            const qty = typeof row?.amount === 'number' ? row.amount : amount;
-            return { dateStr, actionLabel: label, amount: qty, timestamp: row?.timestamp || ts.toISOString() };
-          });
-        allRows.push(...rows);
-      } else {
-        console.log('[ActivityFeed] No Firebase ID token (not signed in) — skipping Edge');
+      const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('customer-activity-log', {
+        body: { business_code: businessCode, phone: raw, limit: pageSize * 4 },
+      });
+      const ed: any = edgeData;
+      if (edgeErr || !ed?.ok) {
+        console.log('[ActivityFeed] Edge error', String(edgeErr?.message || edgeErr || ed?.error || ''));
       }
+      const logs: any[] = Array.isArray(ed?.activity_logs) ? ed.activity_logs : [];
+      const rows = logs
+        .filter((row: any) => !cursorTimestamp || (row?.timestamp && String(row.timestamp) < String(cursorTimestamp)))
+        .map((row: any) => {
+          const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
+          const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+          const { label, amount } = mapRowToLabelAndAmount(row);
+          const qty = typeof row?.amount === 'number' ? row.amount : amount;
+          return { dateStr, actionLabel: label, amount: qty, timestamp: row?.timestamp || ts.toISOString(), subLabel: buildPunchesSub(row) };
+        });
+      allRows.push(...rows);
     } catch (e: any) {
       console.log('[ActivityFeed] Edge exception', String(e?.message || e));
     }
@@ -1549,7 +1594,7 @@ export default function PunchCard() {
           const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
           const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
             + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-          const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+          const { label, amount } = mapRowToLabelAndAmount(row);
           const qty = typeof row?.amount === 'number' ? row.amount : amount;
           return { dateStr, actionLabel: label, amount: qty, timestamp: row?.timestamp || ts.toISOString() };
         });
@@ -1587,7 +1632,7 @@ export default function PunchCard() {
           const ts = row?.action_time ? new Date(row.action_time) : new Date();
           const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
             + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-          const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+          const { label, amount } = mapRowToLabelAndAmount(row);
           const qty = typeof row?.amount === 'number' ? row.amount : amount;
           return { dateStr, actionLabel: label, amount: qty, timestamp: row?.action_time || ts.toISOString() };
         });
@@ -1687,7 +1732,7 @@ export default function PunchCard() {
           const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
           const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
             + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-          const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+          const { label, amount } = mapRowToLabelAndAmount(row);
           const qty = typeof row?.amount === 'number' ? row.amount : amount;
           return { dateStr, actionLabel: label, amount: qty, timestamp: row?.timestamp || ts.toISOString() };
         });
@@ -1749,7 +1794,7 @@ export default function PunchCard() {
           const ts = row?.action_time ? new Date(row.action_time) : new Date();
           const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
             + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-          const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+          const { label, amount } = mapRowToLabelAndAmount(row);
           setActivityRows((prev) => [{ dateStr, actionLabel: label, amount: typeof amount === 'number' ? amount : 1 }, ...prev]);
         }
       );
@@ -1819,7 +1864,7 @@ export default function PunchCard() {
             const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
             const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
               + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-            const { label, amount } = mapActionToLabelAndAmount(row?.action_type);
+            const { label, amount } = mapRowToLabelAndAmount(row);
             setActivityRows((prev) => [{ dateStr, actionLabel: label, amount: typeof amount === 'number' ? amount : 1 }, ...prev]);
           } catch (e) {
             console.log('[ActivityFeed] Realtime activity_logs error', e);
@@ -1842,33 +1887,50 @@ export default function PunchCard() {
   };
 
   const openMyActivity = async () => {
-    try {
-      setMenuVisible(false);
-      setActivityLoading(true);
+    const businessCode = business?.business_code || customer?.business_code;
+    const custPhone = customer?.customer_phone || phoneStr || phoneIntl;
+
+    // פתיחה מיידית (תחושת מהירות) — לא מחכים ל-fetch לפני שהמסך מופיע.
+    setMenuVisible(false);
+    setActivityVisible(true);
+
+    // stale-while-revalidate: אם יש cache (מ-prefetch/פתיחה קודמת) — הצג מיד, בלי מסך טעינה.
+    const cached = activityCacheRef.current;
+    if (cached && cached.rows.length) {
+      setActivityRows(cached.rows);
+      setActivityNextCursor(cached.next);
+      setActivityLoading(false);
+    } else {
       setActivityRows([]);
       setActivityNextCursor(null);
+      setActivityLoading(true);
+    }
 
-      const businessCode = business?.business_code || customer?.business_code;
-      const { rows, next } = await fetchMyActivityFeed(100);
+    // מנוי Realtime (לא חוסם את התצוגה).
+    if (businessCode && custPhone) {
+      cleanupActivitySubscription();
+      subscribeMyActivityRealtime(businessCode, custPhone);
+    }
+
+    // רענון ברקע → עדכון + cache. אם נכשל ויש cache — נשאר ה-cache.
+    try {
+      const { rows, next } = await fetchMyActivityFeed(ACTIVITY_PAGE_SIZE);
       setActivityRows(rows);
       setActivityNextCursor(next);
-      setActivityVisible(true);
-
-      const custPhone = customer?.customer_phone || phoneStr || phoneIntl;
-      if (businessCode && custPhone) {
-        cleanupActivitySubscription();
-        subscribeMyActivityRealtime(businessCode, custPhone);
-      }
+      activityCacheRef.current = { rows, next };
+    } catch {
+      // שקט — משאירים את מה שכבר מוצג
     } finally {
       setActivityLoading(false);
     }
   };
 
+
   const loadMoreActivity = async () => {
     if (activityLoadingMore || !activityNextCursor) return;
     setActivityLoadingMore(true);
     try {
-      const { rows, next } = await fetchMyActivityFeed(100, activityNextCursor);
+      const { rows, next } = await fetchMyActivityFeed(ACTIVITY_PAGE_SIZE, activityNextCursor);
       setActivityRows((prev) => [...prev, ...rows]);
       setActivityNextCursor(next);
     } finally {
@@ -2677,9 +2739,9 @@ export default function PunchCard() {
             <View style={{ backgroundColor: '#2d3748' }}>
               {/* כותרות טבלה */}
               <View style={{ flexDirection: 'row', backgroundColor: '#4a5568' }}>
-                <Text style={{ flex: 2, paddingVertical: 14, textAlign: 'center', color: '#e2e8f0', fontWeight: '600' }}>תאריך</Text>
+                <Text style={{ flex: 3, paddingVertical: 14, textAlign: 'center', color: '#e2e8f0', fontWeight: '600' }}>תאריך</Text>
                 <Text style={{ flex: 5, paddingVertical: 14, textAlign: 'center', color: '#e2e8f0', fontWeight: '600' }}>סוג פעולה</Text>
-                <Text style={{ flex: 3, paddingVertical: 14, textAlign: 'center', color: '#e2e8f0', fontWeight: '600' }}>כמות</Text>
+                <Text style={{ flex: 2, paddingVertical: 14, textAlign: 'center', color: '#e2e8f0', fontWeight: '600' }}>כמות</Text>
               </View>
 
               {/* שורות */}
@@ -2696,11 +2758,22 @@ export default function PunchCard() {
                   renderItem={({ item, index }) => (
                     <View style={{
                       flexDirection: 'row',
+                      alignItems: 'center',
                       backgroundColor: index % 2 === 0 ? '#4a5568' : '#2d3748'
                     }}>
-                      <Text style={{ flex: 2, paddingVertical: 12, textAlign: 'center', color: '#90cdf4', fontWeight: '500' }}>{item.dateStr}</Text>
-                      <Text style={{ flex: 5, paddingVertical: 12, textAlign: 'right', paddingHorizontal: 12, color: '#e2e8f0', fontWeight: '500' }}>{item.actionLabel}</Text>
-                      <Text style={{ flex: 3, paddingVertical: 12, textAlign: 'center', color: item.amount < 0 ? '#dc2626' : '#059669', fontWeight: '600' }}>{item.amount}</Text>
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.8}
+                        style={{ flex: 3, paddingVertical: 12, paddingHorizontal: 4, textAlign: 'center', color: '#90cdf4', fontWeight: '500', fontSize: 12 }}
+                      >{item.dateStr}</Text>
+                      <View style={{ flex: 5, paddingVertical: 12, paddingHorizontal: 12 }}>
+                        <Text style={{ textAlign: 'right', color: '#e2e8f0', fontWeight: '500' }}>{item.actionLabel}</Text>
+                        {!!item.subLabel && (
+                          <Text style={{ textAlign: 'right', color: '#a0aec0', fontWeight: '400', fontSize: 12, marginTop: 2 }}>{item.subLabel}</Text>
+                        )}
+                      </View>
+                      <Text style={{ flex: 2, paddingVertical: 12, textAlign: 'center', color: item.amount < 0 ? '#dc2626' : '#059669', fontWeight: '600' }}>{item.amount}</Text>
                     </View>
                   )}
                   ListEmptyComponent={<Text style={{ color: '#e2e8f0', textAlign: 'center', paddingVertical: 22 }}>אין פעולות להצגה</Text>}
