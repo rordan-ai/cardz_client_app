@@ -9,7 +9,6 @@ import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, DeviceEventEmitter, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
-import { Barcode } from 'react-native-svg-barcode';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { WebView } from 'react-native-webview';
 import { BackButton } from '../../components/BackButton';
@@ -1101,9 +1100,6 @@ export default function PunchCard() {
       </View>
     );
   }
-
-  // לוגיקת קוד כרטיסייה
-  const cardCode = punchCard?.card_number || '';
 
   // לוגיקת ניקובים - שימוש ב-max_punches מהעסק במקום total_punches מהכרטיסייה
   // משתמשים ב-localBusiness כי business (מהContext) לא נטען בכניסה ישירה מ-NFC deep link
@@ -2247,8 +2243,9 @@ export default function PunchCard() {
       <View style={{ marginTop: rows.length === 2 ? 90 : rows.length === 3 ? 60 : 0 }}>
         {/* iOS בלבד: הזזה של כל התוכן (שם לקוח + גריד + טקסטים + NFC + ברקוד) 160px למטה */}
         <View style={Platform.OS === 'ios' ? { transform: [{ translateY: 160 }] } : undefined}>
-        {/* Android: עמוד ראשון בגובה המסך כדי שהברקוד יהיה "עמוד שני" ויתגלה מיד בתחילת גלילה */}
-        <View style={Platform.OS === 'android' ? { minHeight: height } : undefined}>
+        {/* עוטף תוכן הכרטיסייה. ברקוד-הניקוב הוסר (N2) → הוסר גם ה-minHeight:height שאילץ
+            "עמוד שני" בגובה מסך מלא, כדי שלא תיווצר גלילה מיותרת בתוך הכרטיסייה. */}
+        <View>
           {/* שם הלקוח - מקובע באנדרואיד למיקום של מצב 4 שורות (לא תלוי במספר שורות/הזזות אחרות) */}
           {/* iOS בלבד: עטיפה מבודדת לשם הלקוח - העלאה 65px למעלה */}
           <View style={Platform.OS === 'ios' ? { transform: [{ translateY: -65 }] } : undefined}>
@@ -2459,42 +2456,8 @@ export default function PunchCard() {
         {/* סגירת "עמוד ראשון" (Android בלבד) */}
         </View>
 
-        {/* ברקוד - Android בלבד: "עמוד שני" שמתגלה מיד עם תחילת גלילה, ואין גלילה מעבר לסוף הברקוד */}
-        {Platform.OS === 'android' && cardCode && (
-          <View
-            style={{
-              // התאמה לפי מספר שורות כדי לאחד מיקום בין מצבים:
-              // 4 שורות: עולה 10px
-              // 3 שורות: עולה 25px
-              // 2 שורות: עולה 60px
-              marginTop:
-                rows.length === 4 ? -185 :
-                rows.length === 3 ? -200 :
-                rows.length === 2 ? -235 :
-                -175,
-              paddingTop: 0,
-              alignItems: 'center',
-              width: '100%',
-              // עצירת גלילה 50px אחרי ספרות הברקוד
-              paddingBottom: 50,
-            }}
-          >
-            <View style={{ maxWidth: 250, width: '70%' }}>
-              <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
-            </View>
-            <Text style={styles.cardCode}>#{cardCode}</Text>
-          </View>
-        )}
-
-        {/* iOS: שימור התנהגות קיימת */}
-        {Platform.OS !== 'android' && cardCode && (
-          <View style={{ marginTop: rows.length === 3 ? 170 : 200, alignItems: 'center', width: '100%', paddingBottom: 10 }}>
-            <View style={{ maxWidth: 250, width: '70%' }}>
-              <Barcode value={cardCode} format="CODE128" height={50} width={1.2} />
-            </View>
-            <Text style={styles.cardCode}>#{cardCode}</Text>
-          </View>
-        )}
+        {/* ברקוד-הניקוב הוסר (N2): הכרטיסייה שוב ללא ברקוד ובלי "עמוד שני" שנדרשה גלילה
+            כדי לחשוף אותו. שיטות הניקוב שנותרו: NFC + ידני. ברקוד-השוברים (WebView) נפרד ולא הושפע. */}
         </View>{/* סגירת wrapper iOS - הזזה 70px למטה */}
 
       </View>{/* סגירת עטיפת 2/3 שורות */}
@@ -4164,22 +4127,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontFamily: 'Rubik',
     textAlign: 'center',
-  },
-  barcodeBox: {
-    marginVertical: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    transform: [{ translateY: 20 }],
-  },
-  cardCode: {
-    fontSize: 18,
-    color: '#888',
-    marginTop: 8,
-    marginBottom: 16,
-    textAlign: 'center',
-    fontFamily: 'Rubik',
-    transform: [{ translateY: 20 }],
   },
   mailIconContainer: {
     position: 'absolute',
