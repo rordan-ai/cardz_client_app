@@ -14,6 +14,10 @@ const path = require('path');
  * במקום זאת, משתמשים ב-Reader Mode (Foreground Dispatch) מהקוד
  */
 
+// N1 — רגישות NFC: מסננים אך ורק תגי NDEF (כארדז = NTAG עם Text/URI records).
+// הוסרו NfcA/NfcB/NfcF/NfcV/IsoDep/MifareClassic/MifareUltralight — אלה הטכנולוגיות של
+// כרטיסי אשראי/EMV/דרכונים/תחבורה/בקרת-גישה, וגרמו לאפליקציה להיפתח בקרבתם (פתיחות-שווא).
+// Ndef/NdefFormatable שומרים על אותה קריאה+טווח+רגישות לתגי כארדז, בלי לתפוס תגים זרים.
 const NFC_TECH_FILTER_XML = `<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <tech-list>
@@ -21,27 +25,6 @@ const NFC_TECH_FILTER_XML = `<?xml version="1.0" encoding="utf-8"?>
     </tech-list>
     <tech-list>
         <tech>android.nfc.tech.NdefFormatable</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.NfcA</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.NfcB</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.NfcF</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.NfcV</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.IsoDep</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.MifareClassic</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.MifareUltralight</tech>
     </tech-list>
 </resources>
 `;
@@ -76,24 +59,16 @@ class NfcDispatchActivity : Activity() {
     Log.d("NfcDispatch", "Extracted business code: \$businessCode")
     
     if (businessCode != null) {
-      // שליחת deep link שה-Linking listener יתפוס
+      // תג כארדז תקין → שליחת deep link שה-Linking listener יתפוס, ופתיחת האפליקציה.
       val deepLinkUri = Uri.parse("mycardz://business/\$businessCode")
       launchIntent.data = deepLinkUri
       Log.d("NfcDispatch", "✓ Sending deep link: \$deepLinkUri")
+      startActivity(launchIntent)
     } else {
-      // fallback - העברה ישירה של Intent
-      launchIntent.action = intent?.action
-      launchIntent.data = intent?.data
-      launchIntent.type = intent?.type
-      val extras = intent?.extras
-      if (extras != null) {
-        launchIntent.putExtras(extras)
-      }
-      Log.w("NfcDispatch", "✗ Failed to parse, forwarding raw intent")
+      // N1: אין business code (תג לא-כארדז / NDEF זר) → לא פותחים את האפליקציה כלל.
+      // (בעבר הועבר intent גולמי ל-MainActivity, מה שפתח את האפליקציה גם לתגים זרים.)
+      Log.w("NfcDispatch", "✗ Not a Cardz tag (no business code) — ignoring, app not launched")
     }
-
-    Log.d("NfcDispatch", "Starting MainActivity with data: \${launchIntent.data}")
-    startActivity(launchIntent)
     finish()
   }
 

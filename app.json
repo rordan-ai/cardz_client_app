@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cardz",
     "slug": "my-new-test-app",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "icon": "./assets/images/cardz_white_logo_sqwered.png",
     "orientation": "portrait",
     "scheme": "mycardz",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mycardz.app",
-      "buildNumber": "27",
+      "buildNumber": "29",
       "googleServicesFile": "./GoogleService-Info.plist",
       "associatedDomains": [
         "applinks:app.punchcards.digital",
@@ -47,7 +47,7 @@
       "runtimeVersion": "1.0.0"
     },
     "android": {
-      "versionCode": 24,
+      "versionCode": 26,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/cardz_white_logo_sqwered.png",
         "backgroundColor": "#ffffff"
@@ -134,7 +134,8 @@
         }
       ],
       "./plugins/with-nfc-android",
-      "expo-asset"
+      "expo-asset",
+      "./plugins/with-adi-registration"
     ],
     "experiments": {
       "typedRoutes": true

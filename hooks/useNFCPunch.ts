@@ -7,8 +7,9 @@ import * as SecureStore from 'expo-secure-store';
 // מפתח לשמירת מספר טלפון
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
 
-// Timeout לאישור אדמין (60 שניות)
-const ADMIN_APPROVAL_TIMEOUT = 60000;
+// Timeout לאישור אדמין (5 דקות) — מיושר לטיים-אאוט של צד האדמין. אם יהיה קצר מזה,
+// אישור-מאוחר (בדק' 2-4) "נופל בשקט": הבקשה אושרה אך הלקוח כבר הפסיק להאזין ולא ננקב.
+const ADMIN_APPROVAL_TIMEOUT = 300000;
 
 // מצבי הפלואו
 export type PunchFlowState = 
@@ -75,6 +76,8 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
   const [punchRequestId, setPunchRequestId] = useState<string | null>(null);
   
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // ref שמשקף את punchRequestId — לגישה יציבה מ-cancelFlow (בלי stale closure).
+  const punchRequestIdRef = useRef<string | null>(null);
   const subscriptionRef = useRef<any>(null);
   const punchLockRef = useRef(false);
   const punchModeRef = useRef<string | null>(null);
@@ -104,6 +107,7 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
     setCurrentBusinessName(null);
     setCurrentPunchMode(null);
     setPunchRequestId(null);
+    punchRequestIdRef.current = null;
     punchLockRef.current = false;
     punchModeRef.current = null;
   }, [cleanup]);
@@ -111,6 +115,19 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
   // ביטול
   const cancelFlow = useCallback(() => {
     console.log('[NFC] Flow cancelled');
+    // ביטול ע"י לקוח → סימון הבקשה כ-rejected כדי שתיעלם מתור-האישורים של האדמין.
+    // best-effort fire-and-forget, ⛔ בלי .select() (אם anon UPDATE חסום ב-RLS → no-op שקט,
+    // בלי 42501; הבקשה תיפוג בכל מקרה ב-timeout). ממתין לאישור האדמין על מנגנון ה-UPDATE.
+    const rid = punchRequestIdRef.current;
+    if (rid) {
+      supabase
+        .from('punch_requests')
+        .update({ status: 'rejected', resolved_at: new Date().toISOString(), resolved_by: 'auto' })
+        .eq('id', rid)
+        .then(({ error }) => {
+          if (error) console.log('[NFC] cancel status update failed (RLS?):', error.code, error.message);
+        });
+    }
     resetFlow();
   }, [resetFlow]);
 
@@ -591,6 +608,7 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
 
     if (requestId) {
       setPunchRequestId(requestId);
+      punchRequestIdRef.current = requestId;
       subscribeToResponse(requestId, card.card_number);
 
       timeoutRef.current = setTimeout(() => {

@@ -126,7 +126,7 @@ export default function PunchCard() {
   // NFC state
   const [nfcModalVisible, setNfcModalVisible] = useState(false);
   const [nfcNoticeVisible, setNfcNoticeVisible] = useState(false);
-  const { isSupported: nfcSupported, initNFC, startReading, stopReading, parseBusinessId, checkLaunchTag, checkBackgroundTag } = useNFC();
+  const { isSupported: nfcSupported, isEnabled: nfcEnabled, initNFC, startReading, stopReading, parseBusinessId, checkLaunchTag, checkBackgroundTag } = useNFC();
   const nfcLaunchHandled = useRef(false);
   const nfcCooldownRef = useRef(false); // מניעת פתיחה כפולה של מודאל NFC
   const nfcManualReadingRef = useRef(false); // מניעת התנגשות: כפתור ידני מול האזנה רציפה
@@ -194,10 +194,34 @@ export default function PunchCard() {
       // ביצוע ניקוב ישיר
       const executeDirectPunch = async () => {
         console.log('[DEBUG-DIRECT-PUNCH] executeDirectPunch() called');
+
+        // מגבלת-על (הגבלת תדירות ניקובים) — בדיקת Edge לפני ניקוב. FAIL-OPEN:
+        // כל כשל (Edge לא פרוס / רשת / 404 / ok!==true) → ממשיכים לנקב (לא חוסמים לקוח בגלל תשתית).
+        // חוסמים רק כאשר במפורש ok===true ו-allowed===false.
+        try {
+          const { data: limitData, error: limitErr } = await supabase.functions.invoke('punch-check-limit', {
+            body: { business_code: localBusiness?.business_code, phone: phoneIntl },
+          });
+          const lim: any = limitData;
+          if (!limitErr && lim?.ok === true && lim?.allowed === false) {
+            const windowText = lim.period === 'hourly'
+              ? `${lim.value} השעות האחרונות`
+              : `${lim.value} הימים המוקצבים`;
+            console.log('[DIRECT-PUNCH] blocked by punch-check-limit', { current: lim.current, limit: lim.limit, period: lim.period, value: lim.value });
+            setIsDirectRewardingPunch(false);
+            setDirectPunchStatus('error');
+            setDirectPunchMessage(`אנו מצטערים — הגעת למקסימום הניקובים האפשריים (${lim.limit}) במסגרת ${windowText}. אם לדעתך זו טעות — אנא פנה לקופה להסדרת העניין.`);
+            setTimeout(() => { setDirectPunchStatus('idle'); setDirectPunchMessage(''); }, 6000);
+            return;
+          }
+        } catch (e: any) {
+          console.log('[DIRECT-PUNCH] punch-check-limit failed → fail-open (מנקב רגיל)', String(e?.message || e));
+        }
+
         setDirectPunchStatus('punching');
         setDirectPunchMessage('מבצע ניקוב...');
         console.log('[DEBUG-DIRECT-PUNCH] Status set to punching');
-        
+
         try {
           // בדיקת מצב נוכחי של הכרטיסייה
           console.log('[DEBUG-DIRECT-PUNCH] Fetching card from DB...');
@@ -2386,51 +2410,8 @@ export default function PunchCard() {
           </Text>
           </View>
 
-          {/* כפתור סריקת NFC ידנית + אייקון הסבר (בועית משמאל — שפיץ מצביע על כפתור NFC) */}
-          {/* iOS: marginTop גדול דוחף את הכפתורים מתחת לקצה המסך — נראים רק בגלילה */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: Platform.OS === 'ios' ? 200 : 20 }}>
-            <TouchableOpacity
-              style={{ alignItems: 'center', justifyContent: 'center' }}
-              onPress={async () => {
-                if (Platform.OS === 'android') {
-                  setCardSelectionVisible(false);
-                  setTimeout(() => setNfcModalVisible(true), 100);
-                } else {
-                  try {
-                    await initNFC();
-                    const tagData = await startReading();
-                    if (tagData) {
-                      setCardSelectionVisible(false);
-                      setTimeout(() => setNfcModalVisible(true), 100);
-                    }
-                  } catch (err) {
-                    console.log('[NFC] Scan error:', err);
-                  }
-                }
-              }}
-              accessibilityLabel="בקשת ניקוב ידנית"
-              accessibilityRole="button"
-              accessibilityHint={Platform.OS === 'android' ? 'לחץ לשליחת בקשת ניקוב' : 'הצמד את הטלפון למתקן NFC בבית העסק'}
-            >
-              <Image 
-                source={require('../../assets/icons/NFC_ISO_BOTTEN.png')}
-                style={{ width: 80, height: 80 }}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ marginLeft: 4 }}
-              onPress={() => setNfcNoticeVisible(true)}
-              accessibilityLabel="מידע על כפתור ניקוב ידני"
-              accessibilityRole="button"
-            >
-              <Image
-                source={require('../../assets/icons/notice.png')}
-                style={{ width: 36, height: 36 }}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
-          </View>
+          {/* כפתור בקשת-ניקוב-ידני הועבר לתחתית ה-ScrollView (מחוץ לכל עטיפות ה-transform/scale)
+              וגודר להצגה אך ורק כשה-NFC כבוי/לא נתמך — מונע התנגשות שכבות. ראה הבלוק בסוף התוכן. */}
 
           {/* מודאל הסבר כפתור ניקוב ידני */}
           <Modal visible={nfcNoticeVisible} transparent animationType="fade" onRequestClose={() => setNfcNoticeVisible(false)}>
@@ -2462,7 +2443,58 @@ export default function PunchCard() {
 
       </View>{/* סגירת עטיפת 2/3 שורות */}
       </View>{/* סגירת עטיפת הגדלה 25% */}
-      
+
+      {/* כפתור בקשת ניקוב ידנית — מוצג אך ורק כשה-NFC כבוי/לא נתמך במכשיר (למי שלא הפעיל NFC).
+          מיקום בטוח ב-100%: בזרימה רגילה, מחוץ לכל העטיפות עם transform/scale (אין stacking-context
+          שיתנגש), בתחתית תוכן ה-ScrollView — כך שנוצרת גלילה קצרה שמופיעה ומתפקדת רק במקרה הזה. */}
+      {!nfcEnabled && (
+        <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', paddingVertical: 24, paddingHorizontal: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity
+              style={{ alignItems: 'center', justifyContent: 'center' }}
+              onPress={async () => {
+                if (Platform.OS === 'android') {
+                  setCardSelectionVisible(false);
+                  setTimeout(() => setNfcModalVisible(true), 100);
+                } else {
+                  try {
+                    await initNFC();
+                    const tagData = await startReading();
+                    if (tagData) {
+                      setCardSelectionVisible(false);
+                      setTimeout(() => setNfcModalVisible(true), 100);
+                    }
+                  } catch (err) {
+                    console.log('[NFC] Scan error:', err);
+                  }
+                }
+              }}
+              accessibilityLabel="בקשת ניקוב ידנית"
+              accessibilityRole="button"
+              accessibilityHint={Platform.OS === 'android' ? 'לחץ לשליחת בקשת ניקוב' : 'הצמד את הטלפון למתקן NFC בבית העסק'}
+            >
+              <Image
+                source={require('../../assets/icons/NFC_ISO_BOTTEN.png')}
+                style={{ width: 80, height: 80 }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ marginLeft: 4 }}
+              onPress={() => setNfcNoticeVisible(true)}
+              accessibilityLabel="מידע על כפתור ניקוב ידני"
+              accessibilityRole="button"
+            >
+              <Image
+                source={require('../../assets/icons/notice.png')}
+                style={{ width: 36, height: 36 }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
              {/* מודאל תפריט המבורגר */}
        <Modal 
          visible={menuVisible} 

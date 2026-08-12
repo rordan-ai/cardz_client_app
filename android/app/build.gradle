@@ -87,9 +87,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.mycardz.app'
+    // Fixed: namespace must match the Kotlin package (com.yuladigital.cardz) and the
+    // store/Firebase android package. 'com.mycardz.app' is the iOS bundle id only;
+    // with it, BuildConfig generated in the wrong package (compile fail) and manifest
+    // relative class names (.MainActivity) resolved to non-existent classes.
+    namespace 'com.yuladigital.cardz'
     defaultConfig {
-        applicationId 'com.mycardz.app'
+        applicationId 'com.yuladigital.cardz'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

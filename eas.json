@@ -25,6 +25,16 @@
         "GOOGLE_SERVICES_JSON": "@GOOGLE_SERVICES_JSON"
       }
     },
+    "simulator": {
+      "distribution": "internal",
+      "channel": "preview",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "GOOGLE_SERVICES_JSON": "@GOOGLE_SERVICES_JSON"
+      }
+    },
     "production": {
       "distribution": "store",
       "android": {
