@@ -463,21 +463,22 @@ export default function Layout() {
     isSavingRef.current = true;
     
     try {
-      // בקשת הרשאות
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      // הרשאת כתיבה-בלבד (write-only/add-only) — שמירה לגלריה ללא READ_MEDIA_IMAGES
+      // (מדיניות Google Play: אין לבקש גישת-קריאה רחבה כשרק שומרים).
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== 'granted') {
         showTimedToast('נדרשת הרשאה לגישה לגלריה');
         return;
       }
-      
+
       // לכידת התמונה מ-ViewShot
       const uri = await captureRef(viewShotRef, {
         format: 'png',
         quality: 1,
       });
-      
-      // שמירה לגלריה
-      await MediaLibrary.createAssetAsync(uri);
+
+      // שמירה לגלריה (add-only — בלי קריאה)
+      await MediaLibrary.saveToLibraryAsync(uri);
       showTimedToast('השובר נשמר לגלריה בהצלחה! 📸');
     } catch (error) {
       console.error('[SaveToGallery] Error:', error);

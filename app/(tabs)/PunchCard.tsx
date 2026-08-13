@@ -1409,21 +1409,22 @@ export default function PunchCard() {
     isSavingRef.current = true;
     
     try {
-      // בקשת הרשאות
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      // הרשאת כתיבה-בלבד (write-only/add-only) — שמירה לגלריה ללא READ_MEDIA_IMAGES
+      // (מדיניות Google Play: אין לבקש גישת-קריאה רחבה כשרק שומרים).
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== 'granted') {
         showVoucherToast('נדרשת הרשאה לגישה לגלריה');
         return;
       }
-      
+
       // לכידת התמונה מ-ViewShot
       const uri = await captureRef(voucherViewShotRef, {
         format: 'png',
         quality: 1,
       });
-      
-      // שמירה לגלריה
-      await MediaLibrary.createAssetAsync(uri);
+
+      // שמירה לגלריה (add-only — בלי קריאה)
+      await MediaLibrary.saveToLibraryAsync(uri);
       showVoucherToast('השובר נשמר לגלריה בהצלחה! 📸');
     } catch (error) {
       console.error('[SaveToGallery-INBOX] Error:', error);
