@@ -1,6 +1,8 @@
 
 import { isDev, isPreview } from '@/config/environment';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
+import * as SecureStore from 'expo-secure-store';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -190,6 +192,29 @@ export default function BusinessSelector() {
     setModalVisible(true);
   }, []);
 
+  // רישום ראשוני: null = טרם נקבע → מציגים את התצוגה הרגילה (מניעת הבהוב אצל ותיקים).
+  // "רשום" = כניסה מוצלחת בעבר (saved_phone/biometric_phone) או רישום שהושלם (דגל).
+  const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const [savedPhone, regDone, bioPhone] = await Promise.all([
+          AsyncStorage.getItem('saved_phone'),
+          AsyncStorage.getItem('initial_registration_done'),
+          SecureStore.getItemAsync('biometric_phone').catch(() => null),
+        ]);
+        setIsRegistered(!!(savedPhone || regDone || bioPhone));
+      } catch {
+        setIsRegistered(true); // ספק → התנהגות רגילה, לא חוסמים ותיקים
+      }
+    })();
+  }, []);
+
+  const goToInitialRegistration = useCallback(() => {
+    // הטופס הקיים כולל בורר עסק — אין צורך בעסק ב-Context
+    router.push('/(tabs)/newclient_form');
+  }, [router]);
+
 
   // פילטור עסקים לפי חיפוש
   const getFilteredBusinesses = useCallback(() => {
@@ -263,14 +288,30 @@ export default function BusinessSelector() {
         >
         </TouchableOpacity>
 
-        {/* שטח מגע כפתור "בחר עסק" - הכפתור הוורוד במרכז */}
-        <TouchableOpacity 
-          style={[styles.selectBusinessArea, isTablet && styles.tabletSelectBusinessArea]} 
-          onPress={handleOpenModal}
-          accessibilityLabel="בחר עסק"
+        {/* שטח מגע כפתור "בחר עסק" — במצב "לא רשום" מכוסה בכפתור "רישום ראשוני" ומנווט לטופס */}
+        <TouchableOpacity
+          style={[styles.selectBusinessArea, isTablet && styles.tabletSelectBusinessArea, isRegistered === false && styles.initialRegisterOverlay]}
+          onPress={isRegistered === false ? goToInitialRegistration : handleOpenModal}
+          accessibilityLabel={isRegistered === false ? 'רישום ראשוני' : 'בחר עסק'}
           accessibilityRole="button"
-          accessibilityHint="לחץ לבחירת העסק שברצונך לצפות בכרטיסייה שלו"
-        />
+          accessibilityHint={isRegistered === false ? 'לחץ לרישום לקוח חדש וקבלת כרטיסייה' : 'לחץ לבחירת העסק שברצונך לצפות בכרטיסייה שלו'}
+        >
+          {isRegistered === false && (
+            <Text style={styles.initialRegisterText}>רישום ראשוני</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* נתיב משני ללקוח קיים (למשל צורף מרחוק או התקנה מחדש) — רק במצב "לא רשום" */}
+        {isRegistered === false && (
+          <TouchableOpacity
+            style={styles.alreadyHaveCardLink}
+            onPress={handleOpenModal}
+            accessibilityRole="button"
+            accessibilityLabel="כבר יש לך כרטיסייה? לבחירת עסק"
+          >
+            <Text style={styles.alreadyHaveCardText}>כבר יש לך כרטיסייה? לבחירת עסק</Text>
+          </TouchableOpacity>
+        )}
 
         {/* שטח מגע קישור קרדיט - הטקסט למטה */}
         <TouchableOpacity 
@@ -305,7 +346,7 @@ export default function BusinessSelector() {
         <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
           <View style={styles.modalOverlay}>
             <View style={[styles.menuContent, isTablet && styles.tabletMenuContent]}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => handleMenuOption('tutorial_video')}
                 accessibilityLabel="הדגמה והסבר"
@@ -314,6 +355,28 @@ export default function BusinessSelector() {
               >
                 <Text style={styles.menuItemText}>הדגמה והסבר</Text>
               </TouchableOpacity>
+
+              {/* dev בלבד: איפוס זיהוי מקומי לבדיקת מצב "לקוח חדש" — ב-iOS ה-Keychain
+                  (biometric_phone) שורד גם מחיקת אפליקציה, אז נדרש איפוס יזום */}
+              {__DEV__ && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={async () => {
+                    try {
+                      await AsyncStorage.multiRemove(['saved_phone', 'initial_registration_done']);
+                      await SecureStore.deleteItemAsync('biometric_phone').catch(() => {});
+                      setIsRegistered(false);
+                      setMenuVisible(false);
+                    } catch (e) {
+                      console.log('[DevReset] failed:', e);
+                    }
+                  }}
+                  accessibilityLabel="איפוס זיהוי מקומי"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.menuItemText}>🧪 איפוס זיהוי (dev)</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity 
                 style={styles.menuItem}
@@ -871,6 +934,38 @@ const styles = StyleSheet.create({
       },
     }),
     borderRadius: 25,
+  },
+  // כיסוי זמני של הכפתור המצויר בתמונה במצב "לא רשום" (עד לקבלת נכס גרפי ייעודי).
+  // צבע תואם לכפתור הטורקיז שב-new_entry.png; מכסה אותו במלואו כך שאין "כפתור כפול".
+  initialRegisterOverlay: {
+    backgroundColor: '#2E8C92',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  initialRegisterText: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    fontFamily: 'Rubik',
+    textAlign: 'center',
+  },
+  alreadyHaveCardLink: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: { bottom: 92 },
+      android: { bottom: 56 },
+    }),
+  },
+  alreadyHaveCardText: {
+    color: '#ffffff',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+    fontFamily: 'Rubik',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 4,
   },
   creditsArea: {
     position: 'absolute',

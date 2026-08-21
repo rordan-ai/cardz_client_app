@@ -27,7 +27,7 @@ const windowWidth = Dimensions.get('window').width;
 
 export default function CustomersLogin() {
   const router = useRouter();
-  const { businessCode: nfcBusinessCode, nfcLaunch } = useLocalSearchParams();
+  const { businessCode: nfcBusinessCode, nfcLaunch, autoPunch } = useLocalSearchParams();
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const nfcAutoLoginAttempted = useRef(false);
@@ -35,15 +35,21 @@ export default function CustomersLogin() {
 
   const resolvedBusinessCode = typeof nfcBusinessCode === 'string' ? nfcBusinessCode : Array.isArray(nfcBusinessCode) ? nfcBusinessCode[0] : null;
 
+  // העברת כוונת ניקוב (NFC/ניקוב-ישיר) הלאה למסך הכרטיסייה — בלי זה בקשת הניקוב אובדת בכניסה
+  const nfcLaunchStr = typeof nfcLaunch === 'string' ? nfcLaunch : Array.isArray(nfcLaunch) ? nfcLaunch[0] : null;
+  const autoPunchStr = typeof autoPunch === 'string' ? autoPunch : Array.isArray(autoPunch) ? autoPunch[0] : null;
+  const punchIntentParams = `${nfcLaunchStr === 'true' ? '&nfcLaunch=true' : ''}${autoPunchStr === 'true' ? '&autoPunch=true' : ''}`;
+
+  const [backgroundImageError, setBackgroundImageError] = useState(false);
+  const [imageKey, setImageKey] = useState(0);
+  const { business, loading, refresh: refreshBusiness, setBusinessCode } = useBusiness();
+
+  // חייב להופיע אחרי useBusiness() — הפניה ל-business/loading/setBusinessCode לפני ההצהרה היא TDZ
   useEffect(() => {
     if (resolvedBusinessCode && !business && !loading) {
       setBusinessCode(resolvedBusinessCode);
     }
   }, [resolvedBusinessCode, business, loading, setBusinessCode]);
-
-  const [backgroundImageError, setBackgroundImageError] = useState(false);
-  const [imageKey, setImageKey] = useState(0);
-  const { business, loading, refresh: refreshBusiness, setBusinessCode } = useBusiness();
   const [menuVisible, setMenuVisible] = useState(false);
   const [accessibilityModalVisible, setAccessibilityModalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-200)).current;
@@ -275,11 +281,11 @@ export default function CustomersLogin() {
       if (authenticated) {
         const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
         if (savedPhone) {
-          router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(savedPhone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}`);
+          router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(savedPhone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
         }
       }
     }
-  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router]);
+  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router, punchIntentParams]);
 
   // הגדרת כניסה ביומטרית (פעם ראשונה)
   const setupBiometricLogin = useCallback(async () => {
@@ -293,14 +299,14 @@ export default function CustomersLogin() {
         
         setBiometricSetupDone(true);
         Alert.alert('הצלחה! 🎉', 'כניסה ביומטרית הוגדרה בהצלחה.\nמעכשיו תוכל להיכנס בלחיצה אחת לכל עסק!');
-        
-        router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}`);
+
+        router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
       } catch (error) {
         if (__DEV__) console.error('[Biometric] Setup error:', error);
         Alert.alert('שגיאה', 'לא ניתן היה לשמור את ההגדרות');
       }
     }
-  }, [phone, authenticateBiometric, router]);
+  }, [phone, authenticateBiometric, router, punchIntentParams]);
 
   // פופאפים שיווקיים - trigger: entry (בכניסה לאפליקציה)
   const { currentPopup, showPopup, closePopup } = useMarketingPopups({
@@ -352,6 +358,11 @@ export default function CustomersLogin() {
     // שמירת מספר הטלפון לכניסה הבאה
     try {
       await AsyncStorage.setItem('saved_phone', phone);
+      // חובה גם ב-SecureStore: מטפל ה-NFC (_layout) וניתוב ה-DeepLink קוראים את
+      // BIOMETRIC_PHONE_KEY — בלי זה לקוח בכניסה ידנית (ללא ביומטרי) נזרק לכניסה בכל צמדה
+      await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, phone);
+      // כניסה מוצלחת = לקוח קיים — מסך הפתיחה יציג "בחירת עסק" (רישום ראשוני)
+      await AsyncStorage.setItem('initial_registration_done', 'true');
     } catch (error) {
       console.error('שגיאה בשמירת מספר טלפון:', error);
     }
@@ -363,7 +374,7 @@ export default function CustomersLogin() {
       return;
     }
 
-    router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}`);
+    router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
   };
 
   const continueLoginWithoutBiometric = useCallback(() => {
@@ -371,9 +382,9 @@ export default function CustomersLogin() {
     const p = pendingLoginPhoneRef.current || phone;
     pendingLoginPhoneRef.current = null;
     if (p && p.match(/^05\d{8}$/)) {
-      router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(p)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}`);
+      router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(p)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
     }
-  }, [phone, router, resolvedBusinessCode]);
+  }, [phone, router, resolvedBusinessCode, punchIntentParams]);
 
   const openMenu = () => {
     if (__DEV__) {

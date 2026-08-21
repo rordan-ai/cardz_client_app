@@ -233,12 +233,13 @@ function NfcDeepLinkHandler() {
         console.log('[NfcHandler] Business context updated and loaded');
         
         if (!savedPhone) {
-          // אין ביומטרי - למסך כניסה עם העסק מוגדר
-          console.log('[NfcHandler] → customers-login (no phone)');
-          router.replace({
-            pathname: '/(tabs)/customers-login',
-            params: { businessCode, nfcLaunch: 'true' }
-          });
+          // כלל מחייב: לקוח לא-רשום מגיע אך ורק לדף הפתיחה, שם הכפתור "רישום ראשוני".
+          // העסק מהתג כבר נשמר ב-Context (setBusinessCode לעיל) וישמש כברירת מחדל בטופס.
+          console.log('[NfcHandler] → business_selector (no phone → opening screen)');
+          router.replace('/(tabs)/business_selector');
+          // סימון ה-URL ההתחלתי כמטופל — בלעדיו ה-effect (שרץ מחדש בכל ניווט) יעבד
+          // את אותו תג שוב ויחזיר את המשתמש לדף הפתיחה באמצע הרישום
+          if (isInitialUrl) initialUrlHandledRef.current = true;
           return;
         }
 

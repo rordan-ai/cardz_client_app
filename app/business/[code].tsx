@@ -34,11 +34,10 @@ export default function BusinessDeepLinkHandler() {
         const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
 
         if (!savedPhone) {
-          console.log('[DeepLink Route] No saved phone → customers-login');
-          router.replace({
-            pathname: '/(tabs)/customers-login',
-            params: { businessCode: code, nfcLaunch: 'true' }
-          });
+          // כלל מחייב: לקוח לא-רשום מגיע אך ורק לדף הפתיחה, שם הכפתור "רישום ראשוני".
+          // העסק מהתג כבר נשמר ב-Context (setBusinessCode לעיל) וישמש כברירת מחדל בטופס.
+          console.log('[DeepLink Route] No saved phone → business_selector (opening screen)');
+          router.replace('/(tabs)/business_selector');
           return;
         }
 
@@ -52,10 +51,17 @@ export default function BusinessDeepLinkHandler() {
         console.log('[DeepLink Route] Business data:', businessData);
 
         // בדיקה 3: כמה כרטיסיות יש ללקוח בעסק זה?
+        // וריאנטים של פורמט טלפון — לקוחות שהוקמו מהאדמין עשויים להישמר כ-972...
+        const savedClean = savedPhone.replace(/[^0-9]/g, '');
+        const savedVariants = Array.from(new Set([
+          savedClean,
+          /^05\d{8}$/.test(savedClean) ? `972${savedClean.slice(1)}` : savedClean,
+          /^9725\d{8}$/.test(savedClean) ? `0${savedClean.slice(3)}` : savedClean,
+        ].filter(Boolean)));
         const { data: cards } = await supabase
           .from('PunchCards')
           .select('card_number')
-          .eq('customer_phone', savedPhone)
+          .in('customer_phone', savedVariants)
           .eq('business_code', code)
           .eq('status', 'active');
 
