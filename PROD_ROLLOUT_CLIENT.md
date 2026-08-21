@@ -62,7 +62,12 @@
     Pre-check RLS/תלות בענף: businesses.* כולל העמודה · punch_requests SELECT anon ✓ ·
     Edge punch-request-create(is_prepaid=true)→pending ✓. tsc: 0 שגיאות חדשות.
     ⚠️ רולאאוט פרוד: האדמין מוסיף העמודה (Change Gate) + UI טוגל לפני שחרור הגרסה.
-  | P1 | Edge activity | supabase/functions/customer-activity-log + PunchCard fetchMyActivityFeed | Edge + חיבור מסך (getIdToken) | 🟡 קוד מלא, e2e תלוי token | ⬜ |
+  | P1 | Edge activity | supabase/functions/customer-activity-log + PunchCard fetchMyActivityFeed | Edge + חיבור מסך (getIdToken) | ✅ **e2e מאומת** (Edge) | ⬜ |
+
+  P1 e2e (09.08): לכדתי Firebase token אמיתי (דף web + test number + appVerificationDisabledForTesting),
+    קראתי ל-Edge בענף → HTTP 200, ok:true, phone:+972501111111 → 4 activity_logs + 2 punch_requests.
+    הפיד כלל mobile (P2/P3 שלי) + web — phone matching מכסה הכל. שליליים: no/bad token→401. ✓
+    נשאר device-only: זרימת UI מלאה (join) + P5 NFC routing → EAS/מכשיר.
 
   P1 חיבור מסך (09.08, b3c8d88): fetchMyActivityFeed קורא ל-Edge כמקור סמכותי
     (getIdToken → invoke customer-activity-log → מיפוי activity_logs). האדמין אימת:
@@ -80,4 +85,20 @@
     שדרוג Edge (card_number matching) → חיבור המסך → e2e עם token אמיתי.
 
   (הרשימה המלאה + חוזי הערכים: OPEN_ITEMS_CONSOLIDATED.md)
+================================================================================
+
+################################################################################
+  🧹 צ'קליסט ניקוי לאחר סבב הבדיקות (device round) — לבצע כשמסיימים!
+################################################################################
+  1. .env → להחזיר ל-prod מ-.env.bak.prod (כרגע מצביע לענף uydcgsjulzqzseqbnjnz).
+     פקודה: cp .env.bak.prod .env
+  2. Firebase test phone (פרוד) → להסיר: +972503838196 (0503838196).
+     [אם נוסף test phone גם ל-0559742991 — להסיר גם אותו.]
+  3. Supabase test branch → האדמין ימחק uydcgsjulzqzseqbnjnz (באישור משתמש; עוצר חיוב).
+  4. Windows Defender exclusions (המשתמש הוסיף: project/.gradle/SDK) → אופציונלי להסיר,
+     החלטת המשתמש (Remove-MpPreference -ExclusionPath "..." כ-admin).
+  5. לוודא: אין commit של .env / .env.bak.prod (gitignored ✓).
+  6. android/gradle.properties → להחזיר reactNativeArchitectures ל:
+     armeabi-v7a,arm64-v8a,x86,x86_64 (צומצם ל-arm64-v8a לבדיקת device בלבד).
+     (vfs.watch=false / daemon=false — תיקון Windows לגיטימי, אפשר להשאיר.)
 ================================================================================

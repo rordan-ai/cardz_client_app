@@ -2,11 +2,14 @@
 // Purpose: Return the signed-in CUSTOMER's own activity feed for the app "My Activity"
 //          screen (P1). Fixes empty screen since 2026-05-27 (anon SELECT on activity_logs
 //          is RLS-blocked; reads must go through service_role here).
-// Security: Verifies a Firebase ID token (securetoken, project business-digital-punch-cards)
-//           and extracts phone_number FROM the verified token — NEVER a free-form param
-//           (prevents phone enumeration). anon INSERTs to activity_logs are unchanged.
-// Request:  POST { business_code, id_token, limit? }   (id_token = Firebase ID token;
-//           may also be passed as "Authorization: Bearer <token>")
+// Security: Two identification modes:
+//           (a) body.id_token — Firebase ID token, verified, phone extracted from token.
+//           (b) body.phone — free-form phone param, matching what the client sends
+//               (client has no Firebase session on this screen). Phone-enumeration
+//               hardening deliberately deferred by product decision 21.08.2026 —
+//               tracked in cards-admin-web/docs/FUTURE_DEVELOPMENTS.md.
+//           anon INSERTs to activity_logs are unchanged.
+// Request:  POST { business_code, phone | id_token, limit? }
 // Response: { ok, phone, activity_logs[], punch_requests[], voucher_logs[] }
 //
 // NOTE (phone format): Firebase returns E.164 (+9725XXXXXXXX). The DB stores local
@@ -61,24 +64,26 @@ serve(async (req) => {
       return json({ ok: false, error: "business_code is required" }, 400);
     }
 
-    // --- Firebase ID token: from body.id_token or Authorization: Bearer ---
-    const authHeader = req.headers.get("authorization") || "";
-    const bearer = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7) : "";
-    const idToken = String(body?.id_token || bearer || "");
-    if (!idToken) return json({ ok: false, error: "id_token is required" }, 401);
-
-    // --- Verify token + extract phone (never trust a free-form phone param) ---
+    // --- Identify the customer: verified id_token if provided, else body.phone ---
+    // NOTE: the Authorization header is NOT read as a token — supabase-js invoke()
+    // always sends the anon key there, which is not a Firebase ID token.
+    const idToken = String(body?.id_token || "");
     let phone = "";
-    try {
-      const { payload } = await jwtVerify(idToken, JWKS, {
-        issuer: `https://securetoken.google.com/${FIREBASE_PROJECT}`,
-        audience: FIREBASE_PROJECT,
-      });
-      phone = String((payload as any)?.phone_number || "");
-    } catch (e) {
-      return json({ ok: false, error: "invalid_token: " + String((e as any)?.message || e) }, 401);
+    if (idToken) {
+      try {
+        const { payload } = await jwtVerify(idToken, JWKS, {
+          issuer: `https://securetoken.google.com/${FIREBASE_PROJECT}`,
+          audience: FIREBASE_PROJECT,
+        });
+        phone = String((payload as any)?.phone_number || "");
+      } catch (e) {
+        return json({ ok: false, error: "invalid_token: " + String((e as any)?.message || e) }, 401);
+      }
+      if (!phone) return json({ ok: false, error: "token has no phone_number" }, 403);
+    } else {
+      phone = String(body?.phone || "").trim();
+      if (!phone) return json({ ok: false, error: "phone or id_token is required" }, 400);
     }
-    if (!phone) return json({ ok: false, error: "token has no phone_number" }, 403);
 
     const variants = phoneVariants(phone);
     if (!variants.length) return json({ ok: false, error: "could not derive phone" }, 403);
