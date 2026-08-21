@@ -1,4 +1,3 @@
-import { Video, ResizeMode } from 'expo-av';
 import React, { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -23,12 +22,14 @@ interface NFCPunchModalProps {
   businessId: number;
   businessName: string;
   nfcString: string;
+  businessCode?: string; // קוד עסק ישיר - מונע באג state ישן
   customerPhone: string; // מספר הטלפון של הלקוח המחובר (כבר מזוהה!)
   selectedCardNumber?: string; // מספר הכרטיסייה שכבר נבחרה (אופציונלי)
   brandColor?: string;
   onClose: () => void;
   onSuccess: (punchedCardNumber?: string) => void; // מעביר את מספר הכרטיסייה שננקבה
   onCardRenewed?: (newCardNumber: string) => void;
+  onNeedCardSelection?: () => void; // נקרא כשצריך לפתוח מודאל בחירת כרטיסייה ראשי
 }
 
 export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
@@ -36,13 +37,28 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   businessId,
   businessName,
   nfcString,
+  businessCode: businessCodeFromProps,
   customerPhone: customerPhoneFromProps,
   selectedCardNumber,
-  brandColor = '#9747FF',
+  brandColor: rawBrandColor = '#9747FF',
   onClose,
   onSuccess,
   onCardRenewed,
+  onNeedCardSelection,
 }) => {
+  // הגנת קונטרסט: רקע המודאל לבן, וכפתורי/טקסטי המותג נצבעים ב-login_brand_color
+  // של העסק. מותג לבן/בהיר מדי = טקסט לבן על רקע לבן. במקרה כזה נופלים לסגול ברירת המחדל.
+  const brandColor = React.useMemo(() => {
+    const fallback = '#9747FF';
+    let hex = String(rawBrandColor || '').replace('#', '').trim();
+    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return fallback;
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.82 ? fallback : rawBrandColor;
+  }, [rawBrandColor]);
   const {
     flowState,
     customerPhone,
@@ -63,7 +79,6 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   const hasStartedRef = useRef(false);
   const initialSelectedCardNumberRef = useRef<string | undefined>(undefined);
   const selectedCardRef = useRef(selectedCard); // ref לשמירת selectedCard עדכני
-  const [showRenewalAfterReward, setShowRenewalAfterReward] = React.useState(false);
   const [renewing, setRenewing] = React.useState(false);
   const [renewalSuccessMessage, setRenewalSuccessMessage] = React.useState<string | null>(null);
   const [renewalErrorMessage, setRenewalErrorMessage] = React.useState<string | null>(null);
@@ -105,23 +120,35 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
     if (visible && nfcString && customerPhoneFromProps) {
       hasStartedRef.current = true;
       initialSelectedCardNumberRef.current = selectedCardNumber;
-      startPunchFlow(nfcString, customerPhoneFromProps, selectedCardNumber);
+      startPunchFlow(nfcString, customerPhoneFromProps, selectedCardNumber, businessCodeFromProps);
     }
   }, [visible, nfcString, customerPhoneFromProps, selectedCardNumber, startPunchFlow]);
 
   // לוג לדיבאג - מעקב אחר שינויי flowState
   useEffect(() => {
-    console.log('[CONFETTI-NFCModal] flowState changed to:', flowState, { showRenewalAfterReward, visible });
-  }, [flowState, showRenewalAfterReward, visible]);
+    console.log('[NFCPunchModal] flowState changed to:', flowState);
+  }, [flowState, visible]);
 
   // כשהלקוח מזוהה (יש טלפון מהקונטקסט) והגענו ל-selecting_card - סוגרים את המודאל
   // כי בחירת כרטיסייה צריכה להתבצע במודאל הראשי של PunchCard, לא כאן
   useEffect(() => {
     if (flowState === 'selecting_card' && customerPhoneFromProps && !selectedCardNumber) {
-      console.log('[NFCPunchModal] Customer identified but no card selected - closing modal, use main card selection');
+      console.log('[NFCPunchModal] Customer identified but no card selected - opening main card selection');
+      // מודיעים ל-PunchCard לפתוח את מודאל הבחירה הראשי לפני סגירת המודאל הנוכחי
+      onNeedCardSelection?.();
       handleClose();
     }
-  }, [flowState, customerPhoneFromProps, selectedCardNumber]);
+  }, [flowState, customerPhoneFromProps, selectedCardNumber, onNeedCardSelection]);
+
+  const handleClose = () => {
+    resetFlow();
+    setPhoneInput('');
+    setShowPhoneInput(false);
+    setRenewing(false);
+    setRenewalSuccessMessage(null);
+    setRenewalErrorMessage(null);
+    onClose();
+  };
 
   // טיפול בהצלחה
   useEffect(() => {
@@ -136,30 +163,6 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
       }, 2000);
     }
   }, [flowState, selectedCardNumber, onSuccess, handleClose]);
-
-  // טיפול בניקוב מזכה - קונפטי וסאונד
-  useEffect(() => {
-    if (flowState === 'rewarding_punch') {
-      console.log('[CONFETTI-NFCModal] 🎉 REWARDING PUNCH DETECTED! Starting confetti flow...');
-      setShowRenewalAfterReward(false);
-      // לפי האפיון: בזמן הקונפטי כבר צריך להתעדכן מספר הניקובים בכרטיסייה
-      // לכן מרעננים מייד, ואת מודאל החידוש מציגים אחרי האנימציה.
-      // חשוב: משתמשים ב-ref ולא ב-state כי יכול להיות stale closure
-      const punchedCardNumber = selectedCardRef.current?.card_number || selectedCardNumber;
-      onSuccess(punchedCardNumber);
-      setTimeout(() => setShowRenewalAfterReward(true), 3500);
-    }
-  }, [flowState, selectedCardNumber, onSuccess]);
-
-  const handleClose = () => {
-    resetFlow();
-    setPhoneInput('');
-    setShowPhoneInput(false);
-    setRenewing(false);
-    setRenewalSuccessMessage(null);
-    setRenewalErrorMessage(null);
-    onClose();
-  };
 
   const handleRenewCard = async () => {
     if (renewing) return;
@@ -234,42 +237,6 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
 
   // רינדור לפי מצב
   const renderContent = () => {
-    // לאחר ניקוב מזכה: קודם קונפטי על גבי הכרטיסייה (רקע שקוף), ואז הצעת חידוש
-    if (flowState === 'rewarding_punch' && showRenewalAfterReward) {
-      return (
-        <View style={styles.content}>
-          <Text style={styles.title}>הכרטיסייה מלאה!</Text>
-          <Text style={styles.message}>
-            מזל טוב על השלמת הכרטיסייה וקבלת {getBenefitText(businessRewardData, selectedCard?.product_name || 'המוצר')}!{'\n'}
-            האם תרצה לפתוח כרטיסייה חדשה?
-          </Text>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: brandColor }]}
-              onPress={() => {
-                console.log('[NFC] User requested new card');
-                handleRenewCard();
-              }}
-              disabled={renewing}
-            >
-              <Text style={styles.buttonText}>כן, פתח חדשה</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.buttonOutline, { borderColor: brandColor }]}
-              onPress={handleClose}
-              disabled={renewing}
-            >
-              <Text style={[styles.buttonOutlineText, { color: brandColor }]}>
-                לא תודה
-              </Text>
-            </TouchableOpacity>
-          </View>
-          {renewing && <ActivityIndicator size="large" color={brandColor} style={styles.loader} />}
-          {!!renewalSuccessMessage && <Text style={styles.successMessage}>{renewalSuccessMessage}</Text>}
-          {!!renewalErrorMessage && <Text style={styles.errorMessage}>{renewalErrorMessage}</Text>}
-        </View>
-      );
-    }
     switch (flowState) {
       case 'identifying':
         if (showPhoneInput) {
@@ -406,30 +373,6 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
           </View>
         );
 
-      case 'rewarding_punch':
-        console.log('[CONFETTI-NFCModal] Rendering rewarding_punch case - Video should appear NOW');
-        return (
-          <View style={styles.fullScreenOverlay}>
-            {/* וידאו מלא - isMuted חובה כדי ש-shouldPlay יעבוד ב-Android 14+ */}
-            <Video
-              source={require('../../assets/animations/confetti.mp4')}
-              shouldPlay
-              isMuted={true}
-              isLooping={false}
-              resizeMode={ResizeMode.CONTAIN}
-              style={[styles.confettiFullScreen, styles.confettiScaled]}
-              onLoad={() => console.log('[CONFETTI-NFCModal] Video LOADED successfully')}
-              onReadyForDisplay={() => console.log('[CONFETTI-NFCModal] Video READY FOR DISPLAY')}
-              onPlaybackStatusUpdate={(status) => {
-                if (status.isLoaded) {
-                  console.log('[CONFETTI-NFCModal] Video status:', { isPlaying: status.isPlaying, positionMillis: status.positionMillis });
-                }
-              }}
-              onError={(e) => console.log('[CONFETTI-NFCModal] Video ERROR:', e)}
-            />
-          </View>
-        );
-
       case 'success':
         return (
           <View style={styles.content}>
@@ -469,25 +412,15 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
       animationType="fade"
       onRequestClose={handleClose}
     >
-      <View
-        style={[
-          styles.overlay,
-          flowState === 'rewarding_punch' && !showRenewalAfterReward ? styles.overlayTransparent : null,
-        ]}
-      >
-        {flowState === 'rewarding_punch' && !showRenewalAfterReward ? (
-          // בזמן קונפטי: שכבת Overlay שקופה מלאה על גבי המסך (בלי מודאל/תיבה/כפתור סגירה)
-          renderContent()
-        ) : (
-          <View style={styles.container}>
-            {/* כפתור סגירה */}
-            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-              <Text style={styles.closeText}>✕</Text>
-            </TouchableOpacity>
+      <View style={styles.overlay}>
+        <View style={styles.container}>
+          {/* כפתור סגירה */}
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+            <Text style={styles.closeText}>✕</Text>
+          </TouchableOpacity>
 
-            {renderContent()}
-          </View>
-        )}
+          {renderContent()}
+        </View>
       </View>
     </Modal>
   );
@@ -500,9 +433,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  overlayTransparent: {
-    backgroundColor: 'transparent',
-  },
   container: {
     width: width * 0.9,
     maxWidth: 400,
@@ -510,11 +440,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     position: 'relative',
-  },
-  containerTransparent: {
-    backgroundColor: 'transparent',
-    padding: 0,
-    borderRadius: 0,
   },
   closeButton: {
     position: 'absolute',
@@ -654,45 +579,6 @@ const styles = StyleSheet.create({
   fullCardIcon: {
     fontSize: 60,
     marginBottom: 16,
-  },
-  fullScreenOverlay: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'transparent',
-  },
-  confettiFullScreen: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'transparent',
-  },
-  confettiScaled: {
-    transform: [{ scale: 1.1 }],
-  },
-  celebrationIcon: {
-    fontSize: 80,
-    marginBottom: 16,
-  },
-  celebrationTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    marginBottom: 12,
-    textAlign: 'center',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  celebrationMessage: {
-    fontSize: 18,
-    color: '#333',
-    textAlign: 'center',
-    lineHeight: 26,
   },
 });
 

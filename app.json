@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cardz",
     "slug": "my-new-test-app",
-    "version": "1.0.0",
+    "version": "1.0.6",
     "icon": "./assets/images/cardz_white_logo_sqwered.png",
     "orientation": "portrait",
     "scheme": "mycardz",
@@ -15,8 +15,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mycompany.mycard",
-      "buildNumber": "1",
+      "bundleIdentifier": "com.mycardz.app",
+      "buildNumber": "30",
       "googleServicesFile": "./GoogleService-Info.plist",
       "associatedDomains": [
         "applinks:app.punchcards.digital",
@@ -32,9 +32,14 @@
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
           {
-            "CFBundleURLName": "com.mycompany.mycard.mycardz",
+            "CFBundleURLName": "com.mycardz.app.mycardz",
             "CFBundleURLSchemes": [
               "mycardz"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.127384108600-94omku6r38fa804h9c9sm2p84a5pbm2j"
             ]
           }
         ]
@@ -42,13 +47,13 @@
       "runtimeVersion": "1.0.0"
     },
     "android": {
-      "versionCode": 1,
+      "versionCode": 29,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/cardz_white_logo_sqwered.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.mycardz.app",
+      "package": "com.yuladigital.cardz",
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
@@ -76,6 +81,11 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.NFC"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
       ]
     },
     "web": {
@@ -89,6 +99,7 @@
         {
           "ios": {
             "useFrameworks": "static",
+            "deploymentTarget": "16.0",
             "forceStaticLinking": [
               "RNFBApp",
               "RNFBMessaging"
@@ -116,9 +127,15 @@
         }
       ],
       "expo-secure-store",
-      "react-native-nfc-manager",
+      [
+        "react-native-nfc-manager",
+        {
+          "includeNdefEntitlement": false
+        }
+      ],
       "./plugins/with-nfc-android",
-      "expo-asset"
+      "expo-asset",
+      "./plugins/with-adi-registration"
     ],
     "experiments": {
       "typedRoutes": true

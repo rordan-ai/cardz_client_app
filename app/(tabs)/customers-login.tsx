@@ -1,18 +1,16 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import LottieView from 'lottie-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import * as Application from 'expo-application';
-import * as Updates from 'expo-updates';
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Animated, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert, ActivityIndicator, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import LottieView from 'lottie-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { BackButton } from '../../components/BackButton';
 import { useBusiness } from '../../components/BusinessContext';
 import MarketingPopup from '../../components/MarketingPopup';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
-import { BackButton } from '../../components/BackButton';
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 // מפתח לשמירה מאובטחת - מספר טלפון בלבד (לא קשור לעסק ספציפי)
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
@@ -35,9 +33,17 @@ export default function CustomersLogin() {
   const nfcAutoLoginAttempted = useRef(false);
   const pendingLoginPhoneRef = useRef<string | null>(null);
 
+  const resolvedBusinessCode = typeof nfcBusinessCode === 'string' ? nfcBusinessCode : Array.isArray(nfcBusinessCode) ? nfcBusinessCode[0] : null;
+
+  useEffect(() => {
+    if (resolvedBusinessCode && !business && !loading) {
+      setBusinessCode(resolvedBusinessCode);
+    }
+  }, [resolvedBusinessCode, business, loading, setBusinessCode]);
+
   const [backgroundImageError, setBackgroundImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0);
-  const { business, loading, refresh: refreshBusiness } = useBusiness();
+  const { business, loading, refresh: refreshBusiness, setBusinessCode } = useBusiness();
   const [menuVisible, setMenuVisible] = useState(false);
   const [accessibilityModalVisible, setAccessibilityModalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-200)).current;
@@ -230,10 +236,10 @@ export default function CustomersLogin() {
         console.log('[NFC Login] Attempting biometric auth');
         const authSuccess = await authenticateBiometric();
         if (authSuccess) {
-          console.log('[NFC Login] Biometric auth success, navigating to PunchCard');
+          console.log('[NFC Login] Biometric auth success, navigating to PunchCard with businessCode:', resolvedBusinessCode);
           router.replace({
-            pathname: '/PunchCard',
-            params: { phone: savedPhone, nfcLaunch: 'true' }
+            pathname: '/(tabs)/PunchCard',
+            params: { phone: savedPhone, nfcLaunch: 'true', ...(resolvedBusinessCode ? { businessCode: resolvedBusinessCode } : {}) }
           });
           return;
         }
@@ -269,7 +275,7 @@ export default function CustomersLogin() {
       if (authenticated) {
         const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
         if (savedPhone) {
-          router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(savedPhone)}`);
+          router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(savedPhone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}`);
         }
       }
     }
@@ -288,8 +294,7 @@ export default function CustomersLogin() {
         setBiometricSetupDone(true);
         Alert.alert('הצלחה! 🎉', 'כניסה ביומטרית הוגדרה בהצלחה.\nמעכשיו תוכל להיכנס בלחיצה אחת לכל עסק!');
         
-        // כניסה אוטומטית
-        router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}`);
+        router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}`);
       } catch (error) {
         if (__DEV__) console.error('[Biometric] Setup error:', error);
         Alert.alert('שגיאה', 'לא ניתן היה לשמור את ההגדרות');
@@ -358,17 +363,17 @@ export default function CustomersLogin() {
       return;
     }
 
-    router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}`);
+    router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}`);
   };
 
   const continueLoginWithoutBiometric = useCallback(() => {
     setBiometricSetupModalVisible(false);
     const p = pendingLoginPhoneRef.current || phone;
     pendingLoginPhoneRef.current = null;
-    if (p && p.match(/^05\\d{8}$/)) {
-      router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(p)}`);
+    if (p && p.match(/^05\d{8}$/)) {
+      router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(p)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}`);
     }
-  }, [phone, router]);
+  }, [phone, router, resolvedBusinessCode]);
 
   const openMenu = () => {
     if (__DEV__) {
@@ -433,7 +438,7 @@ export default function CustomersLogin() {
     }
   };
 
-  if (loading) {
+  if (loading || (resolvedBusinessCode && !business)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: loginBackgroundColor }}>
         {/* כפתור המבורגר גם במצב טעינה */}
@@ -784,7 +789,7 @@ export default function CustomersLogin() {
                 </Text>
                 
                 <TextInput
-                  style={[biometricStyles.input, { borderColor: brandColor }]}
+                  style={[biometricStyles.input, { borderColor: '#000' }]}
                   placeholder="מספר טלפון"
                   placeholderTextColor="#999"
                   keyboardType="phone-pad"
@@ -796,7 +801,7 @@ export default function CustomersLogin() {
                 {smsError ? <Text style={biometricStyles.errorText}>{smsError}</Text> : null}
                 
                 <TouchableOpacity
-                  style={[biometricStyles.setupButton, { backgroundColor: brandColor, opacity: smsLoading || !resetPhone ? 0.6 : 1 }]}
+                  style={[biometricStyles.setupButton, { backgroundColor: '#424242', borderWidth: 2, borderColor: '#000', opacity: smsLoading || !resetPhone ? 0.6 : 1 }]}
                   onPress={() => sendSmsVerification(resetPhone)}
                   disabled={smsLoading || !resetPhone}
                 >
@@ -823,13 +828,13 @@ export default function CustomersLogin() {
             {/* שלב 2: הזנת קוד */}
             {smsVerificationStep === 'code' && (
               <>
-                <Text style={[biometricStyles.title, { color: brandColor }]}>📱 הזן קוד אימות</Text>
+                <Text style={[biometricStyles.title, { color: '#424242' }]}>📱 הזן קוד אימות</Text>
                 <Text style={biometricStyles.description}>
                   נשלח קוד אימות למספר {resetPhone}
                 </Text>
                 
                 <TextInput
-                  style={[biometricStyles.input, { borderColor: brandColor, textAlign: 'center', fontSize: 24, letterSpacing: 8 }]}
+                  style={[biometricStyles.input, { borderColor: '#000', textAlign: 'center', fontSize: 24, letterSpacing: 8 }]}
                   placeholder="------"
                   placeholderTextColor="#999"
                   keyboardType="number-pad"
@@ -842,7 +847,7 @@ export default function CustomersLogin() {
                 {smsError ? <Text style={biometricStyles.errorText}>{smsError}</Text> : null}
                 
                 <TouchableOpacity
-                  style={[biometricStyles.setupButton, { backgroundColor: brandColor, opacity: smsLoading || verificationCode.length < 6 ? 0.6 : 1 }]}
+                  style={[biometricStyles.setupButton, { backgroundColor: '#424242', borderWidth: 2, borderColor: '#000', opacity: smsLoading || verificationCode.length < 6 ? 0.6 : 1 }]}
                   onPress={() => verifySmsCode(verificationCode)}
                   disabled={smsLoading || verificationCode.length < 6}
                 >

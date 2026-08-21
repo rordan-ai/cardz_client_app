@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Keyboard, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { useBusiness } from '../../components/BusinessContext';
 import { supabase } from '../../components/supabaseClient';
 
 function Check({ checked }: { checked: boolean }) {
@@ -40,6 +42,14 @@ export default function NewClientForm() {
   const lastNameInputRef = useRef<TextInput>(null);
   const phoneInputRef = useRef<TextInput>(null);
   const router = useRouter();
+  const { business } = useBusiness();
+
+  // הגדרת העסק הנוכחי כברירת מחדל אם קיים
+  useEffect(() => {
+    if (business && !selectedBusiness) {
+      setSelectedBusiness({ name: business.name, id: business.business_code });
+    }
+  }, [business]);
 
   useEffect(() => {
     (async () => {
@@ -103,6 +113,9 @@ export default function NewClientForm() {
       if (!customerPhone) {
         return { success: false, error: 'מספר טלפון חסר. לא ניתן ליצור כרטיסיה.' };
       }
+      if (!customerPhone.match(/^05\d{8}$/)) {
+        return { success: false, error: 'מספר טלפון לא תקין. יש להזין מספר בפורמט 05X-XXXXXXX.' };
+      }
       if (!productCode) {
         return { success: false, error: 'קוד מוצר חסר. לא ניתן ליצור כרטיסיה.' };
       }
@@ -153,26 +166,33 @@ export default function NewClientForm() {
         };
       }
 
-      // אם הכרטיסיה לא קיימת, צור אותה
-      if (!existingCard) {
-        const cardData = {
-          card_number: cardNumber,
-          business_code: businessCode,
-          customer_phone: customerPhone,
-          product_code: productCode,
-          total_punches: maxPunches,
-          used_punches: 0,
-          status: 'active'
+      // אם הכרטיסיה כבר קיימת - החזר שגיאת כפילות
+      if (existingCard) {
+        return { 
+          success: false, 
+          isDuplicate: true,
+          error: 'כרטיסיה זו כבר קיימת' 
         };
-        
-        const { error: cardError } = await supabase.from('PunchCards').insert(cardData);
+      }
 
-        if (cardError) {
-          return { 
-            success: false, 
-            error: 'שגיאה ביצירת כרטיסיה' 
-          };
-        }
+      // יצירת כרטיסיה חדשה
+      const cardData = {
+        card_number: cardNumber,
+        business_code: businessCode,
+        customer_phone: customerPhone,
+        product_code: productCode,
+        total_punches: maxPunches,
+        used_punches: 0,
+        status: 'active'
+      };
+      
+      const { error: cardError } = await supabase.from('PunchCards').insert(cardData);
+
+      if (cardError) {
+        return { 
+          success: false, 
+          error: 'שגיאה ביצירת כרטיסיה' 
+        };
       }
 
       return { success: true };
@@ -334,7 +354,27 @@ export default function NewClientForm() {
       const result = await createCardWithProduct((selectedProduct.product_code || '').toString().padStart(4, '0'));
         
         if (result.success) {
+          // P2 (BUG-02): רישום הצטרפות-מרחוק כ-source:'mobile' לאבחנת הדשבורד.
+          // fire-and-forget, ⛔ בלי .select() (activity_logs חסום ל-anon SELECT → 42501 אטומי).
+          supabase.from('activity_logs').insert({
+            business_code: selectedBusiness.id,
+            user_type: 'customer',
+            action_type: 'add_customer',
+            source: 'mobile',
+            user_id: normalizedPhone,
+            target_entity: normalizedPhone,
+            action_details: {
+              customer_phone: normalizedPhone,
+              customer_name: firstName + ' ' + lastName,
+              product_code: (selectedProduct.product_code || '').toString(),
+              product_name: selectedProduct.product_name,
+            },
+          }).then(({ error }) => {
+            if (error) console.log('[P2 add_customer/mobile] log failed:', error.code, error.message);
+          });
           router.push('/(tabs)/thank_you');
+        } else if (result.isDuplicate) {
+          setErrorModal({ visible: true, message: 'זוהה רישום כפול של מספר טלפון ומוצר זהים. נסה/י להגדיר מוצר כרטיסייה שונה.' });
         } else {
           setErrorModal({ visible: true, message: 'שגיאה ביצירת כרטיסיה. נסה שוב מאוחר יותר.' });
       }
@@ -632,7 +672,7 @@ export default function NewClientForm() {
               <Check checked={isPrivacy} />
             </TouchableOpacity>
             <Text style={styles.checkLabel}>
-              קראתי ומאשר את <Text style={styles.privacyLink} onPress={() => Linking.openURL('https://yula-digital.com/')}>מדיניות הפרטיות</Text>
+              קראתי ומאשר את <Text style={styles.privacyLink} onPress={() => WebBrowser.openBrowserAsync('https://app.punchcards.digital/privacy-policy')}>מדיניות הפרטיות</Text>
             </Text>
           </View>
 

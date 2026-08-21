@@ -14,6 +14,10 @@ const path = require('path');
  * במקום זאת, משתמשים ב-Reader Mode (Foreground Dispatch) מהקוד
  */
 
+// N1 — רגישות NFC: מסננים אך ורק תגי NDEF (כארדז = NTAG עם Text/URI records).
+// הוסרו NfcA/NfcB/NfcF/NfcV/IsoDep/MifareClassic/MifareUltralight — אלה הטכנולוגיות של
+// כרטיסי אשראי/EMV/דרכונים/תחבורה/בקרת-גישה, וגרמו לאפליקציה להיפתח בקרבתם (פתיחות-שווא).
+// Ndef/NdefFormatable שומרים על אותה קריאה+טווח+רגישות לתגי כארדז, בלי לתפוס תגים זרים.
 const NFC_TECH_FILTER_XML = `<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <tech-list>
@@ -22,57 +26,124 @@ const NFC_TECH_FILTER_XML = `<?xml version="1.0" encoding="utf-8"?>
     <tech-list>
         <tech>android.nfc.tech.NdefFormatable</tech>
     </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.NfcA</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.NfcB</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.NfcF</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.NfcV</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.IsoDep</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.MifareClassic</tech>
-    </tech-list>
-    <tech-list>
-        <tech>android.nfc.tech.MifareUltralight</tech>
-    </tech-list>
 </resources>
 `;
 
-const NFC_DISPATCH_ACTIVITY_KT = `package com.mycardz.app
+const NFC_DISPATCH_ACTIVITY_KT = `package com.yuladigital.cardz
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
+import android.nfc.NdefMessage
+import android.nfc.NfcAdapter
 import android.os.Bundle
+import android.util.Log
 
 /**
- * Activity ייעודי ל-NFC כדי למנוע התנגשות עם expo-router / deep linking ב-MainActivity.
- * תפקידו: לקבל Intent של NFC ולהעביר אותו ל-MainActivity (singleTop) ואז להיסגר.
+ * Activity ייעודי ל-NFC - מקבל NFC Intent, פוענח תג, ושולח deep link ל-MainActivity
  */
 class NfcDispatchActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
+    Log.d("NfcDispatch", "=== NFC ACTIVITY STARTED ===")
+    Log.d("NfcDispatch", "Intent action: \${intent?.action}")
+    Log.d("NfcDispatch", "Intent data: \${intent?.data}")
+    Log.d("NfcDispatch", "Intent type: \${intent?.type}")
+
     val launchIntent = Intent(this, MainActivity::class.java)
     launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
-    launchIntent.action = intent?.action
-    launchIntent.data = intent?.data
-    launchIntent.type = intent?.type
-    val extras = intent?.extras
-    if (extras != null) {
-      launchIntent.putExtras(extras)
+    // פענוח business code מה-NFC tag
+    val businessCode = extractBusinessCodeFromIntent(intent)
+    Log.d("NfcDispatch", "Extracted business code: \$businessCode")
+    
+    if (businessCode != null) {
+      // תג כארדז תקין → שליחת deep link שה-Linking listener יתפוס, ופתיחת האפליקציה.
+      val deepLinkUri = Uri.parse("mycardz://business/\$businessCode")
+      launchIntent.data = deepLinkUri
+      Log.d("NfcDispatch", "✓ Sending deep link: \$deepLinkUri")
+      startActivity(launchIntent)
+    } else {
+      // N1: אין business code (תג לא-כארדז / NDEF זר) → לא פותחים את האפליקציה כלל.
+      // (בעבר הועבר intent גולמי ל-MainActivity, מה שפתח את האפליקציה גם לתגים זרים.)
+      Log.w("NfcDispatch", "✗ Not a Cardz tag (no business code) — ignoring, app not launched")
     }
-
-    startActivity(launchIntent)
     finish()
+  }
+
+  private fun extractBusinessCodeFromIntent(intent: Intent?): String? {
+    if (intent == null) return null
+
+    try {
+      val rawMessages = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES)
+      
+      if (rawMessages != null && rawMessages.isNotEmpty()) {
+        val ndefMessage = rawMessages[0] as? NdefMessage
+        if (ndefMessage != null && ndefMessage.records.isNotEmpty()) {
+          val record = ndefMessage.records[0]
+          val payload = record.payload
+          
+          if (payload.isEmpty()) return null
+          
+          val tnf = record.tnf
+          val type = record.type
+          
+          // URI Record
+          if (tnf == 3.toShort() || (tnf == 1.toShort() && type.isNotEmpty() && type[0] == 0x55.toByte())) {
+            val uri = parseUriRecord(payload)
+            return extractBusinessCodeFromUri(uri)
+          }
+          
+          // Text Record
+          if (tnf == 1.toShort()) {
+            val text = parseTextRecord(payload)
+            if (text.startsWith("mycardz://business/")) {
+              return text.substringAfter("mycardz://business/")
+            }
+            return text
+          }
+        }
+      }
+    } catch (e: Exception) {
+      Log.e("NfcDispatch", "Error parsing NFC intent", e)
+    }
+    
+    return null
+  }
+
+  private fun parseUriRecord(payload: ByteArray): String {
+    if (payload.isEmpty()) return ""
+    
+    val prefixCode = payload[0].toInt()
+    val uriBytes = payload.sliceArray(1 until payload.size)
+    val uriPath = String(uriBytes, Charsets.UTF_8)
+    
+    val prefix = when (prefixCode) {
+      0x00 -> ""
+      0x01 -> "http://www."
+      0x02 -> "https://www."
+      0x03 -> "http://"
+      0x04 -> "https://"
+      else -> ""
+    }
+    
+    return prefix + uriPath
+  }
+
+  private fun parseTextRecord(payload: ByteArray): String {
+    if (payload.isEmpty()) return ""
+    
+    val langCodeLength = (payload[0].toInt() and 0x3f)
+    val textBytes = payload.sliceArray((1 + langCodeLength) until payload.size)
+    return String(textBytes, Charsets.UTF_8)
+  }
+
+  private fun extractBusinessCodeFromUri(uri: String): String? {
+    if (uri.startsWith("mycardz://business/")) {
+      return uri.substringAfter("mycardz://business/")
+    }
+    return null
   }
 }
 `;
@@ -102,8 +173,8 @@ function withNfcTechFilter(config) {
         'main',
         'java',
         'com',
-        'mycardz',
-        'app'
+        'yuladigital',
+        'cardz'
       );
       if (!fs.existsSync(ktPath)) {
         fs.mkdirSync(ktPath, { recursive: true });

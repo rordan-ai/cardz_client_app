@@ -1,28 +1,28 @@
 
+import { isDev, isPreview } from '@/config/environment';
 import * as Location from 'expo-location';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  FlatList,
-  Image,
-  ImageBackground,
-  Linking,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View
+    ActivityIndicator,
+    Dimensions,
+    FlatList,
+    Image,
+    ImageBackground,
+    Linking,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View
 } from 'react-native';
 import { useBusiness } from '../../components/BusinessContext';
 import { supabase } from '../../components/supabaseClient';
 import TutorialSlideshow from '../../components/TutorialSlideshow';
-import { isPreview, isDev } from '@/config/environment';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 1024 && height >= 768;
@@ -71,10 +71,8 @@ export default function BusinessSelector() {
   const navigation = useNavigation();
 
   // מצבי מיקום
-  const [locationExplanationVisible, setLocationExplanationVisible] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
-  const [locationAsked, setLocationAsked] = useState(false);
   const [sortByDistance, setSortByDistance] = useState(false);
 
   const closeAllOverlays = useCallback(() => {
@@ -83,7 +81,6 @@ export default function BusinessSelector() {
     setTutorialVisible(false);
     setAccessibilityVisible(false);
     setPrivacyVisible(false);
-    setLocationExplanationVisible(false);
     setLocationLoading(false);
   }, []);
 
@@ -116,7 +113,6 @@ export default function BusinessSelector() {
       if (status !== 'granted') {
         if (__DEV__) console.log('[Location] Permission denied');
         setLocationLoading(false);
-        setLocationAsked(true);
         return;
       }
 
@@ -187,37 +183,13 @@ export default function BusinessSelector() {
       if (__DEV__) console.error('[Location] Error:', error);
     } finally {
       setLocationLoading(false);
-      setLocationAsked(true);
     }
   }, [businesses]);
 
-  // כשהמודאל נפתח - בדיקה אם להציג הסבר מיקום
   const handleOpenModal = useCallback(() => {
-    // אם עוד לא שאלנו על מיקום ויש עסקים - קודם מציגים מודאל מיקום
-    if (!locationAsked && businesses.length > 0) {
-      setLocationExplanationVisible(true);
-    } else {
-      // אחרת - ישר פותחים את רשימת העסקים
-      setModalVisible(true);
-    }
-  }, [locationAsked, businesses.length]);
-
-  // המשתמש אישר שימוש במיקום
-  const handleLocationAccept = useCallback(() => {
-    setLocationExplanationVisible(false);
-    setLocationAsked(true);
-    requestLocationAndSort();
-    // פותחים את מודאל בחירת העסקים
-    setModalVisible(true);
-  }, [requestLocationAndSort]);
-
-  // המשתמש דחה שימוש במיקום
-  const handleLocationDecline = useCallback(() => {
-    setLocationExplanationVisible(false);
-    setLocationAsked(true);
-    // פותחים את מודאל בחירת העסקים
     setModalVisible(true);
   }, []);
+
 
   // פילטור עסקים לפי חיפוש
   const getFilteredBusinesses = useCallback(() => {
@@ -309,10 +281,6 @@ export default function BusinessSelector() {
           accessibilityHint="לחץ לפתיחת אתר החברה המפתחת"
         />
         
-        {/* סימון גרסה לבדיקת עדכונים */}
-        <Text style={{ position: 'absolute', top: 50, left: 10, color: '#fff', fontSize: 12, fontFamily: 'Rubik' }}>
-          {Platform.OS === 'android' ? 'V30.80' : 'V33.85'}
-        </Text>
         
         {/* באנר סביבה - רק ב-preview/dev */}
         {(isPreview || isDev) && (
@@ -397,22 +365,30 @@ export default function BusinessSelector() {
             <View style={[styles.modalContent, isTablet && styles.tabletModalContent]}>
               <Text style={styles.modalTitle} accessibilityRole="header">בחר עסק</Text>
               
-              <TextInput
-                style={styles.searchInput}
-                placeholder="חפש עסק..."
-                value={searchBusiness}
-                onChangeText={setSearchBusiness}
-                textAlign="right"
-                accessibilityLabel="חיפוש עסק"
-                accessibilityHint="הקלד שם עסק לחיפוש ברשימה"
-              />
-              
-              {locationLoading && (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#267884" />
-                  <Text style={styles.loadingText}>מחפש עסקים קרובים...</Text>
-                </View>
-              )}
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 12 }}>
+                <TextInput
+                  style={[styles.searchInput, { flex: 1, marginBottom: 0 }]}
+                  placeholder="חפש עסק לפי שם..."
+                  value={searchBusiness}
+                  onChangeText={setSearchBusiness}
+                  textAlign="right"
+                  accessibilityLabel="חיפוש עסק"
+                  accessibilityHint="הקלד שם עסק לחיפוש ברשימה"
+                />
+                <TouchableOpacity
+                  style={{ backgroundColor: '#267884', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginRight: 8 }}
+                  onPress={() => requestLocationAndSort()}
+                  disabled={locationLoading}
+                  accessibilityLabel="מיון לפי מיקום"
+                  accessibilityRole="button"
+                >
+                  {locationLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold', fontFamily: 'Rubik' }}>📍 לפי מיקום</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
               
               <FlatList
                 data={getFilteredBusinesses()}
@@ -458,47 +434,7 @@ export default function BusinessSelector() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* מודאל הסבר מיקום */}
-      <Modal
-        visible={locationExplanationVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={handleLocationDecline}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.locationExplanationContent, isTablet && styles.tabletLocationContent]}>
-            <Text style={styles.locationIcon}>📍</Text>
-            <Text style={styles.locationTitle}>הצגת עסקים קרובים</Text>
-            <Text style={styles.locationText}>
-              האם תרצה לראות את העסקים הקרובים אליך ראשונים ברשימה?
-            </Text>
-            <Text style={styles.locationSubtext}>
-              נשתמש במיקום שלך רק כדי למיין את רשימת העסקים לפי קרבה.{'\n'}
-              המיקום לא נשמר ולא משותף.
-            </Text>
-            
-            <View style={styles.locationButtons}>
-              <TouchableOpacity 
-                style={styles.locationAcceptButton}
-                onPress={handleLocationAccept}
-                accessibilityLabel="אשר שימוש במיקום"
-                accessibilityRole="button"
-              >
-                <Text style={styles.locationAcceptText}>כן, הצג קרובים</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.locationDeclineButton}
-                onPress={handleLocationDecline}
-                accessibilityLabel="דחה שימוש במיקום"
-                accessibilityRole="button"
-              >
-                <Text style={styles.locationDeclineText}>לא, תודה</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* מודאל הסבר מיקום — הוסר בתיקון 9 */}
 
       {/* מצגת הדגמה */}
       <TutorialSlideshow 
@@ -661,6 +597,13 @@ export default function BusinessSelector() {
               <Text style={accessibilityStyles.bulletPoint}>✔ תמיכה וניהול חשבון</Text>
               <Text style={accessibilityStyles.paragraph}>לא נעשה שימוש מסחרי, שיווקי חיצוני או מכירת מידע.</Text>
 
+              <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold', marginTop: 12 }]}>
+                אין "Tracking" לפי הגדרת Apple: האפליקציה אינה מקשרת מידע משתמש עם מידע מצדדים שלישיים לצרכי פרסום או מדידה בין אפליקציות/אתרים, אינה משתפת מזהים לצרכי רימרקטינג, ואינה משתמשת ב-IDFA.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                העסק עשוי לשלוח הודעות שיווקיות ופופאפים ללקוחותיו בתוך האפליקציה במסגרת השירות. זוהי תקשורת ישירה מהעסק ללקוחותיו בלבד, ללא שיתוף מידע עם גורמים חיצוניים.
+              </Text>
+
               <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold', marginTop: 12 }]}>תיבת דואר בתוך האפליקציה (Inbox) – הודעות פוש ו-SMS:</Text>
               <Text style={accessibilityStyles.paragraph}>
                 במסך הכרטיסייה קיימת תיבת דואר של האפליקציה (אייקון "דואר"/Inbox). הודעות שנשלחות אליך במסגרת השירות (לרבות הודעות פוש והודעות SMS) עשויות להיות מוצגות ונשמרות גם בתוך תיבת הדואר באפליקציה, כולל חיווי/סימון שיש הודעות.
@@ -698,9 +641,20 @@ export default function BusinessSelector() {
                 השירות מאפשר שימוש לקטינים. האחריות על התאמת השירות לגיל הלקוח מוטלת על בעל העסק.
               </Text>
 
-              <Text style={accessibilityStyles.sectionTitle}>8. קוקיז ומעקב</Text>
+              <Text style={accessibilityStyles.sectionTitle}>8. קוקיז, אנליטיקה ומעקב</Text>
+              <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold' }]}>אין מעקב (Tracking):</Text>
               <Text style={accessibilityStyles.paragraph}>
-                האפליקציה אינה משתמשת בקוקיז, פיקסלים או מנגנוני מעקב. נעשה שימוש ב־Google Analytics אנונימי בלבד.
+                האפליקציה אינה משתמשת בקוקיז, פיקסלים, או מנגנוני מעקב פרסומי.
+              </Text>
+              <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold' }]}>
+                אין שימוש ב-Google Analytics, IDFA, או כלי מעקב אחרים.
+              </Text>
+              <Text style={accessibilityStyles.paragraph}>
+                האפליקציה אינה משתפת מידע עם רשתות פרסום או גורמי צד שלישי לצורך מעקב.
+              </Text>
+              <Text style={[accessibilityStyles.paragraph, { fontWeight: 'bold', marginTop: 12 }]}>תקשורת שיווקית פנימית:</Text>
+              <Text style={accessibilityStyles.paragraph}>
+                העסק עשוי לשלוח לך הודעות (פוש, SMS, הודעות בתוך האפליקציה) על מבצעים, הטבות והגרלות. מדובר בתקשורת ישירה מהעסק ללקוחות שלו בלבד, ללא שיתוף מידע עם גורמים חיצוניים או שימוש למטרות מעקב פרסומי.
               </Text>
 
               <Text style={accessibilityStyles.sectionTitle}>9. הגבלת אחריות</Text>
