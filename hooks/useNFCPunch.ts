@@ -286,14 +286,15 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
 
       // לוג לקוח: user_activities (קיים אצלך; activity_logs אצלך ללא card_number ולכן נכשל)
       try {
-        await supabase.from('user_activities').insert({
+        // amount הוסר — העמודה לא קיימת בטבלה וה-insert נכשל בשקט
+        const { error: uaError } = await supabase.from('user_activities').insert({
           customer_id: phone,
           business_code: businessCode,
           action_type: 'punch',
           action_time: new Date().toISOString(),
-          amount: 1,
           source: 'nfc',
         });
+        if (uaError) console.log('[NFC] user_activities insert error:', uaError);
       } catch (logErr) {
         console.log('[NFC] Error logging user_activities:', logErr);
         // לא נכשל - הניקוב כבר בוצע
@@ -564,9 +565,9 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
 
     // לפי אפיון: כרטיסייה Prepaid בלבד מבצעת ניקוב ישיר.
     // כל כרטיסייה שאינה Prepaid חייבת לעבור אישור אדמין (בלי קשר ל-punch_mode של העסק).
-    // P5: ה-flag prepaid_requires_approval מנתב לאישור **רק** כשגם העסק ב-auto —
-    // כדי למנוע over-gating (prepaid+semi/manual וכרטיסים לא-prepaid לא מושפעים).
-    const p5RouteToApproval = prepaidApprovalRef.current && effectiveMode === 'auto';
+    // אפיון מעודכן (21.08): ב-semi_auto ניקוב prepaid עובר **תמיד** אישור אדמין,
+    // בלי קשר לצ'קבוקס. ה-flag prepaid_requires_approval ממשיך לשלוט רק במצב auto.
+    const p5RouteToApproval = effectiveMode === 'semi_auto' || (prepaidApprovalRef.current && effectiveMode === 'auto');
     if (isPrepaid && !p5RouteToApproval) {
       setFlowState('punching');
       const result = await executePunch(

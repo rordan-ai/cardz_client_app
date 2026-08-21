@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, DeviceEventEmitter, Dimensions, FlatList, Image, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { WebView } from 'react-native-webview';
@@ -122,10 +122,25 @@ export default function PunchCard() {
 
   // צבע brand מהאדמין (ברירת מחדל סגול אם אין)
   const brandColor = localBusiness?.login_brand_color || '#9747FF';
+  // גרסה בטוחת-קונטרסט לשימוש כרקע מאחורי טקסט לבן: מותג לבן/בהיר מדי → סגול ברירת מחדל
+  const safeBrandBg = useMemo(() => {
+    const fallback = '#9747FF';
+    let hex = String(brandColor || '').replace('#', '').trim();
+    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return fallback;
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.82 ? fallback : brandColor;
+  }, [brandColor]);
 
   // NFC state
   const [nfcModalVisible, setNfcModalVisible] = useState(false);
   const [nfcNoticeVisible, setNfcNoticeVisible] = useState(false);
+  // היסט אנכי לכפתור הניקוב הידני: הטרנספורמציות (scale/translate) של הכרטיסייה
+  // משנות רק ויזואליה ולא layout, אז מחשבים כמה הכרטיסייה "גולשת" ויזואלית מתחת
+  // לקופסת ה-layout שלה ודוחפים את הכפתור מתחת לתחתית הוויזואלית
+  const [manualPunchOffset, setManualPunchOffset] = useState(0);
   const { isSupported: nfcSupported, isEnabled: nfcEnabled, initNFC, startReading, stopReading, parseBusinessId, checkLaunchTag, checkBackgroundTag } = useNFC();
   const nfcLaunchHandled = useRef(false);
   const nfcCooldownRef = useRef(false); // מניעת פתיחה כפולה של מודאל NFC
@@ -779,9 +794,13 @@ export default function PunchCard() {
     const setupNFC = async () => {
       if (!expectedNfcString) return;
       
-      // ב-iOS - לא מתחילים NFC אוטומטית! המשתמש ילחץ על כפתור "סרוק לניקוב"
+      // ב-iOS - לא מתחילים האזנה אוטומטית (session נפתח רק מלחיצת המשתמש),
+      // אבל חובה לאתחל כדי ש-nfcEnabled ישקף את זמינות ה-NFC בפועל —
+      // בלי זה הדגל נשאר false וכפתור הניקוב הידני מוצג גם למכשירים עם NFC פעיל.
+      // initNFC לא פותח session (רק isSupported/start/isEnabled), אז אין UI של סריקה.
       if (Platform.OS === 'ios') {
-        console.log('[NFC] iOS detected - NFC will be triggered by user button only');
+        console.log('[NFC] iOS detected - availability check only, NFC session by user button');
+        await initNFC();
         return;
       }
       
@@ -1586,82 +1605,9 @@ export default function PunchCard() {
       console.log('[ActivityFeed] Edge exception', String(e?.message || e));
     }
 
-    // 1. קריאה מ-customer_activity_feed (קיים)
-    for (const custPhone of variants) {
-      try {
-        let q = supabase
-          .from('customer_activity_feed')
-          .select('*')
-          .eq('business_code', businessCode)
-          .eq('customer_phone', custPhone)
-          .order('timestamp', { ascending: false })
-          .limit(pageSize);
-
-        if (cursorTimestamp) {
-          q = q.lt('timestamp', cursorTimestamp);
-        }
-
-        const { data, error } = await q;
-        if (error) {
-          console.log('[ActivityFeed] customer_activity_feed query error', { businessCode, custPhone, message: String(error?.message || error), errorCode: error.code });
-          continue;
-        }
-        const arr = Array.isArray(data) ? data : [];
-        console.log('[ActivityFeed] fetched from customer_activity_feed', { businessCode, custPhone, count: arr.length, cursor: cursor || null });
-        if (arr.length > 0) {
-          console.log('[ActivityFeed] customer_activity_feed sample:', arr.slice(0, 2).map((r: any) => ({ action_type: r.action_type, timestamp: r.timestamp })));
-        }
-        const rows = arr.map((row: any) => {
-          const ts = row?.timestamp ? new Date(row.timestamp) : new Date();
-          const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
-            + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-          const { label, amount } = mapRowToLabelAndAmount(row);
-          const qty = typeof row?.amount === 'number' ? row.amount : amount;
-          return { dateStr, actionLabel: label, amount: qty, timestamp: row?.timestamp || ts.toISOString() };
-        });
-        allRows.push(...rows);
-      } catch (e: any) {
-        console.log('[ActivityFeed] customer_activity_feed exception', { businessCode, raw, error: String(e?.message || e) });
-      }
-    }
-    
-    // 1.5. קריאה מ-user_activities (אם customer_activity_feed לא כולל הכל)
-    for (const custPhone of variants) {
-      try {
-        let q = supabase
-          .from('user_activities')
-          .select('*')
-          .eq('customer_id', custPhone)
-          .order('action_time', { ascending: false })
-          .limit(pageSize);
-
-        if (cursorTimestamp) {
-          q = q.lt('action_time', cursorTimestamp);
-        }
-
-        const { data, error } = await q;
-        if (error) {
-          console.log('[ActivityFeed] user_activities query error', { businessCode, custPhone, message: String(error?.message || error) });
-          continue;
-        }
-        const arr = Array.isArray(data) ? data : [];
-        console.log('[ActivityFeed] fetched from user_activities', { businessCode, custPhone, count: arr.length });
-        if (arr.length > 0) {
-          console.log('[ActivityFeed] user_activities sample:', arr.slice(0, 2).map((r: any) => ({ action_type: r.action_type, action_time: r.action_time })));
-        }
-        const rows = arr.map((row: any) => {
-          const ts = row?.action_time ? new Date(row.action_time) : new Date();
-          const dateStr = ts.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
-            + ' ' + ts.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-          const { label, amount } = mapRowToLabelAndAmount(row);
-          const qty = typeof row?.amount === 'number' ? row.amount : amount;
-          return { dateStr, actionLabel: label, amount: qty, timestamp: row?.action_time || ts.toISOString() };
-        });
-        allRows.push(...rows);
-      } catch (e: any) {
-        console.log('[ActivityFeed] user_activities exception', { businessCode, raw, error: String(e?.message || e) });
-      }
-    }
+    // בלוקי הקריאה מ-customer_activity_feed (טבלה לא קיימת) ומ-user_activities
+    // (RLS ללא policies ל-SELECT — תמיד ריק) הוסרו 21.08 בתיאום האדמין.
+    // המקור הסמכותי לפיד: ה-Edge customer-activity-log (למעלה) + activity_logs (למטה).
 
     // 2. קריאה מ-activity_logs (פעילויות אדמין) - תיקון כירורגי משופר
     for (const custPhone of variants) {
@@ -1683,7 +1629,8 @@ export default function PunchCard() {
           .from('activity_logs')
           .select('*')
           .eq('business_code', businessCode)
-          .eq('user_type', 'business_user')
+          // כולל גם 'customer' — ניקובים של הלקוח עצמו נכתבים כ-user_type='customer'
+          .in('user_type', ['business_user', 'customer'])
           .order('timestamp', { ascending: false })
           .limit(pageSize * 2); // לוקח יותר כדי לסנן אחר כך
 
@@ -1830,7 +1777,8 @@ export default function PunchCard() {
         },
         async (payload: any) => {
           const row = payload?.new;
-          if (!row || row.user_type !== 'business_user') return;
+          // כולל גם 'customer' — ניקובים של הלקוח עצמו נכתבים כ-user_type='customer'
+          if (!row || !['business_user', 'customer'].includes(row.user_type)) return;
           
           try {
             let isMatch = false;
@@ -2213,13 +2161,23 @@ export default function PunchCard() {
       </TouchableOpacity>
       
       {/* עטיפה להגדלת כל התוכן - עם הפרדה בין iOS לאנדרואיד */}
-      <View style={{ 
-        transform: [{ scale: Platform.OS === 'ios' ? 1.25 : 1.0625 }], // אנדרואיד 15% קטן יותר
-        width: '80%', 
-        alignSelf: 'center', 
-        marginTop: Platform.OS === 'ios' ? 80 : 60 
-      }}>
-      
+      <View
+        style={{
+          transform: [{ scale: Platform.OS === 'ios' ? 1.25 : 1.0625 }], // אנדרואיד 15% קטן יותר
+          width: '80%',
+          alignSelf: 'center',
+          marginTop: Platform.OS === 'ios' ? 80 : 60
+        }}
+        onLayout={(e) => {
+          // גלישה ויזואלית מתחת לקופסת ה-layout: חצי מתוספת ה-scale (הסקייל מהמרכז)
+          // + הזזת ה-70px של עטיפת ה-iOS הפנימית (מוכפלת בסקייל כי היא בתוך העטיפה)
+          const h = e.nativeEvent.layout.height;
+          const cardScale = Platform.OS === 'ios' ? 1.25 : 1.0625;
+          const innerTranslate = Platform.OS === 'ios' ? 70 * cardScale : 0;
+          setManualPunchOffset(Math.max(0, (h * (cardScale - 1)) / 2 + innerTranslate + 16));
+        }}
+      >
+
       {/* מקשה אחת - לוגו, שם עסק ושם לקוח */}
       <View style={styles.topElementsGroup}>
         {/* לוגו ושם עסק - מיקום קבוע לכל המצבים (2/3/4 שורות). אנדרואיד בלבד: עולה 30px. */}
@@ -2446,10 +2404,11 @@ export default function PunchCard() {
       </View>{/* סגירת עטיפת הגדלה 25% */}
 
       {/* כפתור בקשת ניקוב ידנית — מוצג אך ורק כשה-NFC כבוי/לא נתמך במכשיר (למי שלא הפעיל NFC).
-          מיקום בטוח ב-100%: בזרימה רגילה, מחוץ לכל העטיפות עם transform/scale (אין stacking-context
-          שיתנגש), בתחתית תוכן ה-ScrollView — כך שנוצרת גלילה קצרה שמופיעה ומתפקדת רק במקרה הזה. */}
+          מיקום: בזרימה רגילה מחוץ לעטיפות ה-transform, עם marginTop דינמי (manualPunchOffset)
+          שמפצה על הגלישה הוויזואלית של הכרטיסייה המוגדלת — כך הכפתור יושב מתחת לתחתית
+          הוויזואלית של הכרטיסייה ונחשף בגלילה קלה, שקיימת רק במקרה הזה. */}
       {!nfcEnabled && (
-        <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', paddingVertical: 24, paddingHorizontal: 16 }}>
+        <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', marginTop: manualPunchOffset, paddingVertical: 24, paddingHorizontal: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
             <TouchableOpacity
               style={{ alignItems: 'center', justifyContent: 'center' }}
@@ -3839,9 +3798,9 @@ export default function PunchCard() {
             />
           )}
           <View style={{
-            backgroundColor: directPunchStatus === 'success' 
-              ? (isDirectRewardingPunch ? 'rgba(76, 175, 80, 0.95)' : '#4CAF50') 
-              : directPunchStatus === 'error' ? '#f44336' : brandColor,
+            backgroundColor: directPunchStatus === 'success'
+              ? (isDirectRewardingPunch ? 'rgba(76, 175, 80, 0.95)' : '#4CAF50')
+              : directPunchStatus === 'error' ? '#f44336' : safeBrandBg,
             padding: 30,
             borderRadius: 20,
             alignItems: 'center',

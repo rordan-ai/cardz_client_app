@@ -40,12 +40,25 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
   businessCode: businessCodeFromProps,
   customerPhone: customerPhoneFromProps,
   selectedCardNumber,
-  brandColor = '#9747FF',
+  brandColor: rawBrandColor = '#9747FF',
   onClose,
   onSuccess,
   onCardRenewed,
   onNeedCardSelection,
 }) => {
+  // הגנת קונטרסט: רקע המודאל לבן, וכפתורי/טקסטי המותג נצבעים ב-login_brand_color
+  // של העסק. מותג לבן/בהיר מדי = טקסט לבן על רקע לבן. במקרה כזה נופלים לסגול ברירת המחדל.
+  const brandColor = React.useMemo(() => {
+    const fallback = '#9747FF';
+    let hex = String(rawBrandColor || '').replace('#', '').trim();
+    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return fallback;
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.82 ? fallback : rawBrandColor;
+  }, [rawBrandColor]);
   const {
     flowState,
     customerPhone,
@@ -127,6 +140,16 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
     }
   }, [flowState, customerPhoneFromProps, selectedCardNumber, onNeedCardSelection]);
 
+  const handleClose = () => {
+    resetFlow();
+    setPhoneInput('');
+    setShowPhoneInput(false);
+    setRenewing(false);
+    setRenewalSuccessMessage(null);
+    setRenewalErrorMessage(null);
+    onClose();
+  };
+
   // טיפול בהצלחה
   useEffect(() => {
     if (flowState === 'success') {
@@ -140,16 +163,6 @@ export const NFCPunchModal: React.FC<NFCPunchModalProps> = ({
       }, 2000);
     }
   }, [flowState, selectedCardNumber, onSuccess, handleClose]);
-
-  const handleClose = () => {
-    resetFlow();
-    setPhoneInput('');
-    setShowPhoneInput(false);
-    setRenewing(false);
-    setRenewalSuccessMessage(null);
-    setRenewalErrorMessage(null);
-    onClose();
-  };
 
   const handleRenewCard = async () => {
     if (renewing) return;
