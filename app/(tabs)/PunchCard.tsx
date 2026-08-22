@@ -1158,6 +1158,11 @@ export default function PunchCard() {
   // משתמשים ב-localBusiness כי business (מהContext) לא נטען בכניסה ישירה מ-NFC deep link
   const punchedIcon = localBusiness?.punched_icon || business?.punched_icon;
   const unpunchedIcon = localBusiness?.unpunched_icon || business?.unpunched_icon;
+  // לוגו ושם עסק — אותו דפוס fallback כמו שאר מרכיבי הכרטיס: localBusiness נטען תמיד
+  // (גם בכניסת NFC/deep-link שבה ה-context עלול להיות ריק), business מהקונטקסט כגיבוי
+  const displayLogo = localBusiness?.logo || business?.logo;
+  const displayBusinessName = localBusiness?.name || business?.name;
+  const displayBusinessCode = localBusiness?.business_code || business?.business_code;
   // בשורת "לקבלת" מציגים את שם מוצר הכרטיסייה (למקרה של כמה כרטיסיות בעסק).
   // אם אין לנו product_name, ניפול אחורה ל-benefit / product_code כדי לא להשאיר ריק.
   const benefit = (punchCard?.product_name || '').trim() || (punchCard?.benefit || '').trim() || punchCard?.product_code || '';
@@ -2190,7 +2195,7 @@ export default function PunchCard() {
         <View style={styles.logoBusinessOffset}>
           {/* לוגו העסק */}
           <View style={styles.logoContainer}>
-            {business?.logo && (
+            {displayLogo && (
               <View style={{ position: 'relative' }}>
                 {logoLoading && (
                   <View style={{ 
@@ -2206,9 +2211,9 @@ export default function PunchCard() {
                     <Text style={{ color: '#999', fontSize: 12, fontFamily: 'Rubik' }}>טוען לוגו...</Text>
                   </View>
                 )}
-                <Image 
-                  key={`logo-${business.business_code}-${business.logo}`}
-                  source={{ uri: business.logo }} 
+                <Image
+                  key={`logo-${displayBusinessCode}-${displayLogo}`}
+                  source={{ uri: displayLogo }}
                   style={{ 
                     width: Platform.OS === 'android' ? 153 : 170,
                     height: Platform.OS === 'android' ? 153 : 170,
@@ -2222,8 +2227,8 @@ export default function PunchCard() {
               </View>
             )}
             {/* שם העסק מתחת ללוגו */}
-            {business?.name && (
-              <Text style={[styles.businessName, { color: cardTextColor }]} accessibilityRole="header">{business.name}</Text>
+            {displayBusinessName && (
+              <Text style={[styles.businessName, { color: cardTextColor }]} accessibilityRole="header">{displayBusinessName}</Text>
             )}
           </View>
         </View>
