@@ -36,6 +36,12 @@ export default function NewClientForm() {
   const [availableProducts, setAvailableProducts] = useState<{ product_code: string, product_name: string }[]>([]);
   const [existingCards, setExistingCards] = useState<{ product_code: string, product_name: string }[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<{ product_code: string, product_name: string } | null>(null);
+  // מוצר זמין יחיד → נבחר אוטומטית (מקביל ל-AddCustomerModal באדמין); לא דורס בחירה ידנית
+  useEffect(() => {
+    if (availableProducts.length === 1 && !selectedProduct) {
+      setSelectedProduct(availableProducts[0]);
+    }
+  }, [availableProducts, selectedProduct]);
   const [birthDate, setBirthDate] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const firstNameInputRef = useRef<TextInput>(null);

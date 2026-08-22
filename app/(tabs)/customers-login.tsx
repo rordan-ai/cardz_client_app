@@ -69,10 +69,29 @@ export default function CustomersLogin() {
   const [biometricSetupDone, setBiometricSetupDone] = useState(false);
   const [biometricAuthInProgress, setBiometricAuthInProgress] = useState(false);
 
-  const brandColor = business?.login_brand_color || '#9747FF';
+  const rawBrandColor = business?.login_brand_color || '#9747FF';
   const loginBackgroundColor = business?.background_login_page_color || '#FBF8F8';
+  // הגנת קונטרסט מול רקע המסך בפועל (אותו דפוס כמו במודאל החידוש): צבע מותג
+  // קרוב מדי לרקע (למשל #EFEFF1 על רקע בהיר) הופך את אלמנטי ההזדהות לבלתי-נראים
+  const _lum = (c?: string | null): number | null => {
+    let hex = String(c || '').replace('#', '').trim();
+    if (hex.length === 3) hex = hex.split('').map((x) => x + x).join('');
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  };
+  const _bgLum = _lum(loginBackgroundColor) ?? 0.97;
+  const ensureContrast = (c?: string | null): string => {
+    const lum = _lum(c);
+    const fallback = _bgLum > 0.5 ? '#9747FF' : '#FFFFFF';
+    if (lum === null) return fallback;
+    return Math.abs(lum - _bgLum) < 0.25 ? fallback : (c as string);
+  };
+  const brandColor = ensureContrast(rawBrandColor);
   // צבעים חדשים עם fallback ל-brandColor
-  const signupTextColor = business?.entry_signup_text_color || brandColor;
+  const signupTextColor = ensureContrast(business?.entry_signup_text_color || rawBrandColor);
   const clickIconColor = business?.entry_click_icon_color || '#fff';
 
   // פונקציה לאימות ביומטרי (מוגדרת לפני שימוש ב-useEffect כדי לא ליצור ReferenceError)
