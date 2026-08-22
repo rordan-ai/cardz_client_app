@@ -32,6 +32,12 @@ export default function PunchCard() {
   const isNfcLaunch = nfcLaunch === 'true';
   const isAutoPunch = autoPunch === 'true';
   const phoneIntl = phoneStr && /^05\d{8}$/.test(phoneStr) ? `972${phoneStr.slice(1)}` : phoneStr;
+  // וריאנטים לשאילתות: לקוחות שהוקמו מהאדמין עשויים להישמר בפורמט 972... — חיפוש בשניהם
+  const phoneQueryVariants = Array.from(new Set([
+    phoneStr,
+    phoneIntl,
+    /^9725\d{8}$/.test(phoneStr) ? `0${phoneStr.slice(3)}` : phoneStr,
+  ].filter(Boolean)));
   // קוד עסק: מפרמטר URL (לניקוב ישיר מ-NFC) או מהקונטקסט
   const businessCodeStr = typeof businessCodeParam === 'string' ? businessCodeParam : Array.isArray(businessCodeParam) ? businessCodeParam[0] : null;
   const resolvedBusinessCode = businessCodeStr || business?.business_code;
@@ -513,7 +519,7 @@ export default function PunchCard() {
       const { data: customers, error: customerError } = await supabase
         .from('customers')
         .select('*')
-        .eq('customer_phone', phoneStr)
+        .in('customer_phone', phoneQueryVariants)
         .eq('business_code', resolvedBusinessCode)
         .is('deleted_at', null) // מניעת כניסה של לקוח שנמחק (soft delete)
         .limit(1);
@@ -539,7 +545,7 @@ export default function PunchCard() {
       const { data: customerCards, error: cardsError } = await supabase
         .from('PunchCards')
         .select('product_code, card_number, used_punches, total_punches')
-        .eq('customer_phone', phoneStr)
+        .in('customer_phone', phoneQueryVariants)
         .eq('business_code', resolvedBusinessCode)
         .eq('status', 'active');
       
@@ -572,7 +578,7 @@ export default function PunchCard() {
       
       // אם אין כרטיסיות כלל
       if (!customerCards || customerCards.length === 0) {
-        setErrorMessage('לא נמצאו כרטיסיות פעילות עבור לקוח זה. נא ליצור קשר עם בית העסק.');
+        setErrorMessage('לא נמצאו כרטיסיות פעילות עבור לקוח זה. ניתן להירשם ישירות מדף הבית או ליצור קשר עם בית העסק.');
         setLoading(false);
         return;
       }
@@ -1129,15 +1135,15 @@ export default function PunchCard() {
 
   if (errorMessage) {
     return (
-      <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center' }]} accessible={true} accessibilityRole="alert"> 
-        <Text style={{ fontSize: 18, color: '#D32F2F', marginBottom: 16, textAlign: 'center', fontFamily: 'Rubik' }} accessibilityLiveRegion="assertive">{errorMessage}</Text>
-        <Text style={{ color: '#888', marginBottom: 24, textAlign: 'center' }}>
-          נסה שוב ו
+      <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 }]} accessible={true} accessibilityRole="alert">
+        <Text style={{ fontSize: 18, color: '#D32F2F', marginBottom: 16, textAlign: 'center', fontFamily: 'Rubik', lineHeight: 26, maxWidth: 300 }} accessibilityLiveRegion="assertive">{errorMessage}</Text>
+        <Text style={{ color: '#888', marginBottom: 24, textAlign: 'center', lineHeight: 22, maxWidth: 280 }}>
           <Text
             style={{ color: '#1E51E9', textDecorationLine: 'underline' }}
-            onPress={() => router.push('/customers-login')}
+            onPress={() => router.push('/(tabs)/business_selector')}
+            accessibilityRole="link"
           >
-            חזור לדף הכניסה
+            חזור לדף הבית — להרשמה בכפתור התחתון
           </Text>
         </Text>
       </View>
@@ -1152,6 +1158,11 @@ export default function PunchCard() {
   // משתמשים ב-localBusiness כי business (מהContext) לא נטען בכניסה ישירה מ-NFC deep link
   const punchedIcon = localBusiness?.punched_icon || business?.punched_icon;
   const unpunchedIcon = localBusiness?.unpunched_icon || business?.unpunched_icon;
+  // לוגו ושם עסק — אותו דפוס fallback כמו שאר מרכיבי הכרטיס: localBusiness נטען תמיד
+  // (גם בכניסת NFC/deep-link שבה ה-context עלול להיות ריק), business מהקונטקסט כגיבוי
+  const displayLogo = localBusiness?.logo || business?.logo;
+  const displayBusinessName = localBusiness?.name || business?.name;
+  const displayBusinessCode = localBusiness?.business_code || business?.business_code;
   // בשורת "לקבלת" מציגים את שם מוצר הכרטיסייה (למקרה של כמה כרטיסיות בעסק).
   // אם אין לנו product_name, ניפול אחורה ל-benefit / product_code כדי לא להשאיר ריק.
   const benefit = (punchCard?.product_name || '').trim() || (punchCard?.benefit || '').trim() || punchCard?.product_code || '';
@@ -2184,7 +2195,7 @@ export default function PunchCard() {
         <View style={styles.logoBusinessOffset}>
           {/* לוגו העסק */}
           <View style={styles.logoContainer}>
-            {business?.logo && (
+            {displayLogo && (
               <View style={{ position: 'relative' }}>
                 {logoLoading && (
                   <View style={{ 
@@ -2200,9 +2211,9 @@ export default function PunchCard() {
                     <Text style={{ color: '#999', fontSize: 12, fontFamily: 'Rubik' }}>טוען לוגו...</Text>
                   </View>
                 )}
-                <Image 
-                  key={`logo-${business.business_code}-${business.logo}`}
-                  source={{ uri: business.logo }} 
+                <Image
+                  key={`logo-${displayBusinessCode}-${displayLogo}`}
+                  source={{ uri: displayLogo }}
                   style={{ 
                     width: Platform.OS === 'android' ? 153 : 170,
                     height: Platform.OS === 'android' ? 153 : 170,
@@ -2216,8 +2227,8 @@ export default function PunchCard() {
               </View>
             )}
             {/* שם העסק מתחת ללוגו */}
-            {business?.name && (
-              <Text style={[styles.businessName, { color: cardTextColor }]} accessibilityRole="header">{business.name}</Text>
+            {displayBusinessName && (
+              <Text style={[styles.businessName, { color: cardTextColor }]} accessibilityRole="header">{displayBusinessName}</Text>
             )}
           </View>
         </View>

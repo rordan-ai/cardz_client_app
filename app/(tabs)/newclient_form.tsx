@@ -372,6 +372,8 @@ export default function NewClientForm() {
           }).then(({ error }) => {
             if (error) console.log('[P2 add_customer/mobile] log failed:', error.code, error.message);
           });
+          // רישום ראשוני הושלם — מסך הפתיחה יציג מעתה "בחירת עסק" במקום "רישום ראשוני"
+          AsyncStorage.setItem('initial_registration_done', 'true').catch(() => {});
           router.push('/(tabs)/thank_you');
         } else if (result.isDuplicate) {
           setErrorModal({ visible: true, message: 'זוהה רישום כפול של מספר טלפון ומוצר זהים. נסה/י להגדיר מוצר כרטיסייה שונה.' });
@@ -430,11 +432,6 @@ export default function NewClientForm() {
         >
           <Text style={styles.backButtonText}>← שנה עסק</Text>
         </TouchableOpacity>
-        {selectedBusiness && (
-          <Text style={styles.selectedBusinessText}>
-            עסק נבחר: {selectedBusiness.name}
-          </Text>
-        )}
       </View>
 
       <ScrollView contentContainerStyle={[styles.container, { marginTop: '25%' }]}

@@ -94,10 +94,13 @@ export const BusinessProvider = ({ children }: { children: React.ReactNode }) =>
       .eq('business_code', codeToFetch)
       .single();
     
-    if (error) {
-      console.error('❌ שגיאה בטעינת נתוני עסק:', error);
+    if (error || !data) {
+      if (error) console.error('❌ שגיאה בטעינת נתוני עסק:', error);
+      // שומרים את הערך הטוב האחרון — שגיאת רשת רגעית לא מוחקת את העסק מה-state
+      setLoading(false);
+      return null;
     }
-    
+
     setBusiness(data);
     setLoading(false);
     return data; // מחזיר את הנתונים החדשים

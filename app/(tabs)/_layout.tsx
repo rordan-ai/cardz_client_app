@@ -7,7 +7,7 @@ import { DeviceEventEmitter, Linking, Modal, Platform, StyleSheet, Text, Touchab
 import NfcManager from 'react-native-nfc-manager';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { WebView } from 'react-native-webview';
-import { BusinessProvider, useBusiness } from '../../components/BusinessContext';
+import { useBusiness } from '../../components/BusinessContext';
 import FCMService from '../../components/FCMService';
 import { supabase } from '../../components/supabaseClient';
 import { getCapturedInitialUrl, initialUrlPromise } from '../_layout';
@@ -158,10 +158,6 @@ function NfcDeepLinkHandler() {
     const onPunchCard = pathname.includes('PunchCard');
 
     const handleNfcDeepLink = async (url: string, isInitialUrl: boolean = false) => {
-      if (onPunchCard) {
-        console.log('[NfcHandler] PunchCard active, NFC deep link ignored (handled by PunchCard):', url);
-        return;
-      }
       // מניעת עיבוד כפול של URL התחלתי
       if (isInitialUrl && initialUrlHandledRef.current) return;
       // מניעת עיבוד מקבילי - בדיקה וסימון אטומיים
@@ -196,7 +192,16 @@ function NfcDeepLinkHandler() {
       }
       
       console.log('[NfcHandler] Business code:', businessCode);
-      
+
+      if (onPunchCard) {
+        // PunchCard מטפל בניקוב בעצמו — לא מנתבים, אבל כן מסנכרנים את ה-context
+        // כדי שהלוגו/שם העסק לא ייעלמו (belt & braces לתיקון הלוגו הנעלם)
+        console.log('[NfcHandler] PunchCard active — syncing business context only');
+        try { await setBusinessCode(businessCode); } catch {}
+        isProcessingRef.current = false;
+        return;
+      }
+
       try {
         const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
         
@@ -233,12 +238,13 @@ function NfcDeepLinkHandler() {
         console.log('[NfcHandler] Business context updated and loaded');
         
         if (!savedPhone) {
-          // אין ביומטרי - למסך כניסה עם העסק מוגדר
-          console.log('[NfcHandler] → customers-login (no phone)');
-          router.replace({
-            pathname: '/(tabs)/customers-login',
-            params: { businessCode, nfcLaunch: 'true' }
-          });
+          // כלל מחייב: לקוח לא-רשום מגיע אך ורק לדף הפתיחה, שם הכפתור "רישום ראשוני".
+          // העסק מהתג כבר נשמר ב-Context (setBusinessCode לעיל) וישמש כברירת מחדל בטופס.
+          console.log('[NfcHandler] → business_selector (no phone → opening screen)');
+          router.replace('/(tabs)/business_selector');
+          // סימון ה-URL ההתחלתי כמטופל — בלעדיו ה-effect (שרץ מחדש בכל ניווט) יעבד
+          // את אותו תג שוב ויחזיר את המשתמש לדף הפתיחה באמצע הרישום
+          if (isInitialUrl) initialUrlHandledRef.current = true;
           return;
         }
 
@@ -655,7 +661,7 @@ export default function Layout() {
   }
 
   return (
-    <BusinessProvider>
+    <>
       <NfcDeepLinkHandler />
       <NotificationPermissionModal />
       <Slot />
@@ -854,9 +860,9 @@ export default function Layout() {
           </View>
         </View>
       </Modal>
-    </BusinessProvider>
+    </>
   );
-} 
+}
 
 const styles = StyleSheet.create({
   modalBackdrop: {

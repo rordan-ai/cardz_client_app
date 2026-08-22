@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import Head from 'expo-router/head';
 import { Linking, Platform } from 'react-native';
 import { logEnvironmentInfo } from '@/config/environment';
+import { BusinessProvider } from '../components/BusinessContext';
 
 // לכידת Initial URL מוקדם ככל האפשר - ברמת המודול לפני כל רנדור
 // זה מבטיח שלא נפספס את ה-URL גם אם יש עיכוב בטעינת tabs layout
@@ -47,10 +48,14 @@ export default function RootLayout() {
           <style id="hide-rnw-debug-overlay">{`[tabindex="0"][class*="r-backgroundColor"][class*="r-borderColor"], [tabindex="0"][style*="transition-duration"]{display:none!important;outline:none!important;}`}</style>
         </Head>
       )}
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="business" options={{ headerShown: false }} />
-      </Stack>
+      {/* ה-Provider ברמת השורש כדי שגם מסלול ה-deep-link (business/[code]) יקבל
+          context אמיתי — קודם הוא ישב רק בתוך (tabs) ושם setBusinessCode היה no-op שקט */}
+      <BusinessProvider>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="business" options={{ headerShown: false }} />
+        </Stack>
+      </BusinessProvider>
     </>
   );
 }

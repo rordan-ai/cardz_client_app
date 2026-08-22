@@ -1,6 +1,44 @@
 # דו״ח גיבוי - restore_checkpoints
 
-## גיבוי אחרון: 2025-12-21 22:45
+## גיבוי אחרון: 2026-08-21 17:39
+**הערה:** גיבוי מלא לפי `backup_rules_1611.md` כחלק משחרור לפרוד (PR #4 מוזג ל-main)
+
+### סיכום
+- ✅ SHA local = remote: `adf9f7b7f38d99efa7045f7dfd0131cee64d5ab5`
+- ✅ קומיטים: main=375, restore_checkpoints=375 (זהה מושלם!)
+- ✅ Diff main↔restore_checkpoints: **ריק** (`git diff` → ריק)
+- ✅ Working directory: **נקי** (`git status --porcelain` → ריק)
+- ✅ סנכרון remote: **מושלם** (main, restore_checkpoints, origin/* - כולם SHA זהה)
+
+### ענפי ביטחון / Snapshots שנוצרו והועלו ל-origin
+- `safety_snapshot_20260821_171610` (מצב מלא לפני שחרור, כולל שינויים לא-מקומטים)
+- `safety_backup_20260821_173855` (SHA: `adf9f7b`)
+- `restorepoint_snapshot_20260821_173922` (SHA: `adf9f7b`)
+
+### בדיקות איכות שבוצעו
+- `git fetch origin` ✅
+- `git status --porcelain` → ריק ✅
+- `git rev-list --count`: main=375, restore_checkpoints=375 ✅
+- `git diff main restore_checkpoints --name-only` → **ריק** ✅
+- `git rev-parse` local=remote לשני הענפים (SHA זהה) ✅
+
+### אבטחה (סריקה מהירה)
+- סריקת diff השחרור: אין `eyJhbGciOiJI`/SERVICE_ROLE/הפניות לענף בדיקה בקוד ✅
+- `.env` מצביע לפרוד וזהה ל-`.env.bak.prod`; `config/environment.ts` ללא הפניית ענף ✅ (C1)
+- מפתח anon שהיה ב-`.cursor/mcp.json` — הקובץ נמחק בשחרור זה ✅
+
+### שינויים עיקריים שנכללו (release ba0b665 → merge adf9f7b, PR #4)
+- כפתור ניקוב ידני iOS: גידור NFC נכון + מיקום מתחת לכרטיסייה (onLayout דינמי)
+- מודאל חידוש + מסך ניקוב ישיר: הגנת קונטרסט לצבע מותג בהיר (תיקון לבן-על-לבן)
+- semi_auto: ניקוב prepaid מנותב תמיד לאישור אדמין (בתיאום האדמין)
+- פיד פעילות: הרחבת פילטר user_type, הסרת בלוקים מתים, תיקון insert, סנכרון Edge
+- מחיקת תשתית התקשורת הבין-סוכנית הישנה (shared-mcp-server, rules, mcp.json)
+- אומת על אייפון (dev build) לפני השחרור
+- *דוח זה קומט ב-`FIX_DEV_2602` וייכנס ל-main בשחרור הבא (main חסום לדחיפה ישירה)*
+
+---
+
+## גיבוי קודם: 2025-12-21 22:45
 **הערה:** גיבוי מלא לפי `backup_rules_1611.md` - V10 Android UI adjustments + Platform separation rules
 
 ### סיכום
