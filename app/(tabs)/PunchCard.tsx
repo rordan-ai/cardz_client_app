@@ -2314,16 +2314,16 @@ export default function PunchCard() {
                           onLoad={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
                           onError={() => setIconsLoading(prev => ({ ...prev, [iconIndex]: false }))}
                         />
-                        {/* חור ניקוב מעל הכוס - מוקטן ל-80% מהגודל הקודם */}
+                        {/* חור ניקוב מעל הכוס - הוקטן ב-15% נוספים (66→56), ממורכז מול אייקון הבסיס */}
                         <Image
                           source={{ uri: 'https://noqfwkxzmvpkorcaymcb.supabase.co/storage/v1/object/public/icons/punched_icones/punch_overlay.png' }}
-                          style={[styles.icon, { 
-                            position: 'absolute', 
-                            top: -5.5, 
-                            left: -5.5, 
-                            width: 66, 
-                            height: 66, 
-                            opacity: isIconLoading ? 0 : 1 
+                          style={[styles.icon, {
+                            position: 'absolute',
+                            top: -0.5,
+                            left: -0.5,
+                            width: 56,
+                            height: 56,
+                            opacity: isIconLoading ? 0 : 1
                           }]}
                           resizeMode="contain"
                         />

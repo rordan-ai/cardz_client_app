@@ -313,6 +313,17 @@ export default function BusinessSelector() {
           </TouchableOpacity>
         )}
 
+        {/* קבוע (לפי הנחיית המשתמש): רישום משתמש חדש — פותר מכשיר "מזוהה" ללא כרטיסייה
+            בעסק (מכשיר משפחתי/עסק חדש/החלפת מכשיר). תוספת ליד המנגנון הקיים, לא תחליף. */}
+        <TouchableOpacity
+          style={[styles.newRegistrationLink, isRegistered === false && styles.newRegistrationLinkLower]}
+          onPress={goToInitialRegistration}
+          accessibilityRole="button"
+          accessibilityLabel="רישום משתמש חדש"
+        >
+          <Text style={styles.alreadyHaveCardText}>רישום משתמש חדש</Text>
+        </TouchableOpacity>
+
         {/* שטח מגע קישור קרדיט - הטקסט למטה */}
         <TouchableOpacity 
           style={[styles.creditsArea, isTablet && styles.tabletCreditsArea]} 
@@ -966,6 +977,23 @@ const styles = StyleSheet.create({
     fontFamily: 'Rubik',
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowRadius: 4,
+  },
+  newRegistrationLink: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: { bottom: 92 },
+      android: { bottom: 56 },
+    }),
+  },
+  // במצב "לא רשום" הקישור "כבר יש לך כרטיסייה" תופס את השורה העליונה — יורדים שורה
+  newRegistrationLinkLower: {
+    ...Platform.select({
+      ios: { bottom: 70 },
+      android: { bottom: 36 },
+    }),
   },
   creditsArea: {
     position: 'absolute',
