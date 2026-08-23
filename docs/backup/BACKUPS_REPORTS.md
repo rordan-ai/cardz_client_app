@@ -1,6 +1,29 @@
 # דו״ח גיבוי - restore_checkpoints
 
-## גיבוי אחרון: 2026-08-22 16:30
+## גיבוי אחרון: 2026-08-23 11:15 — שחרור v1.0.7 + בניות חנות
+**הערה:** גיבוי מלא לפי `backup_rules_1611.md` + בניית production לשתי החנויות (PR #7 מוזג ל-main)
+
+### סיכום
+- ✅ SHA local = remote: `f24e80f47f250ea35312888cecb835c4d9d81798`
+- ✅ קומיטים: main=385, restore_checkpoints=385 · Diff: **ריק** · Working dir: **נקי** · remote: **מסונכרן**
+- ✅ נסרקו כל הענפים המקומיים — אפס קומיטים לא-דחופים (ענף temp ישן מ-10/2025 נדחף לארכיון)
+
+### בניות חנות (EAS production, אומתו FINISHED + artifact)
+- 🍏 iOS: v1.0.7 build **31** — ipa: expo.dev/artifacts/eas/t7zSbWnAgp8N2r84-n-2vDcHr9RQrEmZh6saCpqLKyc.ipa
+- 🤖 Android: v1.0.7 versionCode **30** — aab: expo.dev/artifacts/eas/5KRaBN8HG0Z7yMbXLmEmWPnBXXN_-qmaYMlPQidunfA.aab
+- ⏸️ הגשה לחנויות טרם בוצעה (החלטת משתמש; מומלץ TestFlight קודם)
+
+### ענפי ביטחון / Snapshots
+- `safety_snapshot_20260823_111304` · `safety_backup_20260823_111457` · `restorepoint_snapshot_20260823_111457`
+
+### שינויים עיקריים (release 9b90e1c → merge f24e80f, PR #7)
+- איפוס כניסה ללא SMS (הוסרה תלות Firebase Phone Auth מהמסך; מודאל אישור→איפוס מקומי)
+- פריטי כפתור הכניסה מול אמולטור האדמין: רקע=entry_click_icon_color, אסט יד מקורי ללא צביעה + רשת ביטחון לרקע בהיר
+- אבטחה: env=prod (C1 ✓), אין סודות ב-diff ✓
+
+---
+
+## גיבוי קודם: 2026-08-22 16:30
 **הערה:** גיבוי מלא לפי `backup_rules_1611.md` כחלק משחרור צד-גיט (PR #6 מוזג ל-main; ללא build לחנויות)
 
 ### סיכום

@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mycardz.app",
-      "buildNumber": "30",
+      "buildNumber": "31",
       "googleServicesFile": "./GoogleService-Info.plist",
       "associatedDomains": [
         "applinks:app.punchcards.digital",
@@ -47,7 +47,7 @@
       "runtimeVersion": "1.0.0"
     },
     "android": {
-      "versionCode": 29,
+      "versionCode": 30,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/cardz_white_logo_sqwered.png",
         "backgroundColor": "#ffffff"
