@@ -309,13 +309,21 @@ export default function CustomersLogin() {
       }
       setBiometricSetupModalVisible(true);
     } else {
-      // כבר מוגדר - אימות וכניסה
-      const authenticated = await authenticateBiometric();
-      if (authenticated) {
-        const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
-        if (savedPhone) {
-          router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(savedPhone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
+      // כבר מוגדר - אימות וכניסה.
+      // אותה נעילה כמו בכפתור הכניסה: אחרת לחיצה על "כנס" ואז על הביומטרי בזמן
+      // שהאימות ברשת עדיין רץ — דוחפת שני מסכי כרטיסייה זה על זה
+      if (loginInFlightRef.current) return;
+      loginInFlightRef.current = true;
+      try {
+        const authenticated = await authenticateBiometric();
+        if (authenticated) {
+          const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
+          if (savedPhone) {
+            router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(savedPhone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
+          }
         }
+      } finally {
+        loginInFlightRef.current = false;
       }
     }
   }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router, punchIntentParams, checkRegistration, persistIdentity, resolvedBusinessCode]);

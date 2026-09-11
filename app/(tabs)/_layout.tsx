@@ -198,6 +198,9 @@ function NfcDeepLinkHandler() {
         // כדי שהלוגו/שם העסק לא ייעלמו (belt & braces לתיקון הלוגו הנעלם)
         console.log('[NfcHandler] PunchCard active — syncing business context only');
         try { await setBusinessCode(businessCode); } catch {}
+        // חובה לסמן גם כאן: ה-effect רץ מחדש בכל שינוי נתיב (pathname בתלויות), ובלי
+        // הסימון ה-URL של הפתיחה עובד שוב בניווט הראשון והמשתמש נזרק חזרה לכרטיסייה
+        if (isInitialUrl) initialUrlHandledRef.current = true;
         isProcessingRef.current = false;
         return;
       }
@@ -290,6 +293,8 @@ function NfcDeepLinkHandler() {
           pathname: '/(tabs)/customers-login',
           params: { businessCode, nfcLaunch: 'true' }
         });
+        // מסלול סופי גם הוא — אחרת ה-URL מעובד שוב בניווט הבא (ראה הענף של PunchCard)
+        if (isInitialUrl) initialUrlHandledRef.current = true;
       } finally {
         // שחרור הנעילה מיידי - מנגנון isTagAlreadyHandled כבר מונע עיבוד כפול של אותו תג
         isProcessingRef.current = false;
@@ -394,6 +399,14 @@ function NfcDeepLinkHandler() {
     // האזנה ל-deep links בזמן שהאפליקציה פתוחה
     const subscription = Linking.addEventListener('url', ({ url }) => {
       console.log('[NfcHandler] URL event:', url);
+      // /business/XXXX (שני הפורמטים) מקבל מסלול ייעודי — expo-router טוען את
+      // app/business/[code].tsx על אותו אירוע, והוא הבעלים של החלטת הניתוב.
+      // טיפול גם כאן יצר שני router.replace מתחרים, והיעד נקבע לפי מי שסיים אחרון.
+      // ⚠️ הקיצור /b/XXXX **אין לו מסלול** — ממשיך להיות מטופל כאן בלבד.
+      if (/^mycardz:\/\/business\/\d{4}/.test(url) || /punchcards\.digital\/business\/\d{4}/.test(url)) {
+        console.log('[NfcHandler] /business/ URL — owned by business/[code] route, skipping');
+        return;
+      }
       handleNfcDeepLink(url, false); // isInitialUrl = false - זו סריקה חדשה
     });
     

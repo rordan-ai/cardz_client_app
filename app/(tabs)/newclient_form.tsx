@@ -49,7 +49,7 @@ export default function NewClientForm() {
   const lastNameInputRef = useRef<TextInput>(null);
   const phoneInputRef = useRef<TextInput>(null);
   const router = useRouter();
-  const { business } = useBusiness();
+  const { business, setBusinessCode } = useBusiness();
   // הגעה עם עסק מפורש: סריקת NFC בעסק שהלקוח אינו רשום בו, או "קח אותי לרישום"
   // מהמודאל בכרטיסייה/במסך הכניסה. הפרמטר גובר על העסק שבקונטקסט.
   // הטלפון לא מתקבל כפרמטר במכוון — הוא נטען רק מזהות מאומתת (ראה loadVerifiedPhone).
@@ -67,14 +67,20 @@ export default function NewClientForm() {
     }
   }, [business, businessCodeFromParam]);
 
-  // מילוי העסק מהפרמטר — מהרשימה כשהיא נטענת, ובינתיים מהקונטקסט אם זה אותו קוד
+  // מילוי העסק מהפרמטר — מהרשימה כשהיא נטענת, ובינתיים מהקונטקסט אם זה אותו קוד.
+  // מוחל **פעם אחת** בלבד: בלי הנעילה, כל בחירה ידנית של עסק אחר בבורר הייתה נדרסת
+  // מיד בחזרה לעסק שבפרמטר (selectedBusiness נמצא בתלויות), והבורר היה נעול.
+  const paramBusinessAppliedRef = useRef(false);
   useEffect(() => {
-    if (!businessCodeFromParam || selectedBusiness?.id === businessCodeFromParam) return;
+    if (!businessCodeFromParam || paramBusinessAppliedRef.current) return;
+    if (selectedBusiness?.id === businessCodeFromParam) { paramBusinessAppliedRef.current = true; return; }
     const fromList = businesses.find(b => b.id === businessCodeFromParam);
     if (fromList) {
       setSelectedBusiness(fromList);
+      paramBusinessAppliedRef.current = true;
     } else if (business?.business_code === businessCodeFromParam && business.name) {
       setSelectedBusiness({ name: business.name, id: businessCodeFromParam });
+      paramBusinessAppliedRef.current = true;
     }
   }, [businessCodeFromParam, businesses, business, selectedBusiness]);
 
@@ -321,16 +327,41 @@ export default function NewClientForm() {
       setErrorModal({ visible: true, message: 'יש לבחור סוג מוצר לפני השליחה' });
       return;
     }
+    // אימות פורמט **לפני** כל כתיבה ל-DB. זו בדיוק הבדיקה ש-createCardWithProduct
+    // עושה ממילא — אבל שם היא רצה אחרי ה-upsert, כך שכל ניסיון עם מספר פגום השאיר
+    // רשומת לקוח יתומה בדשבורד של העסק. הטקסט קיים באפליקציה (מסך הכניסה).
+    if (!/^05\d{8}$/.test(phone)) {
+      setErrorModal({ visible: true, message: 'נא להזין מספר טלפון תקין' });
+      return;
+    }
 
     try {
-      
+
       // עדכון/יצירה של לקוח (upsert) עבור פרסונליזציה
       const normalizedPhone = phone.replace(/[^0-9]/g, '');
+      const fullName = firstName + ' ' + lastName;
+
+      // הגנה על שם של לקוח קיים: ה-upsert הוא UPDATE כשהמספר כבר רשום בעסק, ולכן
+      // הקלדת מספר של לקוח אחר הייתה מחליפה את שמו בדשבורד. אם קיימת רשומה עם שם
+      // מלא ושונה — לא נוגעים ב-name. רשומה בלי שם, או עם אותו שם — מתעדכנת כרגיל.
+      let keepExistingName = false;
+      try {
+        const variants = Array.from(new Set([normalizedPhone, `972${normalizedPhone.slice(1)}`]));
+        const { data: existingRows, error: existingErr } = await supabase
+          .from('customers')
+          .select('name')
+          .in('customer_phone', variants)
+          .eq('business_code', selectedBusiness.id)
+          .limit(1);
+        const existingName = !existingErr && existingRows && existingRows[0] ? String(existingRows[0].name || '').trim() : '';
+        keepExistingName = !!existingName && existingName !== fullName.trim();
+      } catch {}
+
       const { data: upsertedCustomer, error: upsertError } = await supabase
         .from('customers')
         .upsert(
           {
-            name: firstName + ' ' + lastName,
+            ...(keepExistingName ? {} : { name: fullName }),
             customer_phone: normalizedPhone,
             business_code: selectedBusiness.id
           },
@@ -423,6 +454,10 @@ export default function NewClientForm() {
               await AsyncStorage.multiSet([['saved_phone', localPhone], ['identity_verified', localPhone]]);
             } catch {}
           })();
+          // עדכון הקונטקסט לעסק שבו נרשמנו זה עתה. בלי זה, רישום ממסך הפתיחה השאיר
+          // קונטקסט ריק/ישן: מסך התודה בלי לוגו ושם (או של עסק אחר), והכניסה שאחריו
+          // הגיעה בלי קוד עסק → "לא נמצא קוד עסק". לא חוסם את הניווט אם השליפה נכשלת.
+          setBusinessCode(selectedBusiness.id).catch(() => {});
           router.push('/(tabs)/thank_you');
         } else if (result.isDuplicate) {
           setErrorModal({ visible: true, message: 'זוהה רישום כפול של מספר טלפון ומוצר זהים. נסה/י להגדיר מוצר כרטיסייה שונה.' });

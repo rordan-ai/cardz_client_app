@@ -1146,7 +1146,17 @@ export default function PunchCard() {
   if (notRegisteredVisible) {
     return (
       <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Modal visible transparent animationType="fade" onRequestClose={() => router.back()}>
+        {/* router.back() הוא no-op בפתיחה קרה מתג (אין לאן לחזור) — כפתור החזרה של
+            אנדרואיד נראה קפוא. סוגרים ומנווטים למסך הפתיחה, כמו כלל "לא רשום → פתיחה". */}
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setNotRegisteredVisible(false);
+            router.replace('/(tabs)/business_selector');
+          }}
+        >
           <View style={styles.notRegisteredOverlay}>
             {/* ⚠️ בלי accessible={true} על המעטפת: ב-RN זה מכווץ את כל התת-עץ
                 לאלמנט נגישות אחד, ושני הכפתורים מפסיקים להיות ניתנים למיקוד
@@ -1363,11 +1373,22 @@ export default function PunchCard() {
       return;
     }
 
+    // קוד העסק — כמו בשאר המסך: פרמטר קודם, קונטקסט רק כגיבוי. קריאה ישירה מהקונטקסט
+    // נכשלה כשהוא ריק (.eq(undefined) → שגיאה בלי מוצא ללקוח עם כמה כרטיסיות), ועם
+    // קונטקסט ישן טענה את הכרטיסייה עם הלוגו, הצבעים, max_punches, ההטבה וה-nfc_string
+    // של **עסק אחר** — וסריקת התג של העסק הנכון הפסיקה להתאים.
+    const selectionBusinessCode = resolvedBusinessCode || localBusiness?.business_code || business?.business_code;
+    if (!selectionBusinessCode) {
+      setErrorMessage('לא נמצא קוד עסק. נא לחזור למסך הראשי.');
+      setLoading(false);
+      return;
+    }
+
     // שליפת נתוני העסק
     const { data: businessData, error: businessError } = await supabase
       .from('businesses')
       .select('*')
-      .eq('business_code', business?.business_code)
+      .eq('business_code', selectionBusinessCode)
       .single();
 
     if (businessError || !businessData) {
@@ -1382,7 +1403,7 @@ export default function PunchCard() {
       const { data: prodRow } = await supabase
         .from('products')
         .select('product_name')
-        .eq('business_code', business?.business_code)
+        .eq('business_code', selectionBusinessCode)
         .eq('product_code', selectedCard.product_code)
         .maybeSingle();
       selectedProductName = String((prodRow as any)?.product_name || '').trim();
