@@ -22,7 +22,7 @@ interface Business {
   logo_size?: number;
   expiration_date?: string;
   // שדות הטבה מותאמת (reward)
-  reward_type?: 'free_product' | 'discount_percent' | 'custom_gift' | 'custom_text';
+  reward_type?: 'free_product' | 'discount_percent' | 'custom_gift' | 'custom_text' | 'no_text';
   reward_discount_percent?: number;
   reward_discount_product?: string;
   reward_custom_gift?: string;
@@ -50,10 +50,15 @@ const BusinessContext = createContext<BusinessContextType>({
 export const useBusiness = () => useContext(BusinessContext);
 
 // פונקציית עזר לחישוב טקסט ההטבה לפי הגדרות העסק
+// 'no_text' (נוסף באדמין 10.09.2026): העסק בחר לא להציג טקסט הטבה — מחזירים מחרוזת ריקה,
+// והקוראים משמיטים את "לקבלת ..." (במקום ליפול ל-default ולהבטיח "המוצר חינם").
 export const getBenefitText = (business: Business | null, productName: string): string => {
   if (!business) return `${productName} חינם`;
-  
+
   switch (business.reward_type) {
+    case 'no_text':
+      return '';
+
     case 'discount_percent':
       const product = business.reward_discount_product?.trim() || productName;
       return `הנחה של ${business.reward_discount_percent || 0}% על ${product}`;

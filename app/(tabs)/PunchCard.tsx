@@ -323,10 +323,11 @@ export default function PunchCard() {
           // חישוב טקסט הטבה דינמי לפי הגדרות העסק
           const productName = punchCard.benefit || punchCard.product_name || 'מוצר';
           const rewardText = getBenefitText(localBusiness as any, productName);
+          // reward_type='no_text' → אין טקסט הטבה: "מזל טוב, סיימת כרטיסייה" (נוסח מאושר 11.09.2026)
           const successMsg = isRewardingPunch
             ? (isPrepaid
                 ? 'סיימת את מספר הניקובים לכרטיסייה הנוכחית, אנא פנה לקופה לחידוש הכרטיסייה'
-                : `🎉 מזל טוב! הגעת להטבה: ${rewardText}`)
+                : (rewardText ? `🎉 מזל טוב! הגעת להטבה: ${rewardText}` : '🎉 מזל טוב, סיימת כרטיסייה'))
             : `✅ ניקוב ${newPunches}/${totalPunches} בוצע בהצלחה!`;
           setDirectPunchMessage(successMsg);
           console.log('[DEBUG-DIRECT-PUNCH] SUCCESS! Message:', successMsg);
@@ -1169,6 +1170,13 @@ export default function PunchCard() {
   // טקסט הטבה דינמי לפי הגדרות העסק (reward_type)
   const benefitDisplayText = getBenefitText(localBusiness as any, benefit || 'מוצר');
   const prepaid = punchCard?.prepaid === 'כן' ? 'כן' : 'לא';
+  // שורת "נותרו" מתחת לאייקונים — זהה לאמולטור באדמין (CardSettings):
+  // prepaid → "עוד X לניצול הכרטיסייה"; reward_type='no_text' → "נותרו X ניקובים" בלי "לקבלת ..."
+  const remainingText = prepaid === 'כן'
+    ? `עוד ${unpunched} לניצול הכרטיסייה`
+    : benefitDisplayText
+      ? `נותרו ${unpunched} ניקובים לקבלת ${benefitDisplayText}`
+      : `נותרו ${unpunched} ניקובים`;
 
   
 
@@ -2361,13 +2369,10 @@ export default function PunchCard() {
           {/* טקסט מתחת לאייקונים - שונה לפי סוג כרטיסייה */}
           <Text 
             style={[styles.benefitText, { color: cardTextColor }]} 
-            accessibilityLabel={prepaid === 'כן' ? `עוד ${unpunched} לניצול הכרטיסייה` : `נותרו ${unpunched} ניקובים לקבלת ${benefitDisplayText}`}
+            accessibilityLabel={remainingText}
             numberOfLines={3}
           >
-            {prepaid === 'כן'
-              ? `עוד ${unpunched} לניצול הכרטיסייה`
-              : `נותרו ${unpunched} ניקובים לקבלת ${benefitDisplayText}`
-            }
+            {remainingText}
           </Text>
           {/* סטטוס תשלום מראש */}
           <Text style={[styles.prepaidText, { color: cardTextColor }]}>תשלום מראש: {prepaid}</Text>
