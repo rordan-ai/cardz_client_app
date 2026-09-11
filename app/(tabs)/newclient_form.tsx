@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Keyboard, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
@@ -49,13 +49,30 @@ export default function NewClientForm() {
   const phoneInputRef = useRef<TextInput>(null);
   const router = useRouter();
   const { business } = useBusiness();
+  // הגעה עם עסק/טלפון מפורשים: סריקת NFC בעסק שהלקוח אינו רשום בו, או "קח אותי לרישום"
+  // מהמודאל בכרטיסייה. הפרמטר גובר על העסק שבקונטקסט.
+  const { businessCode: businessCodeParam, phone: phoneParam } = useLocalSearchParams<{ businessCode?: string; phone?: string }>();
+  const businessCodeFromParam = typeof businessCodeParam === 'string' ? businessCodeParam.trim() : '';
+  const phoneFromParam = typeof phoneParam === 'string' ? phoneParam.trim() : '';
 
   // הגדרת העסק הנוכחי כברירת מחדל אם קיים
   useEffect(() => {
+    if (businessCodeFromParam) return; // נטען מהפרמטר באפקט הבא
     if (business && !selectedBusiness) {
       setSelectedBusiness({ name: business.name, id: business.business_code });
     }
-  }, [business]);
+  }, [business, businessCodeFromParam]);
+
+  // מילוי העסק מהפרמטר — מהרשימה כשהיא נטענת, ובינתיים מהקונטקסט אם זה אותו קוד
+  useEffect(() => {
+    if (!businessCodeFromParam || selectedBusiness?.id === businessCodeFromParam) return;
+    const fromList = businesses.find(b => b.id === businessCodeFromParam);
+    if (fromList) {
+      setSelectedBusiness(fromList);
+    } else if (business?.business_code === businessCodeFromParam && business.name) {
+      setSelectedBusiness({ name: business.name, id: businessCodeFromParam });
+    }
+  }, [businessCodeFromParam, businesses, business, selectedBusiness]);
 
   useEffect(() => {
     (async () => {
@@ -67,10 +84,14 @@ export default function NewClientForm() {
     })();
   }, []);
 
-  // טעינת מספר טלפון שמור מהכניסה הקודמת
+  // טעינת מספר טלפון שמור מהכניסה הקודמת (טלפון מהפרמטר גובר — הזהות שאיתה נכנסנו)
   useEffect(() => {
     const loadSavedPhone = async () => {
       try {
+        if (/^05\d{8}$/.test(phoneFromParam)) {
+          setPhone(phoneFromParam);
+          return;
+        }
         const savedPhone = await AsyncStorage.getItem('saved_phone');
         if (savedPhone) {
           setPhone(savedPhone);
@@ -80,7 +101,7 @@ export default function NewClientForm() {
       }
     };
     loadSavedPhone();
-  }, []);
+  }, [phoneFromParam]);
 
 
 

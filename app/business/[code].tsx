@@ -58,7 +58,7 @@ export default function BusinessDeepLinkHandler() {
           /^05\d{8}$/.test(savedClean) ? `972${savedClean.slice(1)}` : savedClean,
           /^9725\d{8}$/.test(savedClean) ? `0${savedClean.slice(3)}` : savedClean,
         ].filter(Boolean)));
-        const { data: cards } = await supabase
+        const { data: cards, error: cardsError } = await supabase
           .from('PunchCards')
           .select('card_number')
           .in('customer_phone', savedVariants)
@@ -66,6 +66,30 @@ export default function BusinessDeepLinkHandler() {
           .eq('status', 'active');
 
         console.log('[DeepLink Route] Active cards:', cards?.length || 0);
+
+        // לקוח מזוהה שסרק תג בעסק שאינו רשום בו → ישר לטופס הרישום (עסק+טלפון מוכנים),
+        // בלי לעבור במסך כניסה שמסתיים בהודעת "לא נמצאה כרטיסייה".
+        // מבדילים בין "אין רשומת לקוח בעסק" (רישום חדש) לבין "יש רשומה בלי כרטיסייה
+        // פעילה" (כרטיסייה שפגה/הסתיימה — המסלול הקיים נשמר).
+        if (!cardsError && (!cards || cards.length === 0)) {
+          const { data: existingCustomer, error: customerLookupError } = await supabase
+            .from('customers')
+            .select('customer_phone')
+            .in('customer_phone', savedVariants)
+            .eq('business_code', code)
+            .is('deleted_at', null)
+            .limit(1);
+
+          if (!customerLookupError && (!existingCustomer || existingCustomer.length === 0)) {
+            const localPhone = /^9725\d{8}$/.test(savedClean) ? `0${savedClean.slice(3)}` : savedClean;
+            console.log('[DeepLink Route] Identified customer, not registered in this business → newclient_form');
+            router.replace({
+              pathname: '/(tabs)/newclient_form',
+              params: { businessCode: code, phone: localPhone },
+            });
+            return;
+          }
+        }
 
         // תנאים לניקוב אוטומטי:
         // 1. punch_mode === 'auto'

@@ -56,6 +56,8 @@ export default function PunchCard() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // אין רשומת לקוח בעסק שנבחר (טעות הקלדה או לקוח שטרם נרשם בעסק) — מודאל בחירה
+  const [notRegisteredVisible, setNotRegisteredVisible] = useState(false);
   const [logoLoading, setLogoLoading] = useState(true);
   const [iconsLoading, setIconsLoading] = useState<{ [key: number]: boolean }>({});
   const [menuVisible, setMenuVisible] = useState(false);
@@ -530,7 +532,9 @@ export default function PunchCard() {
         return;
       }
       if (!customers || customers.length === 0) {
-        setErrorMessage('לא נמצאה כרטיסייה מתאימה למספר זה. ודא שהזנת את המספר הנכון או שנרשמת לעסק.');
+        // אין רשומת לקוח בעסק הזה: או טעות הקלדה במספר, או לקוח קארדז שטרם נרשם
+        // בעסק שבחר. מודאל עם שתי אפשרויות במקום הודעת שגיאה שהיא מסלול מת.
+        setNotRegisteredVisible(true);
         setLoading(false);
         return;
       }
@@ -1130,6 +1134,52 @@ export default function PunchCard() {
     return (
       <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center' }]}> 
         <Text style={{ fontSize: 18, color: '#A39393', fontFamily: 'Rubik' }}>טוען נתונים...</Text>
+      </View>
+    );
+  }
+
+  if (notRegisteredVisible) {
+    return (
+      <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Modal visible transparent animationType="fade" onRequestClose={() => router.back()}>
+          <View style={styles.notRegisteredOverlay}>
+            <View style={styles.notRegisteredCard} accessible={true} accessibilityRole="alert">
+              <Text style={styles.notRegisteredText} accessibilityLiveRegion="assertive">
+                נראה שטעית בהקשת מספר הטלפון או שעדיין לא נרשמת כלקוח בעסק שבחרת
+              </Text>
+              <TouchableOpacity
+                style={styles.notRegisteredPrimaryBtn}
+                onPress={() => {
+                  setNotRegisteredVisible(false);
+                  router.replace({
+                    pathname: '/(tabs)/newclient_form',
+                    params: resolvedBusinessCode
+                      ? { businessCode: resolvedBusinessCode, phone: phoneStr }
+                      : { phone: phoneStr },
+                  });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="קח אותי לרישום לקוח חדש"
+              >
+                <Text style={styles.notRegisteredPrimaryText}>קח אותי לרישום לקוח חדש</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.notRegisteredSecondaryBtn}
+                onPress={() => {
+                  setNotRegisteredVisible(false);
+                  router.replace({
+                    pathname: '/(tabs)/customers-login',
+                    params: resolvedBusinessCode ? { businessCode: resolvedBusinessCode } : {},
+                  });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="טעיתי, אקיש מחדש"
+              >
+                <Text style={styles.notRegisteredSecondaryText}>טעיתי - אקיש מחדש</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -4065,6 +4115,60 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#FBF8F8',
+  },
+  // מודאל "אין רשומת לקוח בעסק" (טעות הקלדה / טרם נרשם בעסק)
+  notRegisteredOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  notRegisteredCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  notRegisteredText: {
+    fontSize: 17,
+    color: '#333',
+    textAlign: 'center',
+    fontFamily: 'Rubik',
+    lineHeight: 25,
+    marginBottom: 22,
+  },
+  notRegisteredPrimaryBtn: {
+    width: '100%',
+    backgroundColor: '#1E51E9',
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  notRegisteredPrimaryText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'Rubik',
+  },
+  notRegisteredSecondaryBtn: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1E51E9',
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  notRegisteredSecondaryText: {
+    color: '#1E51E9',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'Rubik',
   },
   topElementsGroup: {
     // transform: [{ translateY: 40 }], // NEUTRALIZED - conflicts with logoBusinessOffset
