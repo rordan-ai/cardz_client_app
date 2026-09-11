@@ -232,7 +232,9 @@ export default function BusinessSelector() {
     // ומודל שקוף עלול לחסום לחיצות במסך הבא.
     closeAllOverlays();
     setSearchBusiness('');
-    router.push('/(tabs)/customers-login');
+    // מעבירים את קוד העסק גם כפרמטר: מסך הכניסה מאמת מולו את המספר שהוקש, ובלי זה
+    // הוא היה תלוי אך ורק בקונטקסט (שמחזיק את העסק הקודם אם שליפת העסק נכשלה)
+    router.push({ pathname: '/(tabs)/customers-login', params: { businessCode: businessItem.id } });
   };
 
   // ניקוי overlays בעת יציאה מהמסך
@@ -374,7 +376,7 @@ export default function BusinessSelector() {
                   style={styles.menuItem}
                   onPress={async () => {
                     try {
-                      await AsyncStorage.multiRemove(['saved_phone', 'initial_registration_done']);
+                      await AsyncStorage.multiRemove(['saved_phone', 'initial_registration_done', 'identity_verified']);
                       await SecureStore.deleteItemAsync('biometric_phone').catch(() => {});
                       setIsRegistered(false);
                       setMenuVisible(false);

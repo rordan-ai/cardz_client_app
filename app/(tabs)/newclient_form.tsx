@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Keyboard, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
@@ -49,13 +50,30 @@ export default function NewClientForm() {
   const phoneInputRef = useRef<TextInput>(null);
   const router = useRouter();
   const { business } = useBusiness();
+  // הגעה עם עסק מפורש: סריקת NFC בעסק שהלקוח אינו רשום בו, או "קח אותי לרישום"
+  // מהמודאל בכרטיסייה/במסך הכניסה. הפרמטר גובר על העסק שבקונטקסט.
+  // הטלפון לא מתקבל כפרמטר במכוון — הוא נטען רק מזהות מאומתת (ראה loadVerifiedPhone).
+  const { businessCode: businessCodeParam } = useLocalSearchParams<{ businessCode?: string }>();
+  const businessCodeFromParam = typeof businessCodeParam === 'string' ? businessCodeParam.trim() : '';
 
   // הגדרת העסק הנוכחי כברירת מחדל אם קיים
   useEffect(() => {
+    if (businessCodeFromParam) return; // נטען מהפרמטר באפקט הבא
     if (business && !selectedBusiness) {
       setSelectedBusiness({ name: business.name, id: business.business_code });
     }
-  }, [business]);
+  }, [business, businessCodeFromParam]);
+
+  // מילוי העסק מהפרמטר — מהרשימה כשהיא נטענת, ובינתיים מהקונטקסט אם זה אותו קוד
+  useEffect(() => {
+    if (!businessCodeFromParam || selectedBusiness?.id === businessCodeFromParam) return;
+    const fromList = businesses.find(b => b.id === businessCodeFromParam);
+    if (fromList) {
+      setSelectedBusiness(fromList);
+    } else if (business?.business_code === businessCodeFromParam && business.name) {
+      setSelectedBusiness({ name: business.name, id: businessCodeFromParam });
+    }
+  }, [businessCodeFromParam, businesses, business, selectedBusiness]);
 
   useEffect(() => {
     (async () => {
@@ -67,19 +85,22 @@ export default function NewClientForm() {
     })();
   }, []);
 
-  // טעינת מספר טלפון שמור מהכניסה הקודמת
+  // מילוי מוקדם של הטלפון — אך ורק מהמספר שעבר אימות מול ה-DB (המפתח מחזיק את
+  // המספר עצמו, לא דגל). מכשירים מגרסאות קודמות שמרו מספר בלי אימות (כולל טעויות
+  // הקלדה), ומילוי אוטומטי שלו כאן היה יוצר לקוח וכרטיסייה תחת מספר שגוי.
+  // בלי מספר מאומת — השדה נשאר ריק והלקוח מקיש בעצמו (fail-closed מכוון).
   useEffect(() => {
-    const loadSavedPhone = async () => {
+    const loadVerifiedPhone = async () => {
       try {
-        const savedPhone = await AsyncStorage.getItem('saved_phone');
-        if (savedPhone) {
-          setPhone(savedPhone);
+        const verifiedPhone = await AsyncStorage.getItem('identity_verified');
+        if (verifiedPhone && /^05\d{8}$/.test(verifiedPhone)) {
+          setPhone(verifiedPhone);
         }
       } catch (error) {
         console.error('שגיאה בטעינת מספר טלפון שמור:', error);
       }
     };
-    loadSavedPhone();
+    loadVerifiedPhone();
   }, []);
 
 
@@ -380,6 +401,21 @@ export default function NewClientForm() {
           });
           // רישום ראשוני הושלם — מסך הפתיחה יציג מעתה "בחירת עסק" במקום "רישום ראשוני"
           AsyncStorage.setItem('initial_registration_done', 'true').catch(() => {});
+          // הרישום הצליח ⇒ המספר אומת (נוצרה כרטיסייה) ⇒ אפשר לשמור אותו כזהות המכשיר.
+          // ⚠️ זהות *מאומתת* של מישהו אחר לא נדרסת — במכשיר משפחתי רישום של אדם נוסף
+          // לא יגזול מהבעלים המקורי את הכניסה המהירה ואת ניתוב ה-NFC. לעומת זאת זהות
+          // לא-מאומתת (מגרסה קודמת, אולי טעות הקלדה) כן נדרסת — אחרת מכשיר כזה היה
+          // חוזר לטופס הרישום בכל סריקת תג.
+          (async () => {
+            try {
+              const localPhone = /^9725\d{8}$/.test(normalizedPhone) ? `0${normalizedPhone.slice(3)}` : normalizedPhone;
+              if (!/^05\d{8}$/.test(localPhone)) return;
+              const verifiedPhone = await AsyncStorage.getItem('identity_verified');
+              if (verifiedPhone && verifiedPhone !== localPhone) return;
+              await SecureStore.setItemAsync('biometric_phone', localPhone);
+              await AsyncStorage.multiSet([['saved_phone', localPhone], ['identity_verified', localPhone]]);
+            } catch {}
+          })();
           router.push('/(tabs)/thank_you');
         } else if (result.isDuplicate) {
           setErrorModal({ visible: true, message: 'זוהה רישום כפול של מספר טלפון ומוצר זהים. נסה/י להגדיר מוצר כרטיסייה שונה.' });
