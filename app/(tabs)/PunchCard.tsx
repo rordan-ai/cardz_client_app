@@ -915,8 +915,9 @@ export default function PunchCard() {
 
     FCMService.setUserContext(businessCode, phoneStr).catch(() => {});
     // `customer` חייב להיות בתלויות: הוא נקבע ב-fetchData אחרי localBusiness, ובלעדיו
-    // ה-effect היה רץ פעם אחת עם customer=null, יוצא, ולא חוזר — כלומר הטוקן לא נרשם כלל
-  }, [localBusiness?.business_code, phoneStr, customer]);
+    // ה-effect היה רץ פעם אחת עם customer=null, יוצא, ולא חוזר — כלומר הטוקן לא נרשם כלל.
+    // לפי customer_phone ולא לפי האובייקט: עריכת שם הלקוח לא תרשום את הטוקן מחדש.
+  }, [localBusiness?.business_code, phoneStr, customer?.customer_phone]);
 
   // טעינת מספר הודעות לא נקראות בלבד (לBadge)
   useEffect(() => {

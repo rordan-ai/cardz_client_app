@@ -14,8 +14,9 @@ import { useMarketingPopups } from '../../hooks/useMarketingPopups';
 
 // מפתח לשמירה מאובטחת - מספר טלפון בלבד (לא קשור לעסק ספציפי)
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
-// סימון שהזהות השמורה עברה אימות מול ה-DB. מכשירים מגרסאות קודמות שמרו טלפון
-// בלי אימות (כולל טעויות הקלדה), ולכן זהות בלי הסימון הזה אינה נחשבת מוכחת.
+// המספר שעבר אימות מול ה-DB. מחזיק את המספר עצמו ולא דגל בוליאני: דגל גלובלי
+// היה "מאשר" כל מספר שבמקרה שמור במפתח אחר, וכך מספר שגוי מגרסה קודמת היה מקבל
+// חותמת אימות. מכשירים מגרסאות קודמות שמרו טלפון בלי אימות ⇒ אין להם מפתח כזה.
 const IDENTITY_VERIFIED_KEY = 'identity_verified';
 // תקרה לשאילתת האימות: מעליה חוזרים להתנהגות הקודמת (fail-open) כדי שרשת איטית
 // לא תהפוך את כפתור הכניסה למת.
@@ -58,11 +59,18 @@ export default function CustomersLogin() {
   const { business, loading, refresh: refreshBusiness, setBusinessCode } = useBusiness();
 
   // חייב להופיע אחרי useBusiness() — הפניה ל-business/loading/setBusinessCode לפני ההצהרה היא TDZ
+  // נטען פעם אחת בלבד: שליפת עסק שנכשלה משאירה business=null (הקונטקסט שומר את
+  // הערך הטוב האחרון), ובלי החסם הזה מסך הכניסה היה נתקע על "טוען נתוני עסק"
+  // בלולאת ניסיונות, בלי כפתור חזרה. אחרי ניסיון כושל מציגים את הטופס כרגיל.
+  const [businessLoadFailed, setBusinessLoadFailed] = useState(false);
   useEffect(() => {
-    if (resolvedBusinessCode && !business && !loading) {
-      setBusinessCode(resolvedBusinessCode);
+    if (resolvedBusinessCode && !business && !loading && !businessLoadFailed) {
+      (async () => {
+        try { await setBusinessCode(resolvedBusinessCode); } catch {}
+        setBusinessLoadFailed(true);
+      })();
     }
-  }, [resolvedBusinessCode, business, loading, setBusinessCode]);
+  }, [resolvedBusinessCode, business, loading, businessLoadFailed, setBusinessCode]);
   const [menuVisible, setMenuVisible] = useState(false);
   const [accessibilityModalVisible, setAccessibilityModalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-200)).current;
@@ -107,6 +115,21 @@ export default function CustomersLogin() {
   // רקע כפתור בהיר מאוד — היד הלבנה הייתה נעלמת, ולכן נצבעת בכהה (באמולטור לא מטופל).
   const clickIconTint = (_lum(clickBtnBgColor) ?? 0.3) > 0.7 ? '#333333' : undefined;
 
+  // שמירת הזהות המקומית — נקראת רק אחרי שהאימות עבר
+  const persistIdentity = useCallback(async (p: string) => {
+    try {
+      await AsyncStorage.setItem('saved_phone', p);
+      // חובה גם ב-SecureStore: מטפל ה-NFC (_layout) וניתוב ה-DeepLink קוראים את
+      // BIOMETRIC_PHONE_KEY — בלי זה לקוח בכניסה ידנית (ללא ביומטרי) נזרק לכניסה בכל צמדה
+      await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, p);
+      // כניסה מוצלחת = לקוח קיים — מסך הפתיחה יציג "בחירת עסק" (רישום ראשוני)
+      await AsyncStorage.setItem('initial_registration_done', 'true');
+      await AsyncStorage.setItem(IDENTITY_VERIFIED_KEY, p);
+    } catch (error) {
+      console.error('שגיאה בשמירת מספר טלפון:', error);
+    }
+  }, []);
+
   // אימות שהמספר שהוקש אכן שייך ללקוח בעסק הזה — לפני שהוא נשמר כזהות המכשיר.
   // מחזיר true גם כשאי אפשר לאמת (אין קוד עסק / שגיאה / timeout) — fail-open מכוון:
   // לקוח לגיטימי לעולם לא ייחסם בגלל תקלת רשת, ומסך הכרטיסייה יציג את השגיאה שלו.
@@ -116,11 +139,13 @@ export default function CustomersLogin() {
     if (!code) return true;
     // וריאנטים זהים ל-PunchCard: לקוחות שהוקמו מהאדמין עשויים להישמר בפורמט 972
     const variants = Array.from(new Set([p, `972${p.slice(1)}`]));
-    const withTimeout = <T,>(pr: PromiseLike<T>): Promise<T | null> =>
-      Promise.race([
+    const withTimeout = <T,>(pr: PromiseLike<T>): Promise<T | null> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      return Promise.race([
         Promise.resolve(pr),
-        new Promise<null>(resolve => setTimeout(() => resolve(null), VALIDATION_TIMEOUT_MS)),
-      ]);
+        new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), VALIDATION_TIMEOUT_MS); }),
+      ]).finally(() => { if (timer) clearTimeout(timer); });
+    };
     try {
       const res = await withTimeout(
         supabase.from('customers').select('customer_phone')
@@ -298,9 +323,10 @@ export default function CustomersLogin() {
           setNotRegisteredVisible(true);
           return;
         }
-        // שמירה מאובטחת של מספר הטלפון בלבד (עובד לכל העסקים)
-        await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, phone);
-        await AsyncStorage.setItem(IDENTITY_VERIFIED_KEY, 'true');
+        // שמירה מאובטחת של מספר הטלפון בלבד (עובד לכל העסקים).
+        // persistIdentity ולא כתיבה נקודתית: כתיבת biometric_phone לבדה הייתה
+        // משאירה את saved_phone על ערך ישן ואת סימון האימות "מאשר" אותו
+        await persistIdentity(phone);
 
         setBiometricSetupDone(true);
         Alert.alert('הצלחה! 🎉', 'כניסה ביומטרית הוגדרה בהצלחה.\nמעכשיו תוכל להיכנס בלחיצה אחת לכל עסק!');
@@ -311,7 +337,7 @@ export default function CustomersLogin() {
         Alert.alert('שגיאה', 'לא ניתן היה לשמור את ההגדרות');
       }
     }
-  }, [phone, authenticateBiometric, router, punchIntentParams]);
+  }, [phone, authenticateBiometric, router, punchIntentParams, persistIdentity, resolvedBusinessCode]);
 
   // פופאפים שיווקיים - trigger: entry (בכניסה לאפליקציה)
   const { currentPopup, showPopup, closePopup } = useMarketingPopups({
@@ -352,21 +378,6 @@ export default function CustomersLogin() {
   }, [business?.business_code]);
 
 
-
-  // שמירת הזהות המקומית — נקראת רק אחרי שהאימות עבר
-  const persistIdentity = useCallback(async (p: string) => {
-    try {
-      await AsyncStorage.setItem('saved_phone', p);
-      // חובה גם ב-SecureStore: מטפל ה-NFC (_layout) וניתוב ה-DeepLink קוראים את
-      // BIOMETRIC_PHONE_KEY — בלי זה לקוח בכניסה ידנית (ללא ביומטרי) נזרק לכניסה בכל צמדה
-      await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, p);
-      // כניסה מוצלחת = לקוח קיים — מסך הפתיחה יציג "בחירת עסק" (רישום ראשוני)
-      await AsyncStorage.setItem('initial_registration_done', 'true');
-      await AsyncStorage.setItem(IDENTITY_VERIFIED_KEY, 'true');
-    } catch (error) {
-      console.error('שגיאה בשמירת מספר טלפון:', error);
-    }
-  }, []);
 
   const handleLogin = async () => {
     if (!phone.match(/^05\d{8}$/)) {
@@ -472,7 +483,7 @@ export default function CustomersLogin() {
     }
   };
 
-  if (loading || (resolvedBusinessCode && !business)) {
+  if (loading || (resolvedBusinessCode && !business && !businessLoadFailed)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: loginBackgroundColor }}>
         {/* כפתור המבורגר גם במצב טעינה */}

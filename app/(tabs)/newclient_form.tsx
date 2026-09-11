@@ -85,19 +85,16 @@ export default function NewClientForm() {
     })();
   }, []);
 
-  // מילוי מוקדם של הטלפון — רק מזהות שעברה אימות מול ה-DB.
-  // מכשירים מגרסאות קודמות שמרו את המספר בלי אימות (כולל טעויות הקלדה), ומילוי
-  // אוטומטי שלו כאן היה יוצר לקוח וכרטיסייה תחת מספר שגוי. בלי סימון אימות —
-  // השדה נשאר ריק והלקוח מקיש בעצמו (fail-closed מכוון: המחיר הוא הקלדה אחת).
+  // מילוי מוקדם של הטלפון — אך ורק מהמספר שעבר אימות מול ה-DB (המפתח מחזיק את
+  // המספר עצמו, לא דגל). מכשירים מגרסאות קודמות שמרו מספר בלי אימות (כולל טעויות
+  // הקלדה), ומילוי אוטומטי שלו כאן היה יוצר לקוח וכרטיסייה תחת מספר שגוי.
+  // בלי מספר מאומת — השדה נשאר ריק והלקוח מקיש בעצמו (fail-closed מכוון).
   useEffect(() => {
     const loadVerifiedPhone = async () => {
       try {
-        const [verified, savedPhone] = await Promise.all([
-          AsyncStorage.getItem('identity_verified'),
-          AsyncStorage.getItem('saved_phone'),
-        ]);
-        if (verified === 'true' && savedPhone && /^05\d{8}$/.test(savedPhone)) {
-          setPhone(savedPhone);
+        const verifiedPhone = await AsyncStorage.getItem('identity_verified');
+        if (verifiedPhone && /^05\d{8}$/.test(verifiedPhone)) {
+          setPhone(verifiedPhone);
         }
       } catch (error) {
         console.error('שגיאה בטעינת מספר טלפון שמור:', error);
@@ -405,17 +402,18 @@ export default function NewClientForm() {
           // רישום ראשוני הושלם — מסך הפתיחה יציג מעתה "בחירת עסק" במקום "רישום ראשוני"
           AsyncStorage.setItem('initial_registration_done', 'true').catch(() => {});
           // הרישום הצליח ⇒ המספר אומת (נוצרה כרטיסייה) ⇒ אפשר לשמור אותו כזהות המכשיר.
-          // ⚠️ רק אם אין עדיין זהות, או שהיא זהה — במכשיר משפחתי רישום של אדם נוסף
-          // לא יגזול מהבעלים המקורי את הכניסה המהירה ואת ניתוב ה-NFC.
+          // ⚠️ זהות *מאומתת* של מישהו אחר לא נדרסת — במכשיר משפחתי רישום של אדם נוסף
+          // לא יגזול מהבעלים המקורי את הכניסה המהירה ואת ניתוב ה-NFC. לעומת זאת זהות
+          // לא-מאומתת (מגרסה קודמת, אולי טעות הקלדה) כן נדרסת — אחרת מכשיר כזה היה
+          // חוזר לטופס הרישום בכל סריקת תג.
           (async () => {
             try {
               const localPhone = /^9725\d{8}$/.test(normalizedPhone) ? `0${normalizedPhone.slice(3)}` : normalizedPhone;
               if (!/^05\d{8}$/.test(localPhone)) return;
-              const existing = await AsyncStorage.getItem('saved_phone');
-              if (existing && existing !== localPhone) return;
-              await AsyncStorage.setItem('saved_phone', localPhone);
+              const verifiedPhone = await AsyncStorage.getItem('identity_verified');
+              if (verifiedPhone && verifiedPhone !== localPhone) return;
               await SecureStore.setItemAsync('biometric_phone', localPhone);
-              await AsyncStorage.setItem('identity_verified', 'true');
+              await AsyncStorage.multiSet([['saved_phone', localPhone], ['identity_verified', localPhone]]);
             } catch {}
           })();
           router.push('/(tabs)/thank_you');
