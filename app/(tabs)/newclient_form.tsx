@@ -53,8 +53,11 @@ export default function NewClientForm() {
   // הגעה עם עסק מפורש: סריקת NFC בעסק שהלקוח אינו רשום בו, או "קח אותי לרישום"
   // מהמודאל בכרטיסייה/במסך הכניסה. הפרמטר גובר על העסק שבקונטקסט.
   // הטלפון לא מתקבל כפרמטר במכוון — הוא נטען רק מזהות מאומתת (ראה loadVerifiedPhone).
-  const { businessCode: businessCodeParam } = useLocalSearchParams<{ businessCode?: string }>();
+  const { businessCode: businessCodeParam, typedPhone: typedPhoneParam } = useLocalSearchParams<{ businessCode?: string; typedPhone?: string }>();
   const businessCodeFromParam = typeof businessCodeParam === 'string' ? businessCodeParam.trim() : '';
+  // המספר שהמשתמש הקיש בעצמו רגע קודם (מסך הכניסה / הכרטיסייה). גובר על הזהות
+  // השמורה — אחרת במכשיר משפחתי היה מופיע כאן מספר של אדם אחר.
+  const typedPhoneFromParam = typeof typedPhoneParam === 'string' ? typedPhoneParam.trim() : '';
 
   // הגדרת העסק הנוכחי כברירת מחדל אם קיים
   useEffect(() => {
@@ -92,6 +95,10 @@ export default function NewClientForm() {
   useEffect(() => {
     const loadVerifiedPhone = async () => {
       try {
+        if (/^05\d{8}$/.test(typedPhoneFromParam)) {
+          setPhone(typedPhoneFromParam);
+          return;
+        }
         const verifiedPhone = await AsyncStorage.getItem('identity_verified');
         if (verifiedPhone && /^05\d{8}$/.test(verifiedPhone)) {
           setPhone(verifiedPhone);
@@ -101,7 +108,7 @@ export default function NewClientForm() {
       }
     };
     loadVerifiedPhone();
-  }, []);
+  }, [typedPhoneFromParam]);
 
 
 

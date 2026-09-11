@@ -300,6 +300,10 @@ export default function CustomersLogin() {
           return;
         }
         if (status === 'confirmed') verifiedPhoneRef.current = phone;
+        // אותה שמירה כמו ב-handleLogin: המסלול הזה לא עובר שם, ובלעדיה לקוח
+        // שנכנס דרך הכפתור הביומטרי ובחר "לא עכשיו" נשאר בלי זהות במכשיר
+        pendingLoginPhoneRef.current = phone;
+        await persistIdentity(phone, status === 'confirmed');
       } finally {
         loginInFlightRef.current = false;
       }
@@ -314,7 +318,7 @@ export default function CustomersLogin() {
         }
       }
     }
-  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router, punchIntentParams, checkRegistration, resolvedBusinessCode]);
+  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router, punchIntentParams, checkRegistration, persistIdentity, resolvedBusinessCode]);
 
   // הגדרת כניסה ביומטרית (פעם ראשונה)
   const setupBiometricLogin = useCallback(async () => {
@@ -823,9 +827,14 @@ export default function CustomersLogin() {
               onPress={() => {
                 setNotRegisteredVisible(false);
                 const code = resolvedBusinessCode || business?.business_code;
+                // typedPhone = המספר שהמשתמש הקיש כאן ממש עכשיו. בלעדיו הטופס היה
+                // ממלא את הזהות השמורה במכשיר — מספר של מישהו אחר במכשיר משפחתי
                 router.push({
                   pathname: '/(tabs)/newclient_form',
-                  params: code ? { businessCode: code } : {},
+                  params: {
+                    ...(code ? { businessCode: code } : {}),
+                    ...(/^05\d{8}$/.test(phone) ? { typedPhone: phone } : {}),
+                  },
                 });
               }}
               accessibilityRole="button"

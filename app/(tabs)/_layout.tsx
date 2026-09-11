@@ -10,7 +10,7 @@ import { WebView } from 'react-native-webview';
 import { useBusiness } from '../../components/BusinessContext';
 import FCMService from '../../components/FCMService';
 import { supabase } from '../../components/supabaseClient';
-import { getCapturedInitialUrl, initialUrlPromise } from '../_layout';
+import { getCapturedInitialUrl, initialUrlPromise, isInitialUrlHandled } from '../_layout';
 
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
 const LAST_NFC_TAG_KEY = 'last_nfc_tag_id';
@@ -300,17 +300,33 @@ function NfcDeepLinkHandler() {
     const checkInitialUrl = async () => {
       // 1. נסה קודם את ה-URL שנלכד ברמת root layout (מוקדם יותר)
       // נמתין ללכידה הראשונית שתסתיים
+      // מסלול business/[code] הוא הסמכותי לפתיחה קרה — הוא כבר ניתב (כולל למצב
+      // "לקוח לא רשום בעסק"), ועיבוד חוזר כאן היה דורס אותו ומחזיר למסך הכרטיסייה
+      if (isInitialUrlHandled()) {
+        console.log('[NfcHandler] Initial URL already handled by business/[code] — skipping');
+        initialUrlHandledRef.current = true;
+        return;
+      }
+
       const capturedUrl = await initialUrlPromise;
       if (capturedUrl) {
+        if (isInitialUrlHandled()) {
+          initialUrlHandledRef.current = true;
+          return;
+        }
         console.log('[NfcHandler] Using captured initial URL:', capturedUrl);
         await handleNfcDeepLink(capturedUrl, true);
         return;
       }
-      
+
       // 2. Fallback: נסה Linking.getInitialURL (במקרה שהלכידה נכשלה)
       const url = await Linking.getInitialURL();
       console.log('[NfcHandler] Initial URL from Linking:', url);
       if (url) {
+        if (isInitialUrlHandled()) {
+          initialUrlHandledRef.current = true;
+          return;
+        }
         await handleNfcDeepLink(url, true); // isInitialUrl = true
         return;
       }

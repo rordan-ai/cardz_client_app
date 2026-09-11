@@ -1148,18 +1148,25 @@ export default function PunchCard() {
       <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center' }]}>
         <Modal visible transparent animationType="fade" onRequestClose={() => router.back()}>
           <View style={styles.notRegisteredOverlay}>
-            <View style={styles.notRegisteredCard} accessible={true} accessibilityRole="alert">
-              <Text style={styles.notRegisteredText} accessibilityLiveRegion="assertive">
+            {/* ⚠️ בלי accessible={true} על המעטפת: ב-RN זה מכווץ את כל התת-עץ
+                לאלמנט נגישות אחד, ושני הכפתורים מפסיקים להיות ניתנים למיקוד
+                והפעלה ב-VoiceOver/TalkBack. ההכרזה יושבת על הטקסט עצמו. */}
+            <View style={styles.notRegisteredCard}>
+              <Text style={styles.notRegisteredText} accessibilityRole="alert" accessibilityLiveRegion="assertive">
                 נראה שטעית בהקשת מספר הטלפון או שעדיין לא נרשמת כלקוח בעסק שבחרת
               </Text>
               <TouchableOpacity
                 style={styles.notRegisteredPrimaryBtn}
                 onPress={() => {
                   setNotRegisteredVisible(false);
-                  // בלי פרמטר טלפון: הטופס ממלא מספר רק מזהות מאומתת
+                  // typedPhone = המספר שאיתו נכנסו למסך הזה. הטופס לא ימלא זהות
+                  // שמורה אחרת במקומו (מכשיר משפחתי), ולא ימלא מספר לא-מאומת
                   router.replace({
                     pathname: '/(tabs)/newclient_form',
-                    params: resolvedBusinessCode ? { businessCode: resolvedBusinessCode } : {},
+                    params: {
+                      ...(resolvedBusinessCode ? { businessCode: resolvedBusinessCode } : {}),
+                      ...(/^05\d{8}$/.test(phoneStr) ? { typedPhone: phoneStr } : {}),
+                    },
                   });
                 }}
                 accessibilityRole="button"

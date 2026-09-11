@@ -4,6 +4,7 @@ import { View, Text, ActivityIndicator, DeviceEventEmitter, StyleSheet } from 'r
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../../components/supabaseClient';
 import { useBusiness } from '../../components/BusinessContext';
+import { markInitialUrlHandled } from '../_layout';
 
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
 
@@ -20,6 +21,9 @@ export default function BusinessDeepLinkHandler() {
 
   useEffect(() => {
     const processDeepLink = async () => {
+      // המסלול הזה סמכותי לפתיחה קרה מתג — כל ענף כאן מסתיים בניווט, ובלי הסימון
+      // מטפל ה-NFC שב-(tabs)/_layout היה מעבד את אותו URL שוב ודורס את הניתוב
+      markInitialUrlHandled();
       if (!code) {
         console.log('[DeepLink Route] No business code');
         router.replace('/(tabs)/business_selector');
