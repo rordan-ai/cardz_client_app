@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cardz",
     "slug": "my-new-test-app",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "icon": "./assets/images/cardz_white_logo_sqwered.png",
     "orientation": "portrait",
     "scheme": "mycardz",

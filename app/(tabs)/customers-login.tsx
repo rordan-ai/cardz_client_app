@@ -115,8 +115,11 @@ export default function CustomersLogin() {
   // רקע כפתור בהיר מאוד — היד הלבנה הייתה נעלמת, ולכן נצבעת בכהה (באמולטור לא מטופל).
   const clickIconTint = (_lum(clickBtnBgColor) ?? 0.3) > 0.7 ? '#333333' : undefined;
 
-  // שמירת הזהות המקומית — נקראת רק אחרי שהאימות עבר
-  const persistIdentity = useCallback(async (p: string) => {
+  // שמירת הזהות המקומית.
+  // `verified` = המספר אושר מול ה-DB בפועל. כשלא ניתן היה לאמת (אין קוד עסק / שגיאה /
+  // timeout) שומרים כמו קודם כדי לא לחסום לקוח לגיטימי, אבל **בלי** סימון האימות —
+  // אחרת טעות הקלדה ברשת איטית הייתה מקבלת חותמת "מאומת" ונכנסת לטופס הרישום.
+  const persistIdentity = useCallback(async (p: string, verified: boolean) => {
     try {
       await AsyncStorage.setItem('saved_phone', p);
       // חובה גם ב-SecureStore: מטפל ה-NFC (_layout) וניתוב ה-DeepLink קוראים את
@@ -124,19 +127,22 @@ export default function CustomersLogin() {
       await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, p);
       // כניסה מוצלחת = לקוח קיים — מסך הפתיחה יציג "בחירת עסק" (רישום ראשוני)
       await AsyncStorage.setItem('initial_registration_done', 'true');
-      await AsyncStorage.setItem(IDENTITY_VERIFIED_KEY, p);
+      if (verified) await AsyncStorage.setItem(IDENTITY_VERIFIED_KEY, p);
     } catch (error) {
       console.error('שגיאה בשמירת מספר טלפון:', error);
     }
   }, []);
 
   // אימות שהמספר שהוקש אכן שייך ללקוח בעסק הזה — לפני שהוא נשמר כזהות המכשיר.
-  // מחזיר true גם כשאי אפשר לאמת (אין קוד עסק / שגיאה / timeout) — fail-open מכוון:
-  // לקוח לגיטימי לעולם לא ייחסם בגלל תקלת רשת, ומסך הכרטיסייה יציג את השגיאה שלו.
-  const isRegisteredInBusiness = useCallback(async (p: string): Promise<boolean> => {
+  // תלת-מצבי במכוון, כי "אושר" ו"לא ניתן לבדוק" הן תוצאות שונות לגמרי:
+  //   'confirmed'  — נמצאה רשומת לקוח (או כרטיסייה פעילה) ⇒ מותר לסמן כמאומת
+  //   'not_found'  — הבדיקה רצה והחזירה ריק ⇒ טעות הקלדה או לקוח שטרם נרשם בעסק
+  //   'unverified' — אין קוד עסק / שגיאה / timeout ⇒ fail-open: לא חוסמים לקוח
+  //                  לגיטימי בגלל תקלת רשת, אבל גם לא מסמנים את המספר כמאומת
+  const checkRegistration = useCallback(async (p: string): Promise<'confirmed' | 'not_found' | 'unverified'> => {
     // קוד העסק מגיע מהפרמטר (NFC/deep-link) או מהקונטקסט (בחירה מהרשימה) — כמו ב-PunchCard
     const code = resolvedBusinessCode || business?.business_code;
-    if (!code) return true;
+    if (!code) return 'unverified';
     // וריאנטים זהים ל-PunchCard: לקוחות שהוקמו מהאדמין עשויים להישמר בפורמט 972
     const variants = Array.from(new Set([p, `972${p.slice(1)}`]));
     const withTimeout = <T,>(pr: PromiseLike<T>): Promise<T | null> => {
@@ -151,18 +157,18 @@ export default function CustomersLogin() {
         supabase.from('customers').select('customer_phone')
           .in('customer_phone', variants).eq('business_code', code).is('deleted_at', null).limit(1)
       );
-      if (!res || res.error) return true; // timeout / שגיאה → fail-open
-      if (res.data && res.data.length > 0) return true;
+      if (!res || res.error) return 'unverified'; // timeout / שגיאה
+      if (res.data && res.data.length > 0) return 'confirmed';
       // אין רשומת לקוח. בדיקה צולבת בטבלה שנייה לפני שחוסמים: אם קיימת כרטיסייה
       // פעילה, מדובר באי-עקביות (או בחסימת קריאה על customers) ולא בטעות הקלדה.
       const cards = await withTimeout(
         supabase.from('PunchCards').select('card_number')
           .in('customer_phone', variants).eq('business_code', code).eq('status', 'active').limit(1)
       );
-      if (!cards || cards.error) return true;
-      return !!(cards.data && cards.data.length > 0);
+      if (!cards || cards.error) return 'unverified';
+      return cards.data && cards.data.length > 0 ? 'confirmed' : 'not_found';
     } catch {
-      return true;
+      return 'unverified';
     }
   }, [resolvedBusinessCode, business?.business_code]);
 
@@ -288,11 +294,12 @@ export default function CustomersLogin() {
       if (loginInFlightRef.current) return;
       loginInFlightRef.current = true;
       try {
-        if (!(await isRegisteredInBusiness(phone))) {
+        const status = await checkRegistration(phone);
+        if (status === 'not_found') {
           setNotRegisteredVisible(true);
           return;
         }
-        verifiedPhoneRef.current = phone;
+        if (status === 'confirmed') verifiedPhoneRef.current = phone;
       } finally {
         loginInFlightRef.current = false;
       }
@@ -307,7 +314,7 @@ export default function CustomersLogin() {
         }
       }
     }
-  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router, punchIntentParams, isRegisteredInBusiness, resolvedBusinessCode]);
+  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router, punchIntentParams, checkRegistration, resolvedBusinessCode]);
 
   // הגדרת כניסה ביומטרית (פעם ראשונה)
   const setupBiometricLogin = useCallback(async () => {
@@ -316,17 +323,12 @@ export default function CustomersLogin() {
     const authenticated = await authenticateBiometric();
     if (authenticated) {
       try {
-        // רשת ביטחון: שומרים רק מספר שעבר אימות מול ה-DB (handleLogin או
-        // handleBiometricPress). בלי זה זו הייתה דרך עוקפת לשמור מספר שגוי.
-        if (verifiedPhoneRef.current !== phone) {
-          setBiometricSetupModalVisible(false);
-          setNotRegisteredVisible(true);
-          return;
-        }
         // שמירה מאובטחת של מספר הטלפון בלבד (עובד לכל העסקים).
         // persistIdentity ולא כתיבה נקודתית: כתיבת biometric_phone לבדה הייתה
-        // משאירה את saved_phone על ערך ישן ואת סימון האימות "מאשר" אותו
-        await persistIdentity(phone);
+        // משאירה את saved_phone על ערך ישן ואת סימון האימות "מאשר" אותו.
+        // המסלול לכאן עובר תמיד דרך בדיקה (handleLogin / handleBiometricPress),
+        // ו-verifiedPhoneRef קובע אם המספר אושר בפועל או רק לא ניתן היה לבדוק.
+        await persistIdentity(phone, verifiedPhoneRef.current === phone);
 
         setBiometricSetupDone(true);
         Alert.alert('הצלחה! 🎉', 'כניסה ביומטרית הוגדרה בהצלחה.\nמעכשיו תוכל להיכנס בלחיצה אחת לכל עסק!');
@@ -390,13 +392,14 @@ export default function CustomersLogin() {
     if (loginInFlightRef.current) return;
     loginInFlightRef.current = true;
     try {
-      if (!(await isRegisteredInBusiness(phone))) {
+      const status = await checkRegistration(phone);
+      if (status === 'not_found') {
         // לא שומרים שום זהות — או טעות הקלדה או לקוח שטרם נרשם בעסק
         setNotRegisteredVisible(true);
         return;
       }
-      verifiedPhoneRef.current = phone;
-      await persistIdentity(phone);
+      if (status === 'confirmed') verifiedPhoneRef.current = phone;
+      await persistIdentity(phone, status === 'confirmed');
 
       // הצעה להפעלת FaceID/ביומטרי לכניסה הבאה (פעם ראשונה אחרי הזנת טלפון)
       if (biometricAvailable && !biometricSetupDone) {

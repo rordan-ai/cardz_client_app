@@ -492,12 +492,16 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
     // נמצאה כרטיסייה ⇒ המספר אומת ⇒ נשמר כזהות המכשיר. שלושת המפתחות נכתבים יחד:
     // כתיבת biometric_phone לבדה הייתה משאירה את saved_phone על ערך ישן, וסימון
     // האימות (שמחזיק את המספר) היה מצביע על מספר אחר מזה שבשדה שהטופס קורא.
+    // ⚠️ זהות מאומתת של אדם אחר לא נדרסת (מכשיר משפחתי) — אותו כלל כמו בטופס הרישום
     try {
-      const existing = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
-      if (existing !== phone) {
-        await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, phone);
+      const verifiedPhone = await AsyncStorage.getItem('identity_verified');
+      if (!verifiedPhone || verifiedPhone === phone) {
+        const existing = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
+        if (existing !== phone) {
+          await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, phone);
+        }
+        await AsyncStorage.multiSet([['saved_phone', phone], ['identity_verified', phone]]);
       }
-      await AsyncStorage.multiSet([['saved_phone', phone], ['identity_verified', phone]]);
     } catch {}
 
     setCustomerCards(cards);
