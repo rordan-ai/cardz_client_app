@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Keyboard, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
@@ -49,11 +50,11 @@ export default function NewClientForm() {
   const phoneInputRef = useRef<TextInput>(null);
   const router = useRouter();
   const { business } = useBusiness();
-  // הגעה עם עסק/טלפון מפורשים: סריקת NFC בעסק שהלקוח אינו רשום בו, או "קח אותי לרישום"
-  // מהמודאל בכרטיסייה. הפרמטר גובר על העסק שבקונטקסט.
-  const { businessCode: businessCodeParam, phone: phoneParam } = useLocalSearchParams<{ businessCode?: string; phone?: string }>();
+  // הגעה עם עסק מפורש: סריקת NFC בעסק שהלקוח אינו רשום בו, או "קח אותי לרישום"
+  // מהמודאל בכרטיסייה/במסך הכניסה. הפרמטר גובר על העסק שבקונטקסט.
+  // הטלפון לא מתקבל כפרמטר במכוון — הוא נטען רק מזהות מאומתת (ראה loadVerifiedPhone).
+  const { businessCode: businessCodeParam } = useLocalSearchParams<{ businessCode?: string }>();
   const businessCodeFromParam = typeof businessCodeParam === 'string' ? businessCodeParam.trim() : '';
-  const phoneFromParam = typeof phoneParam === 'string' ? phoneParam.trim() : '';
 
   // הגדרת העסק הנוכחי כברירת מחדל אם קיים
   useEffect(() => {
@@ -84,24 +85,26 @@ export default function NewClientForm() {
     })();
   }, []);
 
-  // טעינת מספר טלפון שמור מהכניסה הקודמת (טלפון מהפרמטר גובר — הזהות שאיתה נכנסנו)
+  // מילוי מוקדם של הטלפון — רק מזהות שעברה אימות מול ה-DB.
+  // מכשירים מגרסאות קודמות שמרו את המספר בלי אימות (כולל טעויות הקלדה), ומילוי
+  // אוטומטי שלו כאן היה יוצר לקוח וכרטיסייה תחת מספר שגוי. בלי סימון אימות —
+  // השדה נשאר ריק והלקוח מקיש בעצמו (fail-closed מכוון: המחיר הוא הקלדה אחת).
   useEffect(() => {
-    const loadSavedPhone = async () => {
+    const loadVerifiedPhone = async () => {
       try {
-        if (/^05\d{8}$/.test(phoneFromParam)) {
-          setPhone(phoneFromParam);
-          return;
-        }
-        const savedPhone = await AsyncStorage.getItem('saved_phone');
-        if (savedPhone) {
+        const [verified, savedPhone] = await Promise.all([
+          AsyncStorage.getItem('identity_verified'),
+          AsyncStorage.getItem('saved_phone'),
+        ]);
+        if (verified === 'true' && savedPhone && /^05\d{8}$/.test(savedPhone)) {
           setPhone(savedPhone);
         }
       } catch (error) {
         console.error('שגיאה בטעינת מספר טלפון שמור:', error);
       }
     };
-    loadSavedPhone();
-  }, [phoneFromParam]);
+    loadVerifiedPhone();
+  }, []);
 
 
 
@@ -401,6 +404,20 @@ export default function NewClientForm() {
           });
           // רישום ראשוני הושלם — מסך הפתיחה יציג מעתה "בחירת עסק" במקום "רישום ראשוני"
           AsyncStorage.setItem('initial_registration_done', 'true').catch(() => {});
+          // הרישום הצליח ⇒ המספר אומת (נוצרה כרטיסייה) ⇒ אפשר לשמור אותו כזהות המכשיר.
+          // ⚠️ רק אם אין עדיין זהות, או שהיא זהה — במכשיר משפחתי רישום של אדם נוסף
+          // לא יגזול מהבעלים המקורי את הכניסה המהירה ואת ניתוב ה-NFC.
+          (async () => {
+            try {
+              const localPhone = /^9725\d{8}$/.test(normalizedPhone) ? `0${normalizedPhone.slice(3)}` : normalizedPhone;
+              if (!/^05\d{8}$/.test(localPhone)) return;
+              const existing = await AsyncStorage.getItem('saved_phone');
+              if (existing && existing !== localPhone) return;
+              await AsyncStorage.setItem('saved_phone', localPhone);
+              await SecureStore.setItemAsync('biometric_phone', localPhone);
+              await AsyncStorage.setItem('identity_verified', 'true');
+            } catch {}
+          })();
           router.push('/(tabs)/thank_you');
         } else if (result.isDuplicate) {
           setErrorModal({ visible: true, message: 'זוהה רישום כפול של מספר טלפון ומוצר זהים. נסה/י להגדיר מוצר כרטיסייה שונה.' });

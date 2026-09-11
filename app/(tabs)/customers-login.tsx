@@ -9,10 +9,17 @@ import { ActivityIndicator, Alert, Animated, Dimensions, Image, Keyboard, Keyboa
 import { BackButton } from '../../components/BackButton';
 import { useBusiness } from '../../components/BusinessContext';
 import MarketingPopup from '../../components/MarketingPopup';
+import { supabase } from '../../components/supabaseClient';
 import { useMarketingPopups } from '../../hooks/useMarketingPopups';
 
 // מפתח לשמירה מאובטחת - מספר טלפון בלבד (לא קשור לעסק ספציפי)
 const BIOMETRIC_PHONE_KEY = 'biometric_phone';
+// סימון שהזהות השמורה עברה אימות מול ה-DB. מכשירים מגרסאות קודמות שמרו טלפון
+// בלי אימות (כולל טעויות הקלדה), ולכן זהות בלי הסימון הזה אינה נחשבת מוכחת.
+const IDENTITY_VERIFIED_KEY = 'identity_verified';
+// תקרה לשאילתת האימות: מעליה חוזרים להתנהגות הקודמת (fail-open) כדי שרשת איטית
+// לא תהפוך את כפתור הכניסה למת.
+const VALIDATION_TIMEOUT_MS = 2500;
 const LotteryIcon = require('../../assets/images/LOTTARY.png');
 const ShareIcon = require('../../assets/images/SHARE.png');
 const PhoneIcon = require('../../assets/images/PHONE.png');
@@ -32,6 +39,12 @@ export default function CustomersLogin() {
   const [error, setError] = useState('');
   const nfcAutoLoginAttempted = useRef(false);
   const pendingLoginPhoneRef = useRef<string | null>(null);
+  // נעילת לחיצה כפולה על "כנס" בזמן שאילתת האימות
+  const loginInFlightRef = useRef(false);
+  // המספר האחרון שעבר אימות מול ה-DB — שומר שהגדרת ביומטרי לא תנציח מספר שגוי
+  const verifiedPhoneRef = useRef<string | null>(null);
+  // "אינך רשום בעסק זה" (טעות הקלדה או לקוח שטרם נרשם בעסק)
+  const [notRegisteredVisible, setNotRegisteredVisible] = useState(false);
 
   const resolvedBusinessCode = typeof nfcBusinessCode === 'string' ? nfcBusinessCode : Array.isArray(nfcBusinessCode) ? nfcBusinessCode[0] : null;
 
@@ -94,6 +107,40 @@ export default function CustomersLogin() {
   // רקע כפתור בהיר מאוד — היד הלבנה הייתה נעלמת, ולכן נצבעת בכהה (באמולטור לא מטופל).
   const clickIconTint = (_lum(clickBtnBgColor) ?? 0.3) > 0.7 ? '#333333' : undefined;
 
+  // אימות שהמספר שהוקש אכן שייך ללקוח בעסק הזה — לפני שהוא נשמר כזהות המכשיר.
+  // מחזיר true גם כשאי אפשר לאמת (אין קוד עסק / שגיאה / timeout) — fail-open מכוון:
+  // לקוח לגיטימי לעולם לא ייחסם בגלל תקלת רשת, ומסך הכרטיסייה יציג את השגיאה שלו.
+  const isRegisteredInBusiness = useCallback(async (p: string): Promise<boolean> => {
+    // קוד העסק מגיע מהפרמטר (NFC/deep-link) או מהקונטקסט (בחירה מהרשימה) — כמו ב-PunchCard
+    const code = resolvedBusinessCode || business?.business_code;
+    if (!code) return true;
+    // וריאנטים זהים ל-PunchCard: לקוחות שהוקמו מהאדמין עשויים להישמר בפורמט 972
+    const variants = Array.from(new Set([p, `972${p.slice(1)}`]));
+    const withTimeout = <T,>(pr: PromiseLike<T>): Promise<T | null> =>
+      Promise.race([
+        Promise.resolve(pr),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), VALIDATION_TIMEOUT_MS)),
+      ]);
+    try {
+      const res = await withTimeout(
+        supabase.from('customers').select('customer_phone')
+          .in('customer_phone', variants).eq('business_code', code).is('deleted_at', null).limit(1)
+      );
+      if (!res || res.error) return true; // timeout / שגיאה → fail-open
+      if (res.data && res.data.length > 0) return true;
+      // אין רשומת לקוח. בדיקה צולבת בטבלה שנייה לפני שחוסמים: אם קיימת כרטיסייה
+      // פעילה, מדובר באי-עקביות (או בחסימת קריאה על customers) ולא בטעות הקלדה.
+      const cards = await withTimeout(
+        supabase.from('PunchCards').select('card_number')
+          .in('customer_phone', variants).eq('business_code', code).eq('status', 'active').limit(1)
+      );
+      if (!cards || cards.error) return true;
+      return !!(cards.data && cards.data.length > 0);
+    } catch {
+      return true;
+    }
+  }, [resolvedBusinessCode, business?.business_code]);
+
   // פונקציה לאימות ביומטרי (מוגדרת לפני שימוש ב-useEffect כדי לא ליצור ReferenceError)
   const authenticateBiometric = useCallback(async (): Promise<boolean> => {
     try {
@@ -118,7 +165,8 @@ export default function CustomersLogin() {
   const performResetLogin = useCallback(async () => {
     try {
       await SecureStore.deleteItemAsync(BIOMETRIC_PHONE_KEY);
-      await AsyncStorage.removeItem('saved_phone');
+      await AsyncStorage.multiRemove(['saved_phone', IDENTITY_VERIFIED_KEY]);
+      verifiedPhoneRef.current = null;
       setBiometricSetupDone(false);
       setPhone('');
       setResetStep('success');
@@ -210,6 +258,19 @@ export default function CustomersLogin() {
         Alert.alert('נדרש מספר טלפון', 'הזן מספר טלפון תקין לפני הגדרת כניסה ביומטרית');
         return;
       }
+      // מסלול כניסה שני שאינו עובר ב-handleLogin: בלי האימות כאן, טעות הקלדה
+      // הייתה נשמרת ב-Keychain (ששורד גם מחיקת אפליקציה ב-iOS) והופכת לזהות המכשיר
+      if (loginInFlightRef.current) return;
+      loginInFlightRef.current = true;
+      try {
+        if (!(await isRegisteredInBusiness(phone))) {
+          setNotRegisteredVisible(true);
+          return;
+        }
+        verifiedPhoneRef.current = phone;
+      } finally {
+        loginInFlightRef.current = false;
+      }
       setBiometricSetupModalVisible(true);
     } else {
       // כבר מוגדר - אימות וכניסה
@@ -221,7 +282,7 @@ export default function CustomersLogin() {
         }
       }
     }
-  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router, punchIntentParams]);
+  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router, punchIntentParams, isRegisteredInBusiness, resolvedBusinessCode]);
 
   // הגדרת כניסה ביומטרית (פעם ראשונה)
   const setupBiometricLogin = useCallback(async () => {
@@ -230,9 +291,17 @@ export default function CustomersLogin() {
     const authenticated = await authenticateBiometric();
     if (authenticated) {
       try {
+        // רשת ביטחון: שומרים רק מספר שעבר אימות מול ה-DB (handleLogin או
+        // handleBiometricPress). בלי זה זו הייתה דרך עוקפת לשמור מספר שגוי.
+        if (verifiedPhoneRef.current !== phone) {
+          setBiometricSetupModalVisible(false);
+          setNotRegisteredVisible(true);
+          return;
+        }
         // שמירה מאובטחת של מספר הטלפון בלבד (עובד לכל העסקים)
         await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, phone);
-        
+        await AsyncStorage.setItem(IDENTITY_VERIFIED_KEY, 'true');
+
         setBiometricSetupDone(true);
         Alert.alert('הצלחה! 🎉', 'כניסה ביומטרית הוגדרה בהצלחה.\nמעכשיו תוכל להיכנס בלחיצה אחת לכל עסק!');
 
@@ -284,33 +353,51 @@ export default function CustomersLogin() {
 
 
 
+  // שמירת הזהות המקומית — נקראת רק אחרי שהאימות עבר
+  const persistIdentity = useCallback(async (p: string) => {
+    try {
+      await AsyncStorage.setItem('saved_phone', p);
+      // חובה גם ב-SecureStore: מטפל ה-NFC (_layout) וניתוב ה-DeepLink קוראים את
+      // BIOMETRIC_PHONE_KEY — בלי זה לקוח בכניסה ידנית (ללא ביומטרי) נזרק לכניסה בכל צמדה
+      await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, p);
+      // כניסה מוצלחת = לקוח קיים — מסך הפתיחה יציג "בחירת עסק" (רישום ראשוני)
+      await AsyncStorage.setItem('initial_registration_done', 'true');
+      await AsyncStorage.setItem(IDENTITY_VERIFIED_KEY, 'true');
+    } catch (error) {
+      console.error('שגיאה בשמירת מספר טלפון:', error);
+    }
+  }, []);
+
   const handleLogin = async () => {
     if (!phone.match(/^05\d{8}$/)) {
       setError('נא להזין מספר טלפון תקין');
       return;
     }
     setError('');
-    
-    // שמירת מספר הטלפון לכניסה הבאה
+    // מניעת לחיצה כפולה: האימות הוא קריאת רשת, ובלי המנעול הזה שתי לחיצות
+    // מייצרות שתי שאילתות ושני ניווטים
+    if (loginInFlightRef.current) return;
+    loginInFlightRef.current = true;
     try {
-      await AsyncStorage.setItem('saved_phone', phone);
-      // חובה גם ב-SecureStore: מטפל ה-NFC (_layout) וניתוב ה-DeepLink קוראים את
-      // BIOMETRIC_PHONE_KEY — בלי זה לקוח בכניסה ידנית (ללא ביומטרי) נזרק לכניסה בכל צמדה
-      await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, phone);
-      // כניסה מוצלחת = לקוח קיים — מסך הפתיחה יציג "בחירת עסק" (רישום ראשוני)
-      await AsyncStorage.setItem('initial_registration_done', 'true');
-    } catch (error) {
-      console.error('שגיאה בשמירת מספר טלפון:', error);
-    }
+      if (!(await isRegisteredInBusiness(phone))) {
+        // לא שומרים שום זהות — או טעות הקלדה או לקוח שטרם נרשם בעסק
+        setNotRegisteredVisible(true);
+        return;
+      }
+      verifiedPhoneRef.current = phone;
+      await persistIdentity(phone);
 
-    // הצעה להפעלת FaceID/ביומטרי לכניסה הבאה (פעם ראשונה אחרי הזנת טלפון)
-    if (biometricAvailable && !biometricSetupDone) {
-      pendingLoginPhoneRef.current = phone;
-      setBiometricSetupModalVisible(true);
-      return;
-    }
+      // הצעה להפעלת FaceID/ביומטרי לכניסה הבאה (פעם ראשונה אחרי הזנת טלפון)
+      if (biometricAvailable && !biometricSetupDone) {
+        pendingLoginPhoneRef.current = phone;
+        setBiometricSetupModalVisible(true);
+        return;
+      }
 
-    router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
+      router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
+    } finally {
+      loginInFlightRef.current = false;
+    }
   };
 
   const continueLoginWithoutBiometric = useCallback(() => {
@@ -700,6 +787,45 @@ export default function CustomersLogin() {
               onPress={continueLoginWithoutBiometric}
             >
               <Text style={biometricStyles.cancelButtonText}>לא עכשיו</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* אין רשומת לקוח בעסק — טעות הקלדה או לקוח שטרם נרשם בעסק. שום זהות לא נשמרה. */}
+      <Modal
+        visible={notRegisteredVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNotRegisteredVisible(false)}
+      >
+        <View style={biometricStyles.overlay}>
+          <View style={biometricStyles.container} accessible={true} accessibilityRole="alert">
+            <Text style={biometricStyles.description} accessibilityLiveRegion="assertive">
+              נראה שטעית בהקשת מספר הטלפון או שעדיין לא נרשמת כלקוח בעסק שבחרת
+            </Text>
+            <TouchableOpacity
+              style={[biometricStyles.setupButton, { backgroundColor: brandColor }]}
+              onPress={() => {
+                setNotRegisteredVisible(false);
+                const code = resolvedBusinessCode || business?.business_code;
+                router.push({
+                  pathname: '/(tabs)/newclient_form',
+                  params: code ? { businessCode: code } : {},
+                });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="קח אותי לרישום לקוח חדש"
+            >
+              <Text style={biometricStyles.setupButtonText}>קח אותי לרישום לקוח חדש</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={biometricStyles.cancelButton}
+              onPress={() => setNotRegisteredVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel="טעיתי, אקיש מחדש"
+            >
+              <Text style={biometricStyles.cancelButtonText}>טעיתי - אקיש מחדש</Text>
             </TouchableOpacity>
           </View>
         </View>

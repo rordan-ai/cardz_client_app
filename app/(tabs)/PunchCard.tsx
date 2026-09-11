@@ -909,10 +909,14 @@ export default function PunchCard() {
   // עדכון פרטי משתמש עבור רישום טוקן מלא (טלפון + קוד עסק)
   useEffect(() => {
     const businessCode = localBusiness?.business_code;
-    if (!businessCode || !phoneStr) return;
+    // ⚠️ חובה גם `customer`: בלעדיו נרשם טוקן ה-push לטלפון שהוקש עוד לפני שאומת
+    // שהוא לקוח של העסק — כלומר טעות הקלדה רשמה את המכשיר תחת מספר של מישהו אחר
+    if (!businessCode || !phoneStr || !customer) return;
 
     FCMService.setUserContext(businessCode, phoneStr).catch(() => {});
-  }, [localBusiness?.business_code, phoneStr]);
+    // `customer` חייב להיות בתלויות: הוא נקבע ב-fetchData אחרי localBusiness, ובלעדיו
+    // ה-effect היה רץ פעם אחת עם customer=null, יוצא, ולא חוזר — כלומר הטוקן לא נרשם כלל
+  }, [localBusiness?.business_code, phoneStr, customer]);
 
   // טעינת מספר הודעות לא נקראות בלבד (לBadge)
   useEffect(() => {
@@ -1151,11 +1155,10 @@ export default function PunchCard() {
                 style={styles.notRegisteredPrimaryBtn}
                 onPress={() => {
                   setNotRegisteredVisible(false);
+                  // בלי פרמטר טלפון: הטופס ממלא מספר רק מזהות מאומתת
                   router.replace({
                     pathname: '/(tabs)/newclient_form',
-                    params: resolvedBusinessCode
-                      ? { businessCode: resolvedBusinessCode, phone: phoneStr }
-                      : { phone: phoneStr },
+                    params: resolvedBusinessCode ? { businessCode: resolvedBusinessCode } : {},
                   });
                 }}
                 accessibilityRole="button"

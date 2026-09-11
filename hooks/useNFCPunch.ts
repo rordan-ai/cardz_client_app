@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { supabase } from '../components/supabaseClient';
@@ -166,10 +167,8 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       return false;
     }
     setCustomerPhone(phone);
-    // שמירה כדי שבפעם הבאה הזיהוי הביומטרי ישלים את המספר בלי הזנה חוזרת
-    try {
-      await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, phone);
-    } catch {}
+    // השמירה כזהות המכשיר עברה ל-continueFlowWithPhone, אחרי שנמצאה כרטיסייה —
+    // כאן המספר עדיין לא אומת, ושמירתו הנציחה טעויות הקלדה
     return true;
   }, []);
 
@@ -489,6 +488,15 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
       setFlowState('error');
       return;
     }
+
+    // נמצאה כרטיסייה ⇒ המספר אומת ⇒ אפשר לשמור כזהות המכשיר (כתיבה רק כשהשתנה)
+    try {
+      const existing = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
+      if (existing !== phone) {
+        await SecureStore.setItemAsync(BIOMETRIC_PHONE_KEY, phone);
+        await AsyncStorage.setItem('identity_verified', 'true');
+      }
+    } catch {}
 
     setCustomerCards(cards);
 

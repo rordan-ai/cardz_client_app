@@ -81,12 +81,9 @@ export default function BusinessDeepLinkHandler() {
             .limit(1);
 
           if (!customerLookupError && (!existingCustomer || existingCustomer.length === 0)) {
-            const localPhone = /^9725\d{8}$/.test(savedClean) ? `0${savedClean.slice(3)}` : savedClean;
             console.log('[DeepLink Route] Identified customer, not registered in this business → newclient_form');
-            router.replace({
-              pathname: '/(tabs)/newclient_form',
-              params: { businessCode: code, phone: localPhone },
-            });
+            // בלי פרמטר טלפון: הטופס ממלא מספר רק מזהות שעברה אימות מול ה-DB
+            router.replace({ pathname: '/(tabs)/newclient_form', params: { businessCode: code } });
             return;
           }
         }
