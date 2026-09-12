@@ -186,7 +186,12 @@ customer_get_notification_prefs(p_business_code text, p_customer_phone text) ret
 - שומר רק אם הטלפון קיים כלקוח באותו עסק, אחרת `customer_not_found`.
 - שינוי אמיתי נרשם ל-`activity_logs` כ-`notification_pref_change`, `source='mobile'`.
 
-⚠️ **הועבר לאדמין לפני הפריסה:** ב-`activity_logs` יש CHECK על `source`
+✅ **נסגר (12.09):** האדמין אימת שהמיגרציה כבר מציבה `user_type='customer'`,
+`source='mobile'`, `action_type='notification_pref_change'`, ושרישום הלוג עטוף ב-
+`exception when others then null` פנימי ⇒ כשל בלוג לא מפיל את שמירת ההעדפה. הוא גם
+יאמת את ה-CHECK מול פרוד לפני ההרצה ולא יסתמך על התיעוד. הרקע למטה נשמר לתיעוד.
+
+⚠️ **הרקע שהועבר לאדמין:** ב-`activity_logs` יש CHECK על `source`
 (`manual/barcode/nfc/auto/api/web/mobile` — `'mobile'` תקין) ו-CHECK על `user_type`
 (`customer`/`business_user`/`system`), ואין CHECK על `action_type`. אם ה-RPC לא
 מציב `user_type` תקין, ה-INSERT ייפול ב-**23514** — וכיוון שה-RPC הוא SECURITY
