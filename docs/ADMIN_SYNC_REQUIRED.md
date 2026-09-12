@@ -166,13 +166,32 @@ hard_delete_after > now()`. כלומר שחזור מהקליינט **היה** ע
 שורות blacklist ⇒ לקוח שהצטרף מחדש רואה "התראות פעילות" בזמן שהשרת חוסם אותו.
 **נדרש:** `customer_get_notification_pref(...)`, או שה-setter יחזיר את המצב הסופי.
 
-#### ✅ החוזה שסוכם (12.09) — ממתין לפריסה
+#### ✅ החוזה הסופי (12.09) — ⏳ **טרם פרוס בפרוד**
+```sql
+customer_set_notification_prefs(
+  p_business_code text, p_customer_phone text,
+  p_push_blocked boolean,  -- not null
+  p_sms_blocked  boolean   -- not null
+) returns jsonb
+
+customer_get_notification_prefs(p_business_code text, p_customer_phone text) returns jsonb
 ```
-customer_set_notification_prefs(p_business_code, p_phone, p_push_blocked, p_sms_blocked)
-  → קריאה אחת לשני הערוצים, אידמפוטנטית, מחזירה את המצב הסופי מהשרת
-customer_get_notification_prefs(p_business_code, p_phone)
-  → לטעינת המסך
-```
+**החזרה (זהה לשתיהן):**
+`{ success: true, business_code, phone, push_blocked, sms_blocked }`
+כישלון: `{ success: false, error }` — `invalid_phone` · `business_not_found` ·
+`customer_not_found` · `missing_channel_state` · או SQLERRM.
+⚠️ **`success:false` לא זורק** ⇒ חובה לבדוק את השדה, לא רק את ה-`error` של supabase-js.
+- ה-setter מחזיר את המצב הסופי ⇒ אפשר לרנדר ישירות, בלי `get` נוסף.
+- מקבל 05 / 972 / עם מקפים; מנרמל ל-05; בביטול מוחק **שני** הפורמטים.
+- שומר רק אם הטלפון קיים כלקוח באותו עסק, אחרת `customer_not_found`.
+- שינוי אמיתי נרשם ל-`activity_logs` כ-`notification_pref_change`, `source='mobile'`.
+
+⚠️ **הועבר לאדמין לפני הפריסה:** ב-`activity_logs` יש CHECK על `source`
+(`manual/barcode/nfc/auto/api/web/mobile` — `'mobile'` תקין) ו-CHECK על `user_type`
+(`customer`/`business_user`/`system`), ואין CHECK על `action_type`. אם ה-RPC לא
+מציב `user_type` תקין, ה-INSERT ייפול ב-**23514** — וכיוון שה-RPC הוא SECURITY
+DEFINER, זה עלול להפיל את כל הקריאה ולמנוע מהלקוח לבטל התראות בגלל כשל ברישום לוג.
+הומלץ לעטוף את רישום הלוג כך שלא יפיל את שמירת ההעדפה.
 - **פורמט קנוני: `05`.** ה-RPC כותב 05 בלבד; בביטול חסימה מוחק את **שני** הפורמטים
   (ניקוי legacy שנכתב ב-972); ה-getter משווה בשני הפורמטים.
 - **שינויים שאבצע בקליינט כשה-RPC יהיה חי:** קריאה אחת במקום שתיים; טעינת המסך
