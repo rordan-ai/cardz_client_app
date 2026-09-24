@@ -25,8 +25,30 @@ const JWKS = createRemoteJWKSet(
   new URL("https://www.googleapis.com/robot/v1/metadata/jwk/securetoken@system.gserviceaccount.com"),
 );
 
-// action_types that are trigger-duplicates and hidden from the activity view.
-const TRIGGER_ACTIONS = ["punch_added", "punch_removed", "punch_used", "punch_unuse"];
+// action_types the customer app knows how to render ("הפעילות שלי":
+// mapActionToLabelAndAmount / mapRowToLabelAndAmount in app/(tabs)/PunchCard.tsx).
+//
+// ALLOWLIST, not denylist. The client renders any unknown action_type as its raw
+// English name with amount +1 — i.e. a fake punch. Under the old denylist (trigger
+// duplicates only) every other row keyed on the customer's phone leaked into the feed:
+// the app's own 'add_customer' (written on every remote join), admin bookkeeping such as
+// 'update_customer' / 'soft_delete_customer' / 'restore_customer' / 'delete_card',
+// and every new type added later ('card_payment_status', 'notification_pref_change').
+// With an allowlist a new action type is hidden by default instead of leaking until
+// someone remembers to exclude it.
+//
+// The trigger duplicates (punch_added / punch_removed / punch_used / punch_unuse) are
+// mapped by the client but deliberately ABSENT here — they duplicate the real rows.
+// Voucher history also arrives separately via voucher_logs below.
+//
+// ⚠️ Keep in sync with the client mapper. Adding a type here without a client label
+// shows it raw with +1; adding a client label without listing it here hides it.
+const CUSTOMER_VISIBLE_ACTIONS = [
+  "punch", "nfc_punch", "nfc", "add_punch", "stamp", "add_stamp",
+  "void_punch", "cancel_punch",
+  "card_renewal", "renew", "renew_card",
+  "voucher_issued", "voucher_used", "voucher_expired", "voucher_received", "voucher_sent",
+];
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -90,7 +112,8 @@ serve(async (req) => {
 
     const max = Math.min(Number(body?.limit) || 300, 3000);
 
-    // activity_logs: user_id OR target_entity matches any variant; hide trigger dupes.
+    // activity_logs: user_id OR target_entity matches any variant; only types the
+    // client can render (see CUSTOMER_VISIBLE_ACTIONS — trigger dupes excluded there).
     const orParts: string[] = [];
     for (const v of variants) { orParts.push(`user_id.eq.${v}`); orParts.push(`target_entity.eq.${v}`); }
     const alQ = supabase
@@ -98,7 +121,7 @@ serve(async (req) => {
       .select("*")
       .eq("business_code", business_code)
       .or(orParts.join(","))
-      .not("action_type", "in", `(${TRIGGER_ACTIONS.join(",")})`)
+      .in("action_type", CUSTOMER_VISIBLE_ACTIONS)
       .order("timestamp", { ascending: false })
       .limit(max);
 

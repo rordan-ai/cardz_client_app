@@ -175,10 +175,21 @@ export const useNFCPunch = (): UseNFCPunchReturn => {
   // שליפת כרטיסיות לקוח
   const fetchCustomerCards = useCallback(async (phone: string, businessCode: string): Promise<CustomerCard[]> => {
     try {
+      // וריאנטים זהים לשאר המסלול (PunchCard, business/[code], _layout): לקוחות שהוקמו
+      // מהאדמין נשמרים לעיתים בפורמט 972. זו הייתה השאילתה היחידה עם התאמה מדויקת,
+      // ולכן לקוח כזה ראה את הכרטיסייה שלו וקיבל "אין לך כרטיסייה פעילה בעסק זה".
+      // ⚠️ הווריאנטים רק לחיפוש — הטלפון בפורמט 05 ממשיך לכל הכתיבות שאחריו
+      // (זהות המכשיר מחייבת 05; ה-Edge של בקשת הניקוב מנרמל ומשווה בעצמו).
+      const clean = phone.replace(/[^0-9]/g, '');
+      const variants = Array.from(new Set([
+        clean,
+        /^05\d{8}$/.test(clean) ? `972${clean.slice(1)}` : clean,
+        /^9725\d{8}$/.test(clean) ? `0${clean.slice(3)}` : clean,
+      ].filter(Boolean)));
       const { data, error } = await supabase
         .from('PunchCards')
         .select('card_number, product_code, used_punches, total_punches, prepaid, benefit, status')
-        .eq('customer_phone', phone)
+        .in('customer_phone', variants)
         .eq('business_code', businessCode)
         .eq('status', 'active');
 

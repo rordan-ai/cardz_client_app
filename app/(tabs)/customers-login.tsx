@@ -46,6 +46,10 @@ export default function CustomersLogin() {
   const verifiedPhoneRef = useRef<string | null>(null);
   // "אינך רשום בעסק זה" (טעות הקלדה או לקוח שטרם נרשם בעסק)
   const [notRegisteredVisible, setNotRegisteredVisible] = useState(false);
+  // בדיקת המספר מול השרת רצה (עד 2.5 שניות). הערך אומר *איזה* כפתור נלחץ, כדי שהספינר
+  // יופיע על הכפתור הנכון ולא על השני. שני הכפתורים מושבתים בזמן הבדיקה, והקלדה בשדה
+  // הטלפון נחסמת (בלי editable=false — הוא מאפיר את הטקסט באנדרואיד ומוריד את המקלדת).
+  const [checking, setChecking] = useState<'login' | 'biometric' | null>(null);
 
   const resolvedBusinessCode = typeof nfcBusinessCode === 'string' ? nfcBusinessCode : Array.isArray(nfcBusinessCode) ? nfcBusinessCode[0] : null;
 
@@ -293,6 +297,7 @@ export default function CustomersLogin() {
       // הייתה נשמרת ב-Keychain (ששורד גם מחיקת אפליקציה ב-iOS) והופכת לזהות המכשיר
       if (loginInFlightRef.current) return;
       loginInFlightRef.current = true;
+      setChecking('biometric');
       try {
         const status = await checkRegistration(phone);
         if (status === 'not_found') {
@@ -300,21 +305,34 @@ export default function CustomersLogin() {
           return;
         }
         if (status === 'confirmed') verifiedPhoneRef.current = phone;
+        // אותה שמירה כמו ב-handleLogin: המסלול הזה לא עובר שם, ובלעדיה לקוח
+        // שנכנס דרך הכפתור הביומטרי ובחר "לא עכשיו" נשאר בלי זהות במכשיר
+        pendingLoginPhoneRef.current = phone;
+        await persistIdentity(phone, status === 'confirmed');
       } finally {
         loginInFlightRef.current = false;
+        setChecking(null);
       }
       setBiometricSetupModalVisible(true);
     } else {
-      // כבר מוגדר - אימות וכניסה
-      const authenticated = await authenticateBiometric();
-      if (authenticated) {
-        const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
-        if (savedPhone) {
-          router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(savedPhone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
+      // כבר מוגדר - אימות וכניסה.
+      // אותה נעילה כמו בכפתור הכניסה: אחרת לחיצה על "כנס" ואז על הביומטרי בזמן
+      // שהאימות ברשת עדיין רץ — דוחפת שני מסכי כרטיסייה זה על זה
+      if (loginInFlightRef.current) return;
+      loginInFlightRef.current = true;
+      try {
+        const authenticated = await authenticateBiometric();
+        if (authenticated) {
+          const savedPhone = await SecureStore.getItemAsync(BIOMETRIC_PHONE_KEY);
+          if (savedPhone) {
+            router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(savedPhone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
+          }
         }
+      } finally {
+        loginInFlightRef.current = false;
       }
     }
-  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router, punchIntentParams, checkRegistration, resolvedBusinessCode]);
+  }, [biometricAvailable, biometricSetupDone, phone, authenticateBiometric, router, punchIntentParams, checkRegistration, persistIdentity, resolvedBusinessCode]);
 
   // הגדרת כניסה ביומטרית (פעם ראשונה)
   const setupBiometricLogin = useCallback(async () => {
@@ -391,6 +409,7 @@ export default function CustomersLogin() {
     // מייצרות שתי שאילתות ושני ניווטים
     if (loginInFlightRef.current) return;
     loginInFlightRef.current = true;
+    setChecking('login');
     try {
       const status = await checkRegistration(phone);
       if (status === 'not_found') {
@@ -411,6 +430,7 @@ export default function CustomersLogin() {
       router.push(`/(tabs)/PunchCard?phone=${encodeURIComponent(phone)}${resolvedBusinessCode ? `&businessCode=${resolvedBusinessCode}` : ''}${punchIntentParams}`);
     } finally {
       loginInFlightRef.current = false;
+      setChecking(null);
     }
   };
 
@@ -660,7 +680,10 @@ export default function CustomersLogin() {
                 style={styles(brandColor).phoneInput}
                 keyboardType="phone-pad"
                 value={phone}
-                onChangeText={setPhone}
+                // בזמן הבדיקה מתעלמים מהקלדה במקום editable=false: זה חוסם את מרוץ
+                // "שיניתי מספר תוך כדי הבדיקה" בלי להאפיר את הטקסט (אנדרואיד) ובלי
+                // להוריד את המקלדת — שאחרת נעלמת בדיוק כשהלקוח צריך לתקן את המספר
+                onChangeText={(text) => { if (!checking) setPhone(text); }}
                 maxLength={10}
                 accessibilityLabel="שדה הזנת מספר טלפון"
                 accessibilityHint="הזן מספר טלפון נייד בן 10 ספרות לצפייה בכרטיסייה"
@@ -669,11 +692,21 @@ export default function CustomersLogin() {
             <TouchableOpacity
               style={[styles(brandColor).clickBtn, { backgroundColor: clickBtnBgColor }]}
               onPress={handleLogin}
+              disabled={checking !== null}
               accessibilityLabel="כניסה לכרטיסייה"
               accessibilityRole="button"
+              accessibilityState={{ busy: checking === 'login', disabled: checking !== null }}
               accessibilityHint="לחץ לצפייה בכרטיסייה שלך לאחר הזנת מספר טלפון"
             >
-              <Image source={ClickIcon} style={[styles(brandColor).clickIcon, clickIconTint ? { tintColor: clickIconTint } : null]} />
+              {checking === 'login' ? (
+                // אותה קופסה בדיוק כמו האייקון (56×56 בתוך כפתור 48, נחתך ע"י overflow של השורה)
+                // כדי שהמרכוז והחיתוך לא יזוזו; צבע לפי אותו כלל ניגודיות של אייקון היד
+                <View style={[styles(brandColor).clickIcon, { alignItems: 'center', justifyContent: 'center' }]}>
+                  <ActivityIndicator size="small" color={clickIconTint || '#FFFFFF'} />
+                </View>
+              ) : (
+                <Image source={ClickIcon} style={[styles(brandColor).clickIcon, clickIconTint ? { tintColor: clickIconTint } : null]} />
+              )}
             </TouchableOpacity>
           </View>
           {error ? <Text style={styles(brandColor).errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{error}</Text> : null}
@@ -735,19 +768,28 @@ export default function CustomersLogin() {
               <TouchableOpacity
                 style={styles(brandColor).biometricButton}
                 onPress={handleBiometricPress}
+                disabled={checking !== null}
                 accessibilityLabel={biometricSetupDone ? "כניסה מהירה עם זיהוי ביומטרי" : "הגדרת כניסה ביומטרית"}
                 accessibilityRole="button"
+                accessibilityState={{ busy: checking === 'biometric', disabled: checking !== null }}
                 accessibilityHint={biometricSetupDone ? "לחץ לכניסה מהירה באמצעות זיהוי פנים" : "לחץ להגדרת כניסה מהירה עם זיהוי פנים"}
               >
-                <Image 
+                {checking === 'biometric' ? (
+                  // הספינר על הכפתור שנלחץ בפועל, באותה קופסה של האייקון — לא על כפתור היד
+                  <View style={[styles(brandColor).biometricIcon, { alignItems: 'center', justifyContent: 'center' }]}>
+                    <ActivityIndicator size="large" color={brandColor} />
+                  </View>
+                ) : (
+                <Image
                   source={Platform.OS === 'ios' ? FaceRecognitionIcon : BiometricIcon}
                   style={[
                     styles(brandColor).biometricIcon,
                     { tintColor: brandColor }, // צבע המותג לשני הפלטפורמות
                     { opacity: biometricSetupDone ? 1 : 0.6 }
-                  ]} 
+                  ]}
                   resizeMode="contain"
                 />
+                )}
                 {!biometricSetupDone && (
                   <Text style={[styles(brandColor).biometricHint, { color: brandColor }]}>הגדר כניסה מהירה</Text>
                 )}
@@ -823,9 +865,14 @@ export default function CustomersLogin() {
               onPress={() => {
                 setNotRegisteredVisible(false);
                 const code = resolvedBusinessCode || business?.business_code;
+                // typedPhone = המספר שהמשתמש הקיש כאן ממש עכשיו. בלעדיו הטופס היה
+                // ממלא את הזהות השמורה במכשיר — מספר של מישהו אחר במכשיר משפחתי
                 router.push({
                   pathname: '/(tabs)/newclient_form',
-                  params: code ? { businessCode: code } : {},
+                  params: {
+                    ...(code ? { businessCode: code } : {}),
+                    ...(/^05\d{8}$/.test(phone) ? { typedPhone: phone } : {}),
+                  },
                 });
               }}
               accessibilityRole="button"

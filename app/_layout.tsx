@@ -40,6 +40,14 @@ logEnvironmentInfo();
 export const getCapturedInitialUrl = (): string | null => _capturedInitialUrl;
 export const isInitialUrlCaptured = (): boolean => _initialUrlCaptured;
 
+// שני מטפלים מעבדים את אותו URL פתיחה: המסלול הייעודי app/business/[code].tsx
+// (שנטען ראשון ומכיר גם את מצב "לקוח לא רשום בעסק") ומטפל ה-NFC שב-(tabs)/_layout,
+// שנטען רק אחרי הניווט הראשון ואז דורס אותו. הדגל הזה הופך את המסלול הייעודי
+// לסמכותי בפתיחה קרה; מטפל ה-(tabs) ממשיך לטפל בסריקות בזמן שהאפליקציה פתוחה.
+let _initialUrlHandled = false;
+export const markInitialUrlHandled = (): void => { _initialUrlHandled = true; };
+export const isInitialUrlHandled = (): boolean => _initialUrlHandled;
+
 export default function RootLayout() {
   return (
     <>
